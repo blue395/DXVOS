@@ -1,0 +1,224 @@
+// DXV OS data model — Week 1 (Dealflow).
+// See DXV_OS_Product_Spec_FINAL.md §5–7 for the domain rules behind these tables.
+//
+// Conventions:
+//  - Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote)
+//    are only ever INSERTed by the app. There is deliberately no update/delete code
+//    path for them, so history can't be rewritten.
+//  - Money is stored in whole pounds (Int) — angel tickets are whole-pound amounts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Users & auth ────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  // ANGEL — added when angel self-service login lands (deferred, spec §9)
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+
+  stageChanges      StageChange[]
+  memoVersions      MemoVersion[]
+  preSelectionVotes PreSelectionVote[]
+  investmentVotes   InvestmentVote[]
+  founderCommsSent  FounderComm[]
+  venturesCreated   Venture[]
+}
+
+// ── Pipeline ────────────────────────────────────────────────────────────────
+
+// Ten linear stages + the cross-cutting terminal PASSED state (spec §5).
+// Order here matches pipeline order; src/lib/pipeline.ts is the source of truth
+// for ordering and labels in code.
+enum Stage {
+  FOUNDER_DECK
+  ELIGIBILITY_SCREENING
+  ADD_TO_PIPELINE
+  INTERNAL_REVIEW
+  PITCH_SELECTION
+  PITCH_OUTCOME
+  INVESTMENT_VOTES
+  DUE_DILIGENCE
+  CAPITAL_TRANSFER
+  INVESTMENT
+  PASSED
+}
+
+enum PassReason {
+  INSUFFICIENT_INTEREST
+  DD_FLAG
+  VALUATION_GAP
+  FOUNDER_WITHDREW
+  INELIGIBLE
+  OTHER // requires a note
+}
+
+model Venture {
+  id             String   @id @default(cuid())
+  name           String
+  founderNames   String?
+  founderEmail   String?
+  website        String?
+  sector         String?
+  companyStage   String? // e.g. "Pre-seed", "Seed"
+  raiseAmountGbp Int?
+  description    String?
+  deckUrl        String? // Google Drive link — files stay in Drive (spec §2)
+  driveFolderUrl String?
+
+  currentStage   Stage       @default(FOUNDER_DECK)
+  stageEnteredAt DateTime    @default(now()) // denormalised from StageChange for fast "days in stage"
+  passReason     PassReason? // set while currentStage = PASSED
+  passNote       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  stageChanges      StageChange[]
+  memoVersions      MemoVersion[]
+  ddItems           DDItem[]
+  preSelectionVotes PreSelectionVote[]
+  investmentVotes   InvestmentVote[]
+  founderComms      FounderComm[]
+
+  @@index([currentStage])
+}
+
+// Append-only stage-history log (spec §5). fromStage is null for the creation row.
+model StageChange {
+  id          String      @id @default(cuid())
+  ventureId   String
+  venture     Venture     @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  fromStage   Stage?
+  toStage     Stage
+  passReason  PassReason?
+  note        String?
+  changedById String
+  changedBy   User        @relation(fields: [changedById], references: [id])
+  changedAt   DateTime    @default(now())
+
+  @@index([ventureId, changedAt])
+  @@index([changedAt])
+}
+
+// ── Deal review ─────────────────────────────────────────────────────────────
+
+// Investment memo, versioned and append-only. The document itself lives in Drive.
+model MemoVersion {
+  id          String   @id @default(cuid())
+  ventureId   String
+  venture     Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  version     Int
+  docUrl      String
+  summary     String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([ventureId, version])
+}
+
+// Due-diligence checklist item. This is working state (ticked/unticked), not history,
+// so it is editable.
+model DDItem {
+  id          String    @id @default(cuid())
+  ventureId   String
+  venture     Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  title       String
+  owner       String? // free text until Angels module links DD group members
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([ventureId])
+}
+
+// ── Votes (spec §7) — two distinct entities, never collapsed ────────────────
+
+// Pitch-selection stage: interest only, no ticket size. Append-only.
+model PreSelectionVote {
+  id           String   @id @default(cuid())
+  ventureId    String
+  venture      Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  angelName    String // free text in Week 1
+  angelId      String? // reserved: linked to Angel record in Week 2
+  interested   Boolean
+  note         String?
+  recordedById String
+  recordedBy   User     @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([ventureId, createdAt])
+}
+
+// Investment-votes stage (EOI): interest + max ticket. Append-only; the latest
+// record per angel is the one that counts towards the momentum threshold.
+model InvestmentVote {
+  id           String   @id @default(cuid())
+  ventureId    String
+  venture      Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  angelName    String
+  angelId      String?
+  interested   Boolean
+  maxTicketGbp Int      @default(0)
+  note         String?
+  recordedById String
+  recordedBy   User     @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([ventureId, createdAt])
+}
+
+// ── Decision gates & founder comms (spec §6) ────────────────────────────────
+
+enum Gate {
+  ELIGIBILITY
+  PITCH_SELECTION
+  PITCH_OUTCOME
+  INVESTMENT_VOTES
+  DUE_DILIGENCE
+  PASSED
+}
+
+enum CommsStatus {
+  NOT_YET_SENT
+  SENT
+  FOUNDER_ACKNOWLEDGED
+}
+
+// Founder-facing comms owed at a decision gate. Created automatically (NOT_YET_SENT)
+// when a venture crosses a gate; admins then mark it Sent / Acknowledged.
+model FounderComm {
+  id             String      @id @default(cuid())
+  ventureId      String
+  venture        Venture     @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  gate           Gate
+  decision       String // e.g. "Proceed" / "Decline" — what the founder is being told
+  status         CommsStatus @default(NOT_YET_SENT)
+  sentAt         DateTime?
+  sentById       String?
+  sentBy         User?       @relation(fields: [sentById], references: [id])
+  acknowledgedAt DateTime?
+  note           String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([ventureId, gate])
+  @@index([status])
+}

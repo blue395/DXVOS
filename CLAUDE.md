@@ -1,0 +1,16 @@
+@AGENTS.md
+
+# DXV OS — project conventions
+
+Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
+
+- Blue is building this hands-on to learn: explain what you're doing and why as you go; ask before big, hard-to-reverse architecture calls.
+- Palette is exactly `#fbe45b` (dxv-yellow), `#1a3c35` (dxv-green), white, black. Tints via opacity (`black/10`), never new colours. Warnings use yellow, not red.
+- Domain rules go in `src/lib/pipeline.ts` (pure + unit-tested), not in components.
+- Stage changes only via `moveVentureStage()` in `src/lib/ventures.ts`.
+- Every page and server action calls `requireAdmin()` itself; `src/proxy.ts` is not a security boundary.
+- Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote): never add update/delete paths.
+- Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`.
+- Helpers used by server components must not live in `"use client"` files.
+- Prisma 7: client is generated to `src/generated/prisma` (import from `@/generated/prisma/client` or `/enums`). Scripts run via `tsx --conditions=react-server`.
+- Before pushing: `npm test && npm run typecheck && npm run lint && npm run build`.
