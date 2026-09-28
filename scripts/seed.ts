@@ -24,7 +24,7 @@ const SAMPLES: { name: string; sector: string; founderNames: string; stage: Stag
   { name: "Northstar Logistics", sector: "Logistics", founderNames: "Omar Haddad", stage: "PITCH_OUTCOME" },
   { name: "Verdant Foods", sector: "Food", founderNames: "Lina Chen", stage: "INVESTMENT_COMMITMENTS" },
   { name: "Mosaic Pay", sector: "Fintech", founderNames: "Daniel Asante", stage: "DUE_DILIGENCE" },
-  { name: "Fable Robotics", sector: "Deeptech", founderNames: "Hana Ito", stage: "CAPITAL_TRANSFER" },
+  { name: "Fable Robotics", sector: "Deeptech", founderNames: "Hana Ito", stage: "DUE_DILIGENCE" },
   { name: "Ember Energy", sector: "Climate", founderNames: "Grace Nwosu", stage: "SEIS_CERTIFICATE" },
   { name: "Quill Legal", sector: "Legaltech", founderNames: "Sam Patel", stage: "PASSED", passReason: "VALUATION_GAP" },
 ];

@@ -6,6 +6,10 @@ import {
   canCreateDDDocument,
   advanceTarget,
   focusSections,
+  finalInvestmentTotals,
+  canDecline,
+  BOARD_STAGES,
+  boardColumn,
   cardOneLiner,
   formatGbpCompact,
   stagePhase,
@@ -40,7 +44,8 @@ describe("gatesCrossed", () => {
 
   it("owes nothing moving between non-gate stages", () => {
     expect(gatesCrossed("SUBMITTED", "ELIGIBILITY_SCREEN")).toEqual([]);
-    expect(gatesCrossed("CAPITAL_TRANSFER", "INVESTMENT_COMPLETE")).toEqual([]);
+    expect(gatesCrossed("DUE_DILIGENCE", "INVESTMENT_COMPLETE").map((g) => g.gate)).toEqual(["DUE_DILIGENCE"]);
+    expect(gatesCrossed("CAPITAL_TRANSFER", "INVESTMENT_COMPLETE")).toEqual([]); // retired stage
     expect(gatesCrossed("INVESTMENT_COMPLETE", "SEIS_CERTIFICATE")).toEqual([]);
   });
 
@@ -60,10 +65,11 @@ describe("gatesCrossed", () => {
     expect(gatesCrossed("PASSED", "PARTNER_REVIEW")).toEqual([]);
   });
 
-  it("always owes a decline when passing, from any stage", () => {
+  it("always owes a decline when declining, naming where it was declined", () => {
     expect(gatesCrossed("SUBMITTED", "PASSED", "INELIGIBLE")).toEqual([
-      { gate: "PASSED", decision: "Decline — Ineligible" },
+      { gate: "PASSED", decision: "Declined at Submitted: Ineligible" },
     ]);
+    expect(gatesCrossed("PITCH_OUTCOME", "PASSED", "VALUATION_GAP")[0].decision).toBe("Declined at Pitch Outcome: Valuation gap");
   });
 });
 
@@ -120,7 +126,7 @@ describe("dealWarnings", () => {
 });
 
 describe("stages", () => {
-  it("has the ten stages in order, with gates at 2 to 7", () => {
+  it("has the nine stages in order, with gates at 2 to 7 (Capital Transfer retired)", () => {
     expect(LINEAR_STAGES.map((s) => s.label)).toEqual([
       "Submitted",
       "Eligibility Screen",
@@ -129,7 +135,6 @@ describe("stages", () => {
       "Pitch Outcome",
       "Investment Commitments",
       "Due Diligence",
-      "Capital Transfer",
       "Investment Complete",
       "S/EIS Certificate",
     ]);
@@ -139,11 +144,14 @@ describe("stages", () => {
   it("labels the retired stage for old history, but doesn't offer it", () => {
     expect(stageLabel("ADD_TO_PIPELINE")).toBe("Add to pipeline (retired)");
     expect(ALL_STAGES.some((s) => s.key === "ADD_TO_PIPELINE")).toBe(false);
+    expect(stageLabel("CAPITAL_TRANSFER")).toBe("Capital Transfer (retired)");
+    expect(ALL_STAGES.some((s) => s.key === "CAPITAL_TRANSFER")).toBe(false);
+    expect(stageLabel("PASSED")).toBe("Declined");
   });
 
   it("counts deals as active until Investment Complete", () => {
     expect(isActiveStage("SUBMITTED")).toBe(true);
-    expect(isActiveStage("CAPITAL_TRANSFER")).toBe(true);
+    expect(isActiveStage("DUE_DILIGENCE")).toBe(true);
     expect(isActiveStage("INVESTMENT_COMPLETE")).toBe(false);
     expect(isActiveStage("SEIS_CERTIFICATE")).toBe(false);
     expect(isActiveStage("PASSED")).toBe(false);
@@ -184,21 +192,54 @@ describe("parseRoundFilter", () => {
 });
 
 describe("dashboardMetrics", () => {
-  it("counts live, in-DD and invested deals, and sums invested amounts", () => {
+  const none: { ticketGbp: number; paidAt: Date | null }[] = [];
+  it("counts live, in-DD and invested deals, and sums paid final investment tickets", () => {
     const m = dashboardMetrics([
-      { currentStage: "SUBMITTED", investedAmountGbp: null },
-      { currentStage: "DUE_DILIGENCE", investedAmountGbp: null },
-      { currentStage: "CAPITAL_TRANSFER", investedAmountGbp: null },
-      { currentStage: "INVESTMENT_COMPLETE", investedAmountGbp: 50_000 },
-      { currentStage: "SEIS_CERTIFICATE", investedAmountGbp: 75_000 },
-      { currentStage: "INVESTMENT_COMPLETE", investedAmountGbp: null }, // amount not entered yet
-      { currentStage: "PASSED", investedAmountGbp: null },
+      { currentStage: "SUBMITTED", investedAmountGbp: null, finalInvestments: none },
+      { currentStage: "DUE_DILIGENCE", investedAmountGbp: null, finalInvestments: [{ ticketGbp: 9_000, paidAt: d("2026-03-01") }] },
+      {
+        currentStage: "INVESTMENT_COMPLETE",
+        investedAmountGbp: 999_999, // legacy amount ignored once there are final investment entries
+        finalInvestments: [
+          { ticketGbp: 20_000, paidAt: d("2026-03-01") },
+          { ticketGbp: 5_000, paidAt: null }, // not paid yet: doesn't count
+        ],
+      },
+      { currentStage: "SEIS_CERTIFICATE", investedAmountGbp: 75_000, finalInvestments: none }, // legacy deal
+      { currentStage: "INVESTMENT_COMPLETE", investedAmountGbp: null, finalInvestments: none },
+      { currentStage: "PASSED", investedAmountGbp: null, finalInvestments: none },
     ]);
-    expect(m).toEqual({ liveDeals: 3, inDueDiligence: 1, investments: 3, investedTotalGbp: 125_000 });
+    expect(m).toEqual({ liveDeals: 2, inDueDiligence: 1, investments: 3, investedTotalGbp: 95_000 });
   });
 
   it("ignores amounts on deals that aren't invested", () => {
-    expect(dashboardMetrics([{ currentStage: "PASSED", investedAmountGbp: 10_000 }]).investedTotalGbp).toBe(0);
+    expect(dashboardMetrics([{ currentStage: "PASSED", investedAmountGbp: 10_000, finalInvestments: none }]).investedTotalGbp).toBe(0);
+  });
+});
+
+describe("finalInvestmentTotals", () => {
+  it("separates committed from paid", () => {
+    expect(
+      finalInvestmentTotals([
+        { ticketGbp: 10_000, paidAt: d("2026-03-01") },
+        { ticketGbp: 5_000, paidAt: null },
+      ]),
+    ).toEqual({ committedGbp: 15_000, paidGbp: 10_000, angels: 2, paidCount: 1 });
+  });
+});
+
+describe("declining and the board", () => {
+  it("allows declining at any live stage", () => {
+    expect(canDecline("SUBMITTED")).toBe(true);
+    expect(canDecline("DUE_DILIGENCE")).toBe(true);
+    expect(canDecline("INVESTMENT_COMPLETE")).toBe(false);
+    expect(canDecline("PASSED")).toBe(false);
+  });
+
+  it("shows S/EIS Certificate deals under Investment Complete", () => {
+    expect(BOARD_STAGES.some((s) => s.key === "SEIS_CERTIFICATE")).toBe(false);
+    expect(boardColumn("SEIS_CERTIFICATE")).toBe("INVESTMENT_COMPLETE");
+    expect(boardColumn("DUE_DILIGENCE")).toBe("DUE_DILIGENCE");
   });
 });
 
@@ -209,7 +250,7 @@ describe("board presentation", () => {
     expect(stagePhase("PARTNER_REVIEW")).toBe("review");
     expect(stagePhase("PITCH_OUTCOME")).toBe("review");
     expect(stagePhase("INVESTMENT_COMMITMENTS")).toBe("closing");
-    expect(stagePhase("CAPITAL_TRANSFER")).toBe("closing");
+    expect(stagePhase("DUE_DILIGENCE")).toBe("closing");
     expect(stagePhase("INVESTMENT_COMPLETE")).toBe("invested");
     expect(stagePhase("SEIS_CERTIFICATE")).toBe("invested");
     expect(stagePhase("PASSED")).toBe("passed");
@@ -256,6 +297,7 @@ describe("advanceTarget", () => {
     expect(advanceTarget("SUBMITTED")).toBe("ELIGIBILITY_SCREEN");
     expect(advanceTarget("ELIGIBILITY_SCREEN")).toBeNull(); // eligibility decision form instead
     expect(advanceTarget("PARTNER_REVIEW")).toBe("PITCH_SELECTION");
+    expect(advanceTarget("DUE_DILIGENCE")).toBe("INVESTMENT_COMPLETE");
     expect(advanceTarget("INVESTMENT_COMPLETE")).toBe("SEIS_CERTIFICATE");
     expect(advanceTarget("SEIS_CERTIFICATE")).toBeNull();
     expect(advanceTarget("PASSED")).toBeNull();
@@ -266,7 +308,9 @@ describe("advanceTarget", () => {
 describe("focusSections", () => {
   it("follows the dealflow, and always keeps documents open", () => {
     expect(focusSections("ELIGIBILITY_SCREEN")).toContain("eligibility");
-    expect(focusSections("PARTNER_REVIEW")).toEqual(["assessment", "memo", "documents"]);
+    expect(focusSections("PARTNER_REVIEW")).toEqual(["assessment", "documents"]);
+    expect(focusSections("DUE_DILIGENCE")).toContain("final");
+    expect(focusSections("INVESTMENT_COMPLETE")[0]).toBe("final");
     expect(focusSections("PITCH_SELECTION")).toContain("preSelection");
     expect(focusSections("INVESTMENT_COMMITMENTS")).toContain("commitments");
     expect(focusSections("DUE_DILIGENCE")[0]).toBe("dd");

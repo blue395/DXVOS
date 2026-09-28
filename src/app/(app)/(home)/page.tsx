@@ -12,7 +12,11 @@ export default async function DashboardPage() {
   const [ventures, awaiting] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findMany({
-        select: { currentStage: true, investedAmountGbp: true },
+        select: {
+          currentStage: true,
+          investedAmountGbp: true,
+          finalInvestments: { where: { removedAt: null }, select: { ticketGbp: true, paidAt: true } },
+        },
       }),
       // Spec §6: ventures at a crossed gate whose founder comm isn't marked Sent yet.
       db.founderComm.findMany({
@@ -47,7 +51,7 @@ export default async function DashboardPage() {
           wide
           label="Investment total"
           value={formatGbpCompact(metrics.investedTotalGbp)}
-          title={formatGbp(metrics.investedTotalGbp)}
+          title={`${formatGbp(metrics.investedTotalGbp)}: paid Final investment tickets on deals at Investment Complete or S/EIS`}
         />
       </div>
 

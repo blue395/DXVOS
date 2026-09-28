@@ -14,6 +14,8 @@ export function AssessmentCard({
   draft,
   reviewed,
   collapse,
+  memoSummary,
+  children,
 }: {
   ventureId: string;
   canGenerate: boolean;
@@ -22,6 +24,10 @@ export function AssessmentCard({
   draft: { number: number; content: unknown; updatedAt: Date } | null;
   reviewed: { issueNumber: number; content: unknown; createdAt: Date; createdBy: { name: string } } | null;
   collapse?: { open: boolean; now: boolean };
+  /** Collapsed summary when there's an uploaded memo but no AI work yet. */
+  memoSummary?: string | null;
+  /** The memo versions list (issues and uploaded files), shown under the assessment. */
+  children?: React.ReactNode;
 }) {
   const eff = latest ? effectiveDeckStatus(latest) : null;
   const running = eff && (eff.status === "PENDING" || eff.status === "PROCESSING");
@@ -30,7 +36,7 @@ export function AssessmentCard({
 
   return (
     <Card
-      title="Investment assessment"
+      title="Investment assessment & memo"
       id="assessment"
       collapse={
         collapse && {
@@ -43,12 +49,18 @@ export function AssessmentCard({
                 ? `${aiDraftName(latest.number)} · ${scoreOf(latest.output)}/${MAX_TOTAL_SCORE}`
                 : running
                   ? "Drafting…"
-                  : "Not started",
+                  : (memoSummary ?? "Not started"),
         }
       }
       actions={latest ? <Link href={href} className="text-xs text-dxv-green hover:underline">Open assessment →</Link> : undefined}>
       <div className="space-y-3 text-sm">
-        {!latest && <p className="text-black/60">Get an AI-assisted first-draft memo in DXV&apos;s template, scored against the eleven criteria.</p>}
+        {!latest && (
+          <p className="text-black/60">
+            {canGenerate
+              ? "Get an AI-assisted first-draft memo in DXV's template, scored against the eleven criteria. Once a DXV team member reviews and marks it complete, it becomes the memo (DXV Review Issue)."
+              : "The AI assessment is available from DXV Partner Review onwards. Reviewed and completed, it becomes the investment memo."}
+          </p>
+        )}
 
         {running && (
           <p className="flex items-center gap-2 text-dxv-green" aria-live="polite">
@@ -79,6 +91,13 @@ export function AssessmentCard({
             </Link>
           )}
         </div>
+
+        {children && (
+          <div className="border-t border-black/10 pt-3">
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-black/55">Memo versions</h3>
+            {children}
+          </div>
+        )}
       </div>
     </Card>
   );

@@ -62,6 +62,14 @@ Dashboard · Angels · Deals · Portfolio · Activity, plus a **View as Angel** 
 > **Amended again 2026-09-28:** the £20k-in-one-week momentum threshold is removed;
 > Investment Commitments shows a running total of commitments instead. The list below is the original
 > wording, kept for context; `src/lib/pipeline.ts` is the source of truth.
+> **Amended 2026-09-29 (Blue): deal lifecycle.** Capital Transfer is retired (deals there moved
+> back to Due Diligence); payments are ticked off per angel in a new **Final Investment** section,
+> and paid tickets on deals at Investment Complete make the dashboard's Investment Total.
+> "Passed" is shown as **Declined**; a Decline button works at any live stage and records where
+> in the dealflow the deal was declined, and the founder comm says so. The board has no S/EIS
+> column (those deals show under Investment Complete). Each deal has a **Lead angel**. The
+> Investment Assessment and Investment Memo are one section. EOIs and final tickets can be
+> edited and removed, with every change kept in an audit history.
 
 Ten linear stages plus one cross-cutting terminal state:
 

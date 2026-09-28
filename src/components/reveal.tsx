@@ -14,18 +14,21 @@ export function Reveal({
   children,
   variant = "secondary",
   savedLabel = "✓ Saved",
+  buttonClassName,
 }: {
   label: React.ReactNode;
   children: React.ReactNode;
   variant?: ButtonVariant;
   savedLabel?: string;
+  /** Overrides the button style (e.g. the Decline pill). */
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
 
   if (!open) {
     return (
-      <button type="button" aria-expanded={false} onClick={() => setOpen(true)} className={buttonClass(variant)}>
+      <button type="button" aria-expanded={false} onClick={() => setOpen(true)} className={buttonClassName ?? buttonClass(variant)}>
         {saved ? savedLabel : label}
       </button>
     );

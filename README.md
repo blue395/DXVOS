@@ -76,10 +76,10 @@ scripts/                      seed.ts (dev), create-admin.ts
   are insert-only — there is no update/delete code path. A re-vote creates a new row; the
   latest per angel counts (older ones show as "superseded").
 - **Two vote entities, never collapsed** (spec §7).
-- **Founder comms are created automatically.** Moving a deal out of a gate stage (or to Passed)
+- **Founder comms are created automatically.** Moving a deal out of a gate stage (or declining it)
   creates a `FounderComm` row as *Not yet sent*, so the dashboard's "founders awaiting a decision
   update" can't be forgotten. Skipping stages creates one per gate skipped; moving backwards creates none.
-- **Passed is pinned** on the board's right edge — it's reachable from every stage, so it's always a drop target.
+- **Declined is pinned** on the board's right edge (stored as `PASSED`) — reachable from every stage, so it's always a drop target.
 - **Investment commitments** show a running total of each angel's latest interested EOI (no threshold);
   a deal sitting in Investment Commitments for over 7 days gets a warning (`src/lib/pipeline.ts`).
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`
@@ -102,7 +102,18 @@ The deal page follows the dealflow. Sections that matter at the deal's stage sta
 **Now**; the others collapse to a one-line summary (e.g. "£20k from 2 angels"). Rules: `focusSections()` in
 `src/lib/pipeline.ts`. A sticky menu jumps to any section. The header has one-click **Advance to <next stage>**
 (the confirm says what founder update it queues; `advanceTarget()`), and **Other move…** for anything else,
-including Passed. Entry forms (votes, EOIs, DD items) open from "+ Record…" buttons and close after saving.
+including Declined, and a **Decline** pill that records where in the dealflow the deal was declined and flags the
+founder update. Entry forms (votes, EOIs, DD items) open from "+ Record…" buttons and close after saving.
+
+## Commitments, final investment and the Investment Total
+
+- **Investment commitments / EOI:** running total of each angel's latest interested EOI.
+- **Final investment** (after Due Diligence): each angel's actual ticket, ticked when the money arrives.
+  "Add interested angels from EOIs" starts the list. Paid tickets on deals at Investment Complete (or S/EIS)
+  make the dashboard's Investment Total (`investedGbp()` in `pipeline.ts`; deals from before this feature
+  fall back to the old typed-in amount).
+- Both lists can be edited and entries removed. Every change (and each payment tick) is written to
+  `EntryAudit` and shown under **History**; removed entries are hidden, never deleted.
 
 ## AI deck reading & eligibility screen
 
