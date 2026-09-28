@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import type { PassReason, Stage } from "@/generated/prisma/enums";
 import { formatGbpCompact, LINEAR_STAGES, PASSED_STAGE, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
-import { WarningIcon } from "@/components/ui";
+import { Spinner, WarningIcon } from "@/components/ui";
 import { moveVenture } from "./actions";
 import { PassDialog } from "./pass-dialog";
 
@@ -39,6 +39,7 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
   const [pendingPass, setPendingPass] = useState<BoardCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [saving, setSaving] = useState<Set<string>>(new Set());
 
   // Re-sync when the server sends fresh data (after revalidation). This is React's
   // recommended "adjust state when a prop changes" pattern, without an effect.
@@ -57,8 +58,14 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
     const before = cards;
     setError(null);
     setCards((cs) => cs.map((c) => (c.id === card.id ? { ...c, currentStage: to, daysInStage: 0 } : c)));
+    setSaving((s) => new Set(s).add(card.id));
     startTransition(async () => {
       const res = await moveVenture(card.id, { to, passReason, note });
+      setSaving((s) => {
+        const next = new Set(s);
+        next.delete(card.id);
+        return next;
+      });
       if (res.error) {
         setCards(before);
         setError(`${card.name}: ${res.error}`);
@@ -88,10 +95,10 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
             because it's reachable from every stage and must always be a visible drop target. */}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {LINEAR_STAGES.map((stage) => (
-            <Column key={stage.key} stage={stage} cards={cards.filter((c) => c.currentStage === stage.key)} />
+            <Column key={stage.key} stage={stage} cards={cards.filter((c) => c.currentStage === stage.key)} saving={saving} />
           ))}
           <div className="sticky right-0 shrink-0 bg-white pl-3 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.25)]">
-            <Column stage={PASSED_STAGE} cards={cards.filter((c) => c.currentStage === "PASSED")} />
+            <Column stage={PASSED_STAGE} cards={cards.filter((c) => c.currentStage === "PASSED")} saving={saving} />
           </div>
         </div>
       </DndContext>
@@ -119,7 +126,7 @@ const PHASE_STYLE: Record<StagePhase, { column: string; header: string; dot: str
   passed: { column: "bg-black/[0.03] border-black/15", header: "border-black/10", dot: "bg-black/60", label: "Declined" },
 };
 
-function Column({ stage, cards }: { stage: StageMeta; cards: BoardCard[] }) {
+function Column({ stage, cards, saving }: { stage: StageMeta; cards: BoardCard[]; saving: Set<string> }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key });
   const phase = PHASE_STYLE[stagePhase(stage.key)];
   const totalRaise = cards.reduce((a, c) => a + (c.raiseAmountGbp ?? 0), 0);
@@ -150,7 +157,7 @@ function Column({ stage, cards }: { stage: StageMeta; cards: BoardCard[] }) {
       </div>
       <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
         {cards.map((c) => (
-          <DealCard key={c.id} card={c} />
+          <DealCard key={c.id} card={c} saving={saving.has(c.id)} />
         ))}
       </div>
     </div>
@@ -161,7 +168,7 @@ function Pill({ children, className }: { children: React.ReactNode; className: s
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{children}</span>;
 }
 
-function DealCard({ card }: { card: BoardCard }) {
+function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   const hasPills = card.companyStage || card.sector || card.round;
@@ -172,9 +179,9 @@ function DealCard({ card }: { card: BoardCard }) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-lg border border-black/10 bg-white p-3 shadow-sm transition-shadow hover:shadow ${
+      className={`relative cursor-grab rounded-lg border border-black/10 bg-white p-3 shadow-sm transition hover:-translate-y-px hover:border-dxv-green/40 hover:shadow-md active:cursor-grabbing ${
         isDragging ? "z-10 shadow-lg ring-2 ring-dxv-green" : ""
-      }`}
+      } ${saving ? "opacity-70" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <Link href={`/deals/${card.id}`} className="font-semibold leading-snug text-black hover:text-dxv-green hover:underline">
@@ -187,6 +194,7 @@ function DealCard({ card }: { card: BoardCard }) {
             </span>
           ) : null}
           {card.warnings.length > 0 && <WarningIcon title={card.warnings.join(" · ")} />}
+          {saving && <Spinner className="h-3 w-3 text-dxv-green" />}
         </span>
       </div>
 

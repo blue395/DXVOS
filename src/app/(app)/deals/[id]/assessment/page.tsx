@@ -7,7 +7,7 @@ import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName
 import { totalScore, MAX_TOTAL_SCORE, type MemoContent } from "@/lib/memo-ai/schema";
 import { canGenerateAssessment } from "@/lib/pipeline";
 import { AiTag, Card, formatDateTime, StageBadge } from "@/components/ui";
-import { AutoRefresh, CopyButton } from "../eligibility-client";
+import { CopyButton } from "../eligibility-client";
 import { FinaliseForm, GenerateButton, MemoTextForm, ReviseIssueButton, ScoreRow, StartReviewButton } from "./assessment-client";
 import { MemoView, ReviewBanner, TotalScore } from "./memo-view";
 
@@ -108,8 +108,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
         {running && (
           <p className="flex items-center gap-2 text-sm text-dxv-green" aria-live="polite">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
-            Drafting the assessment… usually 1 to 3 minutes. This page updates by itself.
-            <AutoRefresh />
+            Drafting the assessment… usually 1 to 3 minutes. Progress is in the corner; this page updates when it&apos;s done.
           </p>
         )}
       </div>

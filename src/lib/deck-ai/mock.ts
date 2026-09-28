@@ -37,6 +37,7 @@ export function fakeAnthropicClient(
   return {
     messages: {
       parse: async (params: { messages: { content: { title?: string }[] }[] }) => {
+        await mockDelay();
         opts.onRequest?.(params);
         const title = params.messages[0]?.content[0]?.title ?? "deck.pdf";
         return {
@@ -48,4 +49,10 @@ export function fakeAnthropicClient(
       },
     },
   } as unknown as Anthropic;
+}
+
+/** Local dev only: DECK_AI_MOCK_DELAY_MS makes the fake AI take a while, to see progress UI. */
+async function mockDelay() {
+  const ms = Number(process.env.DECK_AI_MOCK_DELAY_MS ?? 0);
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms));
 }

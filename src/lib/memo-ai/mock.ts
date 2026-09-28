@@ -33,6 +33,7 @@ export function fakeMemoClient(opts: { memo?: MemoContent | null; stopReason?: s
   return {
     messages: {
       parse: async (params: unknown) => {
+        await mockDelay();
         opts.onRequest?.(params);
         return {
           model: "mock-model",
@@ -43,4 +44,10 @@ export function fakeMemoClient(opts: { memo?: MemoContent | null; stopReason?: s
       },
     },
   } as unknown as Anthropic;
+}
+
+/** Local dev only: DECK_AI_MOCK_DELAY_MS makes the fake AI take a while, to see progress UI. */
+async function mockDelay() {
+  const ms = Number(process.env.DECK_AI_MOCK_DELAY_MS ?? 0);
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms));
 }

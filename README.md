@@ -86,6 +86,12 @@ scripts/                      seed.ts (dev), create-admin.ts
   (spec §10 principle, ready for angel logins later).
 - **Money in whole pounds** (`Int`).
 
+## Feel: feedback on every click
+
+- **Page loads:** a yellow progress bar at the top (`nav-progress.tsx`) plus a skeleton per page (`loading.tsx`, preloaded by Next so clicks respond at once).
+- **Buttons:** clear hover (lift + ring) and press states; spinner and a working label while running; "✓ Saved" after (`action-form.tsx`, `action-button.tsx`). DD ticks and board moves update instantly (optimistic) while the server saves.
+- **Long AI jobs** (eligibility screen, investment assessment, DD document): a floating tray, bottom right, on every page, with elapsed time and an estimated progress bar, then "ready: Open" (`job-tray.tsx` + `/api/jobs`). It only checks while something is running. In local dev, `DECK_AI_MOCK_DELAY_MS=15000` makes the fake AI slow enough to see it.
+
 ## AI deck reading & eligibility screen
 
 Upload a deck on **New venture** and Claude (Sonnet 5) pre-fills the form and drafts the

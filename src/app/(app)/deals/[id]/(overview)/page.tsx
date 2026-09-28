@@ -22,20 +22,19 @@ import {
   addDDItem,
   addInvestmentVote,
   addPreSelectionVote,
-  deleteDDItem,
   moveVentureForm,
-  toggleDDItem,
   updateFounderComm,
   updateVenture,
-} from "../actions";
-import { VentureFields } from "../venture-fields";
-import { StageMover } from "./stage-mover";
-import { DocumentItem, DocumentsCard, type DocRow } from "./documents-card";
+} from "../../actions";
+import { VentureFields } from "../../venture-fields";
+import { StageMover } from "../stage-mover";
+import { DocumentItem, DocumentsCard, type DocRow } from "../documents-card";
 import { DocumentUploader } from "@/components/document-uploader";
-import { EligibilityCard } from "./eligibility-card";
+import { EligibilityCard } from "../eligibility-card";
 import { issueNumbers, reviewIssueName } from "@/lib/memo-ai/render";
-import { AssessmentCard } from "./assessment-card";
-import { DDDocumentPanel } from "./dd-document";
+import { AssessmentCard } from "../assessment-card";
+import { DDDocumentPanel } from "../dd-document";
+import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   await requireAdmin();
@@ -262,16 +261,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                   const overdue = !item.completedAt && item.dueDate && item.dueDate < now;
                   return (
                     <li key={item.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-                      <form action={toggleDDItem.bind(null, item.id)}>
-                        <button
-                          aria-label={item.completedAt ? "Mark not done" : "Mark done"}
-                          className={`flex h-5 w-5 items-center justify-center rounded border ${
-                            item.completedAt ? "border-dxv-green bg-dxv-green text-white" : "border-black/30 bg-white"
-                          }`}
-                        >
-                          {item.completedAt ? "✓" : ""}
-                        </button>
-                      </form>
+                      <DDItemToggle itemId={item.id} done={!!item.completedAt} />
                       <span className={`flex-1 ${item.completedAt ? "text-black/45 line-through" : ""}`}>
                         {item.title}
                         {item.owner && <span className="text-black/50"> · {item.owner}</span>}
@@ -282,11 +272,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                           {formatDate(item.dueDate)}
                         </span>
                       )}
-                      <form action={deleteDDItem.bind(null, item.id)}>
-                        <button aria-label="Remove item" className="px-1 text-black/35 hover:text-black">
-                          ×
-                        </button>
-                      </form>
+                      <DDItemRemove itemId={item.id} title={item.title} />
                       <span className="w-full pl-8">
                         {docs.filter((d) => d.ddItemId === item.id).length > 0 && (
                           <ul>

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { cardOneLiner, daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import { buttonClass } from "@/components/ui";
-import { KanbanBoard, type BoardCard } from "./kanban-board";
+import { KanbanBoard, type BoardCard } from "../kanban-board";
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   await requireAdmin();
