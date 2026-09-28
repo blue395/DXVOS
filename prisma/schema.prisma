@@ -37,6 +37,8 @@ model User {
   investmentVotes   InvestmentVote[]
   founderCommsSent  FounderComm[]
   venturesCreated   Venture[]
+  deckAnalyses      DeckAnalysis[]
+  eligibilityReviews EligibilityReview[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -96,6 +98,8 @@ model Venture {
   preSelectionVotes PreSelectionVote[]
   investmentVotes   InvestmentVote[]
   founderComms      FounderComm[]
+  deckAnalyses      DeckAnalysis[]
+  eligibilityReviews EligibilityReview[]
 
   @@index([currentStage])
 }
@@ -221,4 +225,66 @@ model FounderComm {
 
   @@unique([ventureId, gate])
   @@index([status])
+}
+
+// ── AI deck reading & eligibility screen ────────────────────────────────────
+
+enum DeckAnalysisStatus {
+  PENDING // record created, deck uploading
+  PROCESSING // background worker is reading it
+  COMPLETE
+  FAILED
+}
+
+// One AI pass over one uploaded deck: suggested Venture fields + the eligibility
+// screen. Kept as its own record (never merged into the Venture), so a reviewer
+// always sees the AI's first pass alongside their own judgement, not in place of it.
+// ventureId is null while the deck belongs to a "New venture" form not yet saved.
+model DeckAnalysis {
+  id           String             @id @default(cuid())
+  ventureId    String?
+  venture      Venture?           @relation(fields: [ventureId], references: [id], onDelete: SetNull)
+  storagePath  String // private copy in Supabase Storage (bucket "decks")
+  fileName     String
+  fileSize     Int
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  extracted    Json? // suggested Venture fields
+  screen       Json? // structured eligibility screen
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation(fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  reviews EligibilityReview[]
+
+  @@index([ventureId, createdAt])
+}
+
+enum EligibilityDecision {
+  PROCEED
+  DECLINE
+  NEED_MORE_INFO
+}
+
+// The human decision on an eligibility screen. Append-only: a later decision is a
+// new row. PROCEED and DECLINE also move the deal (via moveVentureStage).
+model EligibilityReview {
+  id          String              @id @default(cuid())
+  ventureId   String
+  venture     Venture             @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  analysisId  String?
+  analysis    DeckAnalysis?       @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  decision    EligibilityDecision
+  passReason  PassReason?
+  note        String?
+  decidedById String
+  decidedBy   User                @relation(fields: [decidedById], references: [id])
+  decidedAt   DateTime            @default(now())
+
+  @@index([ventureId, decidedAt])
 }

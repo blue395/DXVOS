@@ -21,10 +21,11 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
 
    Use the *pooler* strings, not "Direct connection": that one is IPv6-only and
    Netlify's build machines can't reach it.
-4. **(Recommended) Download the SSL certificate.** Project Settings → **Database** →
-   *SSL Configuration* → **Download certificate**. Open the file in a text editor —
-   you'll paste its contents into Netlify as `DATABASE_CA_CERT`. With it, the app verifies
-   it's really talking to Supabase; without it, the connection is still encrypted but not verified.
+4. **Don't set `DATABASE_CA_CERT` (yet).** The certificate under Database settings → SSL
+   is for *direct* connections; the connection pooler (port 6543) presents a different chain,
+   so supplying it makes every query fail with `self-signed certificate in certificate chain`.
+   Without it, the connection is still encrypted, just not identity-verified. (Follow-up: find
+   the pooler's CA chain so verification can be switched on.)
 
 ## 2. Netlify — create the site
 
@@ -38,8 +39,7 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
    | `DATABASE_URL` | Transaction pooler string (port 6543) |
    | `DIRECT_URL` | Session pooler string (port 5432) |
    | `SESSION_SECRET` | 40+ random characters — e.g. generate a long password in your password manager. Never reuse it anywhere. |
-   | `DATABASE_CA_CERT` | *(recommended)* the full contents of the certificate file, including the `-----BEGIN/END CERTIFICATE-----` lines |
-
+   
 3. **Turn off Deploy Previews for now.** Site configuration → Build & deploy →
    *Deploy Previews* → "Don't deploy pull requests". Previews would otherwise run
    unmerged code against the **production** database. (We can add a separate
@@ -83,6 +83,41 @@ Then open the Netlify URL (`https://<site-name>.netlify.app`) and sign in.
 
 The brand site on the root domain is unaffected — only the `app.` subdomain points to Netlify.
 
+## 5. AI deck reading & eligibility screen
+
+Uploading a deck pre-fills the New Venture form and drafts the eligibility screen
+(prompt in `src/lib/deck-ai/prompt.ts`, model Claude Sonnet 5). Needs four more
+Netlify environment variables, then a redeploy.
+
+1. **Anthropic API key.** At [console.anthropic.com](https://console.anthropic.com): create an
+   account/organisation for DXV, add billing (Settings → Billing; set a monthly spend limit),
+   then Settings → **API keys** → *Create key* named "DXV OS". Copy it once; it's shown only once.
+2. **Supabase keys.** Supabase → Project Settings → **API Keys**:
+   the **Publishable key** (`sb_publishable_…`) and a **Secret key** (`sb_secret_…`, create one
+   named "dxv-os-server"). The project URL is on the project home page (`https://<ref>.supabase.co`).
+3. **Netlify → Environment variables:**
+
+   | Key | Value | Contains secret values? |
+   |---|---|---|
+   | `ANTHROPIC_API_KEY` | the Anthropic key | ☑ Yes |
+   | `SUPABASE_SECRET_KEY` | the Supabase **secret** key | ☑ Yes |
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://<ref>.supabase.co` | ☐ **No** |
+   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the Supabase **publishable** key | ☐ **No** |
+
+   The two `NEXT_PUBLIC_` values are *meant* to be public (they're built into the browser
+   code, which uploads decks straight to Supabase). Marking them secret makes the build fail.
+4. **Merge and deploy.** The deploy's migration creates the private `decks` storage bucket
+   (PDF only, 20 MB max). Check it exists under Supabase → **Storage**. If not, create it by
+   hand: name `decks`, **Private**, file size limit 20 MB, allowed MIME type `application/pdf`.
+
+How it runs: the browser uploads the PDF directly to Supabase with a one-time signed link;
+a Netlify **background function** (`netlify/functions/analyze-deck-background.mts`, up to 15
+minutes) reads it with Claude and saves the result; the page checks every few seconds.
+A private copy of each deck is kept for re-running the screen (download it from the deal page).
+
+**Local development without keys:** leave the Supabase variables unset (decks are saved in
+`.data/decks/`) and run `DECK_AI_MOCK=true npm run dev` to get a canned AI result.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.
@@ -97,6 +132,12 @@ The brand site on the root domain is unaffected — only the `app.` subdomain po
 |---|---|
 | Build fails at `prisma migrate deploy` with `P1001 Can't reach database` | `DIRECT_URL` wrong or using the "Direct connection" (IPv6) string — use the Session pooler |
 | Build fails with `prepared statement ... already exists` during migrate | `DIRECT_URL` is the Transaction pooler (6543) — it must be the Session pooler (5432) |
-| Pages error with `self-signed certificate in certificate chain` | `DATABASE_CA_CERT` is incomplete/wrong — re-paste the whole file, or remove the variable |
+| Pages show "A server error occurred"; function log says `self-signed certificate in certificate chain` | `DATABASE_CA_CERT` is set — delete it and redeploy (see §1.4) |
 | Sign-in always says "Incorrect email or password" | Email in the `User` row isn't lowercase, or role isn't `ADMIN` |
 | Sign-in works then immediately logs out | `SESSION_SECRET` missing or shorter than 32 characters |
+| Deck upload says "Deck storage isn't configured" | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` missing — add them and redeploy |
+| Upload fails with "Bucket not found" | The `decks` bucket wasn't created — see §5.4 |
+| Screen fails: "ANTHROPIC_API_KEY isn't set" | Add the key (§5.3) and redeploy |
+| Screen fails: "Claude API error (401)" / "(403)" | Key wrong or revoked, or no billing set up on the Anthropic account |
+| Screen stays "Reading…" then times out | Check Netlify → Logs → Functions → `analyze-deck-background` for the error |
+| Build fails: secrets scanning found `NEXT_PUBLIC_SUPABASE_…` | It was marked secret — untick "Contains secret values" for the two `NEXT_PUBLIC_` variables |

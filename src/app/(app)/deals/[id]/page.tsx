@@ -12,6 +12,7 @@ import {
   formatGbp,
   latestVotePerAngel,
   stageLabel,
+  canDecideEligibility,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
@@ -29,6 +30,7 @@ import {
 } from "../actions";
 import { VentureFields } from "../venture-fields";
 import { StageMover } from "./stage-mover";
+import { EligibilityCard } from "./eligibility-card";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   await requireAdmin();
@@ -43,6 +45,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
       investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
       founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
+      deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
+      eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
     },
   });
   if (!v) notFound();
@@ -57,6 +61,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
+
+  // At intake the eligibility decision is the next job, so show it first.
+  const eligibility = (
+    <EligibilityCard ventureId={v.id} stage={v.currentStage} analyses={v.deckAnalyses} reviews={v.eligibilityReviews} />
+  );
+  const atIntake = canDecideEligibility(v.currentStage);
 
   return (
     <div className="space-y-6">
@@ -96,8 +106,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* ── Main column ── */}
         <div className="space-y-6">
+          {atIntake && eligibility}
+
           <Card title="Stage">
-            <StageMover currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
+            {/* key: reset the dropdown whenever the stage changes elsewhere (board, eligibility decision) */}
+            <StageMover key={v.currentStage} currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
           </Card>
 
           <Card title="Investment memo">
@@ -239,6 +252,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               <SubmitButton variant="secondary">Add DD item</SubmitButton>
             </ActionForm>
           </Card>
+
+          {!atIntake && eligibility}
         </div>
 
         {/* ── Sidebar ── */}

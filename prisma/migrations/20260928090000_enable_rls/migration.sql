@@ -14,4 +14,11 @@ ALTER TABLE "DDItem" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "PreSelectionVote" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "InvestmentVote" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "FounderComm" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "_prisma_migrations" ENABLE ROW LEVEL SECURITY;
+-- Prisma's own bookkeeping table. Guarded because `prisma migrate dev` replays
+-- migrations into a scratch "shadow" database where this table doesn't exist.
+DO $$
+BEGIN
+  IF to_regclass('"_prisma_migrations"') IS NOT NULL THEN
+    ALTER TABLE "_prisma_migrations" ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;

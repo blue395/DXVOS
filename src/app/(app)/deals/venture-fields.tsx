@@ -1,7 +1,7 @@
 import { Field, inputClass } from "@/components/ui";
 
 type VentureValues = {
-  name?: string;
+  name?: string | null;
   founderNames?: string | null;
   founderEmail?: string | null;
   website?: string | null;
@@ -14,38 +14,40 @@ type VentureValues = {
 };
 
 // Shared by "New venture" and the edit form on the deal page.
-export function VentureFields({ v = {} }: { v?: VentureValues }) {
+// `ai` lists fields pre-filled from a deck, which get an "AI suggested" tag.
+export function VentureFields({ v = {}, ai = [] }: { v?: VentureValues; ai?: string[] }) {
+  const tag = (field: string) => ai.includes(field);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Company name *">
-        <input name="name" required defaultValue={v.name} className={inputClass} />
+      <Field aiSuggested={tag("name")} label="Company name *">
+        <input name="name" required defaultValue={v.name ?? ""} className={inputClass} />
       </Field>
-      <Field label="Founder(s)">
+      <Field aiSuggested={tag("founderNames")} label="Founder(s)">
         <input name="founderNames" defaultValue={v.founderNames ?? ""} className={inputClass} />
       </Field>
-      <Field label="Founder email">
+      <Field aiSuggested={tag("founderEmail")} label="Founder email">
         <input name="founderEmail" type="email" defaultValue={v.founderEmail ?? ""} className={inputClass} />
       </Field>
-      <Field label="Website">
+      <Field aiSuggested={tag("website")} label="Website">
         <input name="website" type="url" placeholder="https://" defaultValue={v.website ?? ""} className={inputClass} />
       </Field>
-      <Field label="Sector">
+      <Field aiSuggested={tag("sector")} label="Sector">
         <input name="sector" defaultValue={v.sector ?? ""} className={inputClass} />
       </Field>
-      <Field label="Company stage" hint="e.g. Pre-seed, Seed">
+      <Field aiSuggested={tag("companyStage")} label="Company stage" hint="e.g. Pre-seed, Seed">
         <input name="companyStage" defaultValue={v.companyStage ?? ""} className={inputClass} />
       </Field>
-      <Field label="Raise amount (£)">
+      <Field aiSuggested={tag("raiseAmountGbp")} label="Raise amount (£)">
         <input name="raiseAmountGbp" inputMode="numeric" defaultValue={v.raiseAmountGbp ?? ""} className={inputClass} />
       </Field>
-      <Field label="Deck link" hint="Google Drive link — files stay in Drive">
+      <Field aiSuggested={tag("deckUrl")} label="Deck link" hint="Google Drive link — files stay in Drive">
         <input name="deckUrl" type="url" placeholder="https://drive.google.com/…" defaultValue={v.deckUrl ?? ""} className={inputClass} />
       </Field>
-      <Field label="Drive folder link">
+      <Field aiSuggested={tag("driveFolderUrl")} label="Drive folder link">
         <input name="driveFolderUrl" type="url" placeholder="https://drive.google.com/…" defaultValue={v.driveFolderUrl ?? ""} className={inputClass} />
       </Field>
       <div className="sm:col-span-2">
-        <Field label="Description / eligibility notes" hint="Stage, sector, team and thesis-fit against DXV's underestimated-founder criteria">
+        <Field aiSuggested={tag("description")} label="Description / eligibility notes" hint="Stage, sector, team and thesis-fit against DXV's underestimated-founder criteria">
           <textarea name="description" rows={4} defaultValue={v.description ?? ""} className={inputClass} />
         </Field>
       </div>
