@@ -5,6 +5,8 @@ import { PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
 import { Card, formatDateTime } from "@/components/ui";
 
 // Spec §4: for the MVP the raw stage-history log is the activity feed.
+// Admin-only (spec: angels must never see Activity or the Dashboard, even once they
+// can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function ActivityPage() {
   await requireAdmin();
   const changes = await db.stageChange.findMany({

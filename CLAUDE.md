@@ -9,6 +9,7 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Domain rules go in `src/lib/pipeline.ts` (pure + unit-tested), not in components.
 - Stage changes only via `moveVentureStage()` in `src/lib/ventures.ts`.
 - Every page and server action calls `requireAdmin()` itself; `src/proxy.ts` is not a security boundary.
+- Future angel logins: the **Dashboard and Activity pages stay admin-only** (Blue's requirement). When an angel role is added, keep `requireAdmin()` on them; the angel experience is still to be designed, so ask Blue before exposing any existing page to angels.
 - Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote): never add update/delete paths.
 - Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`.
 - Helpers used by server components must not live in `"use client"` files.

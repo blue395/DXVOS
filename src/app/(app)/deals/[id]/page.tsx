@@ -14,6 +14,7 @@ import {
   stageLabel,
   canDecideEligibility,
   roundOptionCount,
+  isInvestedStage,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
@@ -88,10 +89,22 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           ))}
         </div>
         <p className="mt-1 text-sm text-black/60">
-          {[v.round ? `Round ${v.round}` : null, v.founderNames, v.sector, v.companyStage, v.raiseAmountGbp ? `Raising ${formatGbp(v.raiseAmountGbp)}` : null]
+          {[
+            v.round ? `Round ${v.round}` : null,
+            v.founderNames,
+            v.sector,
+            v.companyStage,
+            v.raiseAmountGbp ? `Raising ${formatGbp(v.raiseAmountGbp)}` : null,
+            v.investedAmountGbp ? `DXV invested ${formatGbp(v.investedAmountGbp)}` : null,
+          ]
             .filter(Boolean)
             .join(" · ")}
         </p>
+        {isInvestedStage(v.currentStage) && v.investedAmountGbp === null && (
+          <p className="mt-2 inline-block rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-1 text-sm">
+            Add the amount DXV invested under <strong>Details → Edit venture details</strong> so it counts towards the dashboard total.
+          </p>
+        )}
         {v.currentStage === "PASSED" && v.passReason && (
           <p className="mt-2 inline-block rounded bg-black px-3 py-1 text-sm text-white">
             Passed: {PASS_REASON_LABELS[v.passReason]}
@@ -302,7 +315,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
               <ActionForm action={updateVenture.bind(null, v.id)} resetOnSuccess={false} className="mt-4 space-y-4">
-                <VentureFields v={v} roundOptions={roundOptionCount(_max.round)} />
+                <VentureFields v={v} roundOptions={roundOptionCount(_max.round)} showInvested />
                 <SubmitButton>Save details</SubmitButton>
               </ActionForm>
             </details>

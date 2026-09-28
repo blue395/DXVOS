@@ -274,3 +274,26 @@ export function parseRoundFilter(value: string | string[] | undefined): RoundFil
   const n = Number(v);
   return v && Number.isInteger(n) && n > 0 ? { kind: "round", round: n } : { kind: "all" };
 }
+
+// ── Dashboard metrics ───────────────────────────────────────────────────────
+
+/** Invested: reached Investment Complete (S/EIS Certificate is after it). */
+export function isInvestedStage(stage: Stage): boolean {
+  return stage === "INVESTMENT_COMPLETE" || stage === "SEIS_CERTIFICATE";
+}
+
+export type DashboardMetrics = { liveDeals: number; inDueDiligence: number; investments: number; investedTotalGbp: number };
+
+/**
+ * Live deals: not passed and not yet invested. Investment total: sum of what DXV
+ * actually invested (entered per deal); deals without an amount count as £0.
+ */
+export function dashboardMetrics(ventures: { currentStage: Stage; investedAmountGbp: number | null }[]): DashboardMetrics {
+  const invested = ventures.filter((v) => isInvestedStage(v.currentStage));
+  return {
+    liveDeals: ventures.filter((v) => isActiveStage(v.currentStage)).length,
+    inDueDiligence: ventures.filter((v) => v.currentStage === "DUE_DILIGENCE").length,
+    investments: invested.length,
+    investedTotalGbp: sum(invested.map((v) => v.investedAmountGbp ?? 0)),
+  };
+}

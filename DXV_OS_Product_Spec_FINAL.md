@@ -27,6 +27,13 @@ DXV may start charging angels a membership fee this winter. Nothing in this MVP 
 
 ## 4. Navigation
 
+> **Amended 2026-09-28 (Blue):** when angel members get logins, the **Dashboard and
+> Activity pages must not be visible or accessible to them** (admin-only). What the
+> platform looks like for angels is still to be designed.
+> Dashboard headline metrics are now: Angels, Live Deals (not passed and not yet
+> invested), In DD, Investments (number), Investment total (£, from each deal's
+> "Amount invested by DXV"), plus Deals by stage and Founders awaiting a decision update.
+
 Dashboard · Angels · Deals · Portfolio · Activity, plus a **View as Angel** preview mode (lets an admin see exactly what a given angel's restricted view looks like — the practical test that the certification gate works, once it exists).
 
 - **Dashboard** — deals by stage, cert-overdue count, founders-awaiting-a-decision-update count, upcoming pitch event
