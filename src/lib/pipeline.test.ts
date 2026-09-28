@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_STAGES,
   canDecideEligibility,
+  dashboardMetrics,
   isActiveStage,
   LINEAR_STAGES,
   parseRoundFilter,
@@ -192,5 +193,24 @@ describe("parseRoundFilter", () => {
     expect(parseRoundFilter("0")).toEqual({ kind: "all" });
     expect(parseRoundFilter("2.5")).toEqual({ kind: "all" });
     expect(parseRoundFilter(["4", "5"])).toEqual({ kind: "round", round: 4 });
+  });
+});
+
+describe("dashboardMetrics", () => {
+  it("counts live, in-DD and invested deals, and sums invested amounts", () => {
+    const m = dashboardMetrics([
+      { currentStage: "SUBMITTED", investedAmountGbp: null },
+      { currentStage: "DUE_DILIGENCE", investedAmountGbp: null },
+      { currentStage: "CAPITAL_TRANSFER", investedAmountGbp: null },
+      { currentStage: "INVESTMENT_COMPLETE", investedAmountGbp: 50_000 },
+      { currentStage: "SEIS_CERTIFICATE", investedAmountGbp: 75_000 },
+      { currentStage: "INVESTMENT_COMPLETE", investedAmountGbp: null }, // amount not entered yet
+      { currentStage: "PASSED", investedAmountGbp: null },
+    ]);
+    expect(m).toEqual({ liveDeals: 3, inDueDiligence: 1, investments: 3, investedTotalGbp: 125_000 });
+  });
+
+  it("ignores amounts on deals that aren't invested", () => {
+    expect(dashboardMetrics([{ currentStage: "PASSED", investedAmountGbp: 10_000 }]).investedTotalGbp).toBe(0);
   });
 });

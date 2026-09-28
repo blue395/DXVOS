@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ALL_STAGES, GATE_LABELS, daysSince, dealWarnings, isActiveStage } from "@/lib/pipeline";
+import { ALL_STAGES, GATE_LABELS, daysSince, dashboardMetrics, formatGbp } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
 
+// Admin-only (spec: angels must never see the Dashboard or Activity, even once they
+// can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function DashboardPage() {
   await requireAdmin();
   const now = new Date();
 
   const [ventures, awaiting] = await Promise.all([
     db.venture.findMany({
-      select: {
-        currentStage: true,
-        stageEnteredAt: true,
-        ddItems: { select: { dueDate: true, completedAt: true } },
-      },
+      select: { currentStage: true, investedAmountGbp: true },
     }),
     // Spec §6: ventures at a crossed gate whose founder comm isn't marked Sent yet.
     db.founderComm.findMany({
@@ -26,8 +24,7 @@ export default async function DashboardPage() {
 
   const byStage = ALL_STAGES.map((s) => ({ ...s, count: ventures.filter((v) => v.currentStage === s.key).length }));
   const maxCount = Math.max(1, ...byStage.map((s) => s.count));
-  const active = ventures.filter((v) => isActiveStage(v.currentStage)).length;
-  const flagged = ventures.filter((v) => dealWarnings(v, now).length > 0).length;
+  const metrics = dashboardMetrics(ventures);
   // One row per founder/venture (that's what the headline counts), listing each gate owed.
   const awaitingByVenture = [...Map.groupBy(awaiting, (c) => c.venture.id).values()].map((comms) => ({
     venture: comms[0].venture,
@@ -40,14 +37,17 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-dxv-green">Dashboard</h1>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="#awaiting" className="rounded-lg bg-dxv-green p-5 text-white hover:bg-dxv-green/95">
-          <p className="text-sm text-white/80">Founders awaiting a decision update</p>
-          <p className="mt-1 text-4xl font-semibold text-dxv-yellow tabular-nums">{foundersAwaiting}</p>
-        </Link>
-        <Stat label="Active deals" value={active} />
-        <Stat label="Deals with warnings" value={flagged} />
-        <Stat label="Passed" value={byStage.find((s) => s.key === "PASSED")!.count} />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        <Metric label="Angels" value="–" note="Coming with the Angels module" />
+        <Metric label="Live Deals" value={metrics.liveDeals} href="/deals" />
+        <Metric label="In DD" value={metrics.inDueDiligence} href="/deals" />
+        <Metric label="Investments" value={metrics.investments} />
+        <Metric
+          wide
+          label="Investment total"
+          value={formatGbpCompact(metrics.investedTotalGbp)}
+          title={formatGbp(metrics.investedTotalGbp)}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -73,7 +73,10 @@ export default async function DashboardPage() {
         </Card>
 
         <div id="awaiting">
-          <Card title="Founders awaiting a decision update">
+          <Card
+            title="Founders awaiting a decision update"
+            actions={<span className="rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-semibold text-dxv-green">{foundersAwaiting}</span>}
+          >
             {awaitingByVenture.length === 0 ? (
               <p className="text-sm text-black/55">All founders are up to date.</p>
             ) : (
@@ -101,16 +104,50 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <p className="text-xs text-black/45">Certification-overdue count and upcoming pitch event arrive with the Angels module (week 2).</p>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-black/10 bg-white p-5">
-      <p className="text-sm text-black/60">{label}</p>
-      <p className="mt-1 text-4xl font-semibold text-dxv-green tabular-nums">{value}</p>
-    </div>
+/** Large, centred headline number. */
+function Metric({
+  label,
+  value,
+  note,
+  href,
+  title,
+  wide,
+}: {
+  label: string;
+  value: number | string;
+  note?: string;
+  href?: string;
+  title?: string;
+  /** Full width on phones (the fifth tile would otherwise sit alone at half width). */
+  wide?: boolean;
+}) {
+  const body = (
+    <>
+      <p className="text-sm font-medium uppercase tracking-wide text-black/55">{label}</p>
+      <p className="mt-2 text-4xl font-semibold text-dxv-green tabular-nums sm:text-5xl" title={title}>
+        {value}
+      </p>
+      {/* Same height on every tile, so the numbers line up across the row. */}
+      <p className="mt-2 h-4 text-xs text-black/45">{note}</p>
+    </>
   );
+  const cls = `flex flex-col items-center justify-center rounded-lg border border-black/10 bg-white px-4 py-7 text-center ${
+    wide ? "col-span-2 md:col-span-1" : ""
+  }`;
+  return href ? (
+    <Link href={href} className={`${cls} hover:border-dxv-green/40 hover:bg-dxv-green/[0.03]`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
+/** £1,250,000 as "£1.25M", so large totals fit the tile (full amount on hover). */
+function formatGbpCompact(n: number): string {
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 2 }).format(n);
 }

@@ -9,6 +9,7 @@ type VentureValues = {
   companyStage?: string | null;
   raiseAmountGbp?: number | null;
   round?: number | null;
+  investedAmountGbp?: number | null;
   description?: string | null;
   deckUrl?: string | null;
   driveFolderUrl?: string | null;
@@ -17,7 +18,18 @@ type VentureValues = {
 // Shared by "New venture" and the edit form on the deal page.
 // `ai` lists fields pre-filled from a deck, which get an "AI suggested" tag.
 // `roundOptions`: how many rounds to offer in the Round dropdown.
-export function VentureFields({ v = {}, ai = [], roundOptions = 12 }: { v?: VentureValues; ai?: string[]; roundOptions?: number }) {
+// `showInvested`: the "amount invested" input, only relevant once a deal is live (edit form).
+export function VentureFields({
+  v = {},
+  ai = [],
+  roundOptions = 12,
+  showInvested = false,
+}: {
+  v?: VentureValues;
+  ai?: string[];
+  roundOptions?: number;
+  showInvested?: boolean;
+}) {
   const tag = (field: string) => ai.includes(field);
   const rounds = Array.from({ length: Math.max(roundOptions, v.round ?? 0) }, (_, i) => i + 1);
   return (
@@ -32,7 +44,13 @@ export function VentureFields({ v = {}, ai = [], roundOptions = 12 }: { v?: Vent
           ))}
         </select>
       </Field>
-      <div className="hidden sm:block" />
+      {showInvested ? (
+        <Field label="Amount invested by DXV (£)" hint="Fill in once the investment completes; counts towards the dashboard total">
+          <input name="investedAmountGbp" inputMode="numeric" defaultValue={v.investedAmountGbp ?? ""} className={inputClass} />
+        </Field>
+      ) : (
+        <div className="hidden sm:block" />
+      )}
       <Field aiSuggested={tag("name")} label="Company name *">
         <input name="name" required defaultValue={v.name ?? ""} className={inputClass} />
       </Field>

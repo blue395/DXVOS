@@ -70,6 +70,7 @@ const VentureSchema = z.object({
   sector: optionalText,
   companyStage: optionalText,
   raiseAmountGbp: optionalPounds,
+  investedAmountGbp: optionalPounds,
   round: z
     .string()
     .trim()

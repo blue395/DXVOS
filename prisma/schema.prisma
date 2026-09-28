@@ -81,6 +81,7 @@ model Venture {
   companyStage   String? // e.g. "Pre-seed", "Seed"
   raiseAmountGbp Int?
   round          Int? // DXV round the deal belongs to (Round 1, Round 2, ...)
+  investedAmountGbp Int? // what DXV actually invested, entered once the investment completes
   description    String?
   deckUrl        String? // Google Drive link — files stay in Drive (spec §2)
   driveFolderUrl String?
