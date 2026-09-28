@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* DXV palette — the only four colours in the UI. Tints come from opacity
+   (e.g. `border-black/10`, `bg-dxv-green/5`), never from extra greys. */
+@theme {
+  --color-dxv-yellow: #fbe45b;
+  --color-dxv-green: #1a3c35;
+  --color-white: #ffffff;
+  --color-black: #000000;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-white);
+  color: var(--color-black);
+}
+
+/* Visible keyboard focus in brand colours. */
+:focus-visible {
+  outline: 2px solid var(--color-dxv-green);
+  outline-offset: 2px;
+}
