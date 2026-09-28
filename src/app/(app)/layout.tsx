@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
+import { Suspense } from "react";
 import { NavLink } from "@/components/nav-link";
+import { NavProgress } from "@/components/nav-progress";
+import { JobTray } from "@/components/job-tray";
+import { SignOutButton } from "@/components/sign-out-button";
 
 // Shell for every signed-in page. requireAdmin() here protects page *rendering*;
 // server actions still check again themselves.
@@ -10,6 +14,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       <header className="bg-dxv-green text-white">
         <div className="mx-auto flex max-w-[1600px] items-center gap-6 px-4 py-3">
           <Link href="/" className="flex items-center gap-2">
@@ -29,13 +36,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden text-white/70 sm:inline">{user.name}</span>
-            <form action={logout}>
-              <button className="rounded px-2 py-1 text-white/80 hover:bg-white/10 hover:text-white">Sign out</button>
-            </form>
+            <SignOutButton action={logout} />
           </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6">{children}</main>
+      <JobTray />
     </div>
   );
 }

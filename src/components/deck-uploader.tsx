@@ -1,5 +1,6 @@
 "use client";
 
+import { announceJobStarted } from "@/lib/job-events";
 import { useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -66,6 +67,7 @@ export function DeckUploader({
       setPhase({ kind: "reading", fileName: file.name });
       const begun = await beginDeckAnalysis(start.analysisId);
       if (begun.error) throw new Error(begun.error);
+      announceJobStarted();
 
       // Poll until the background job finishes (the server times stuck jobs out).
       for (;;) {

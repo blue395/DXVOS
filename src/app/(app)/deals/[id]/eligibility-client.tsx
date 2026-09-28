@@ -1,24 +1,16 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { EligibilityDecision, PassReason } from "@/generated/prisma/enums";
 import { PASS_REASONS, PASS_REASON_LABELS } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ActionButton } from "@/components/action-button";
 import { DeckUploader } from "@/components/deck-uploader";
+import { announceJobStarted } from "@/lib/job-events";
 import { buttonClass, Field, inputClass } from "@/components/ui";
 import type { ActionResult } from "@/lib/action-result";
 import { rerunDeckAnalysis } from "../deck-actions";
-
-/** While the background job runs, refresh the (server-rendered) page every few seconds. */
-export function AutoRefresh({ everyMs = 4000 }: { everyMs?: number }) {
-  const router = useRouter();
-  useEffect(() => {
-    const t = setInterval(() => router.refresh(), everyMs);
-    return () => clearInterval(t);
-  }, [router, everyMs]);
-  return null;
-}
 
 export function DeckUploadForVenture({ ventureId, label }: { ventureId: string; label?: string }) {
   const router = useRouter();
@@ -26,25 +18,10 @@ export function DeckUploadForVenture({ ventureId, label }: { ventureId: string; 
 }
 
 export function RerunButton({ ventureId }: { ventureId: string }) {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   return (
-    <span>
-      <button
-        type="button"
-        disabled={pending}
-        className={buttonClass("secondary")}
-        onClick={() =>
-          start(async () => {
-            const res = await rerunDeckAnalysis(ventureId);
-            setError(res.error ?? null);
-          })
-        }
-      >
-        {pending ? "Starting…" : "Re-run screen"}
-      </button>
-      {error && <span className="ml-2 text-xs">{error}</span>}
-    </span>
+    <ActionButton run={() => rerunDeckAnalysis(ventureId)} variant="secondary" pendingLabel="Starting…" onDone={announceJobStarted}>
+      Re-run screen
+    </ActionButton>
   );
 }
 
@@ -60,7 +37,7 @@ export function CopyButton({ text, label = "Copy screen as text" }: { text: stri
         setTimeout(() => setCopied(false), 2000);
       }}
     >
-      {copied ? "Copied" : label}
+      {copied ? "✓ Copied" : label}
     </button>
   );
 }

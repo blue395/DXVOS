@@ -3,7 +3,6 @@ import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { MAX_TOTAL_SCORE, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
 import { aiDraftName, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { AiTag, buttonClass, Card, formatDateTime } from "@/components/ui";
-import { AutoRefresh } from "./eligibility-client";
 import { GenerateButton } from "./assessment/assessment-client";
 
 /** Compact summary on the deal page; the full memo lives at /deals/[id]/assessment. */
@@ -36,7 +35,6 @@ export function AssessmentCard({
           <p className="flex items-center gap-2 text-dxv-green" aria-live="polite">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
             Drafting {aiDraftName(latest!.number)}… usually 1 to 3 minutes.
-            <AutoRefresh />
           </p>
         )}
         {eff?.status === "FAILED" && (

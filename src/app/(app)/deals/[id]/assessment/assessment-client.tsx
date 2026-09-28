@@ -1,51 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { ActionButton } from "@/components/action-button";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonClass, Field, inputClass } from "@/components/ui";
+import { announceJobStarted } from "@/lib/job-events";
+import { Field, inputClass } from "@/components/ui";
 import type { MemoContent, MemoScore } from "@/lib/memo-ai/schema";
 import { finaliseMemo, generateAssessment, reviseIssue, saveMemoScore, saveMemoText, startReview } from "../../memo-actions";
 import { ScoreBadge } from "./memo-view";
 
-/** A button that runs a server action with no form fields and shows its error inline. */
-export function ActionButton({
-  run,
-  children,
-  variant = "primary",
-  confirm,
-}: {
-  run: () => Promise<{ error?: string }>;
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "accent";
-  confirm?: string;
-}) {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        disabled={pending}
-        className={buttonClass(variant)}
-        onClick={() => {
-          if (confirm && !window.confirm(confirm)) return;
-          start(async () => setError((await run()).error ?? null));
-        }}
-      >
-        {pending ? "Working…" : children}
-      </button>
-      {error && (
-        <span role="alert" className="rounded bg-dxv-yellow/30 px-2 py-0.5 text-xs">
-          {error}
-        </span>
-      )}
-    </span>
-  );
-}
-
 export function GenerateButton({ ventureId, again }: { ventureId: string; again: boolean }) {
   return (
-    <ActionButton run={() => generateAssessment(ventureId)} variant="accent">
+    <ActionButton run={() => generateAssessment(ventureId)} variant="accent" pendingLabel="Starting…" onDone={announceJobStarted}>
       {again ? "Generate a new AI draft" : "Generate AI assessment"}
     </ActionButton>
   );
@@ -65,6 +31,7 @@ export function StartReviewButton({
   return (
     <ActionButton
       run={() => startReview(analysisId)}
+      pendingLabel="Preparing draft…"
       confirm={
         replacing
           ? `Restart DXV Review Draft ${draftNumber} from AI Draft ${aiNumber}? Your current edits are kept in history but no longer editable.`
@@ -78,7 +45,7 @@ export function StartReviewButton({
 
 export function ReviseIssueButton({ memoVersionId, draftName }: { memoVersionId: string; draftName: string }) {
   return (
-    <ActionButton run={() => reviseIssue(memoVersionId)} variant="secondary">
+    <ActionButton run={() => reviseIssue(memoVersionId)} variant="secondary" pendingLabel="Preparing draft…">
       Revise as {draftName}
     </ActionButton>
   );
@@ -137,7 +104,7 @@ export function MemoTextForm({ draftId, m, version }: { draftId: string; m: Memo
         {area("followUpQuestions", joinLines(m.followUpQuestions), 5)}
       </Field>
 
-      <SubmitButton>Save draft</SubmitButton>
+      <SubmitButton doneLabel="Draft saved">Save draft</SubmitButton>
     </ActionForm>
   );
 }
@@ -179,7 +146,7 @@ export function ScoreRow({ draftId, s, ai, version }: { draftId: string; s: Memo
         <textarea name="justification" defaultValue={s.justification} rows={2} className={inputClass} aria-label={`${s.criterion} justification`} />
         <div className="flex flex-wrap items-center gap-2">
           <input name="reason" placeholder="Reason for change (optional, logged)" className={`${inputClass} flex-1`} />
-          <SubmitButton variant="secondary">Save score</SubmitButton>
+          <SubmitButton variant="secondary" doneLabel="Score saved">Save score</SubmitButton>
         </div>
       </ActionForm>
     </li>
@@ -192,7 +159,9 @@ export function FinaliseForm({ draftId, issueName }: { draftId: string; issueNam
       <Field label="Issue note (optional)" hint="e.g. Reviewed by Blue and Anna, Round 3 pitch">
         <input name="summary" className={inputClass} />
       </Field>
-      <SubmitButton>Mark complete: release {issueName}</SubmitButton>
+      <SubmitButton pendingLabel="Releasing…" doneLabel="Released">
+        Mark complete: release {issueName}
+      </SubmitButton>
     </ActionForm>
   );
 }

@@ -3,7 +3,6 @@ import type { Stage } from "@/generated/prisma/enums";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { canCreateDDDocument } from "@/lib/pipeline";
 import { AiTag, formatDateTime } from "@/components/ui";
-import { AutoRefresh } from "./eligibility-client";
 import { CreateDDDocumentButton } from "./dd-document-client";
 
 export type DDJobRow = {
@@ -34,8 +33,7 @@ export function DDDocumentPanel({ ventureId, stage, latest }: { ventureId: strin
       {running && (
         <p className="flex items-center gap-2 text-dxv-green" aria-live="polite">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
-          Drafting the DD document… usually 1 to 3 minutes. This page updates by itself.
-          <AutoRefresh />
+          Drafting the DD document… usually 1 to 3 minutes. Progress is in the corner; this page updates when it&apos;s done.
         </p>
       )}
       {status?.status === "FAILED" && (

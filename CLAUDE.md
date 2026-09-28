@@ -11,7 +11,9 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Every page and server action calls `requireAdmin()` itself; `src/proxy.ts` is not a security boundary.
 - Future angel logins: the **Dashboard and Activity pages stay admin-only** (Blue's requirement). When an angel role is added, keep `requireAdmin()` on them; the angel experience is still to be designed, so ask Blue before exposing any existing page to angels.
 - Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote): never add update/delete paths.
-- Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`.
+- Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`. Every clickable thing gives feedback: buttons use `buttonClass` / `SubmitButton` / `ActionButton` (spinner + working label, "✓ Saved" after); no bare `<form action>` buttons.
+- Long AI jobs: call `announceJobStarted()` after starting one; the floating `JobTray` (`src/components/job-tray.tsx`, reads `/api/jobs`) shows progress and refreshes the page when done. Pages must not poll themselves.
+- Every page has a `loading.tsx` skeleton next to it (route groups keep one route's skeleton from showing for another).
 - Helpers used by server components must not live in `"use client"` files.
 - Prisma 7: client is generated to `src/generated/prisma` (import from `@/generated/prisma/client` or `/enums`). Scripts run via `tsx --conditions=react-server`.
 - Deployed on Netlify + Supabase (`docs/DEPLOY.md`). Every migration that creates a table must also `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (Supabase Data API exposure).

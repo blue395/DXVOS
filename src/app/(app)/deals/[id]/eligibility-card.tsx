@@ -5,7 +5,7 @@ import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { canDecideEligibility, PASS_REASON_LABELS } from "@/lib/pipeline";
 import { AiTag, Card, formatDateTime } from "@/components/ui";
 import { decideEligibility } from "../deck-actions";
-import { AutoRefresh, CopyButton, DecisionForm, DeckUploadForVenture, RerunButton } from "./eligibility-client";
+import { CopyButton, DecisionForm, DeckUploadForVenture, RerunButton } from "./eligibility-client";
 
 type Analysis = {
   id: string;
@@ -76,8 +76,7 @@ export function EligibilityCard({
         {running && (
           <p className="flex items-center gap-2 text-sm text-dxv-green" aria-live="polite">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
-            Reading {latest.fileName}… this page updates by itself.
-            <AutoRefresh />
+            Reading {latest.fileName}… progress is in the corner; this page updates when it&apos;s done.
           </p>
         )}
 

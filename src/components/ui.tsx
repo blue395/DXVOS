@@ -112,15 +112,33 @@ export function formatDateTime(d: Date) {
   }).format(d);
 }
 
-export function buttonClass(variant: "primary" | "secondary" | "accent" = "primary") {
+export type ButtonVariant = "primary" | "secondary" | "accent";
+
+/**
+ * Buttons lift slightly and gain a ring on hover, press down on click, and show a
+ * "not allowed" cursor while disabled, so it's always clear they do something.
+ */
+export function buttonClass(variant: ButtonVariant = "primary") {
   const base =
-    "inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 cursor-pointer";
+    "inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium cursor-pointer select-none " +
+    "transition duration-150 hover:-translate-y-px active:translate-y-0 active:scale-[0.98] " +
+    "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 disabled:translate-y-0";
   switch (variant) {
     case "primary":
-      return `${base} bg-dxv-green text-white hover:bg-dxv-green/90`;
+      return `${base} bg-dxv-green text-white shadow-sm hover:shadow-md hover:ring-2 hover:ring-dxv-yellow`;
     case "accent":
-      return `${base} bg-dxv-yellow text-dxv-green hover:bg-dxv-yellow/80`;
+      return `${base} bg-dxv-yellow text-dxv-green shadow-sm hover:shadow-md hover:ring-2 hover:ring-dxv-green/40`;
     case "secondary":
-      return `${base} border border-dxv-green/30 bg-white text-dxv-green hover:bg-dxv-green/5`;
+      return `${base} border border-dxv-green/30 bg-white text-dxv-green hover:border-dxv-green hover:bg-dxv-green/10 hover:shadow-sm`;
   }
+}
+
+/** Small spinner that inherits the text colour. */
+export function Spinner({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return <span aria-hidden className={`${className} inline-block shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent`} />;
+}
+
+/** Grey placeholder block for loading screens. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div aria-hidden className={`animate-pulse rounded-md bg-black/[0.06] ${className}`} />;
 }
