@@ -13,4 +13,5 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`.
 - Helpers used by server components must not live in `"use client"` files.
 - Prisma 7: client is generated to `src/generated/prisma` (import from `@/generated/prisma/client` or `/enums`). Scripts run via `tsx --conditions=react-server`.
+- Deployed on Netlify + Supabase (`docs/DEPLOY.md`). Every migration that creates a table must also `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (Supabase Data API exposure).
 - Before pushing: `npm test && npm run typecheck && npm run lint && npm run build`.

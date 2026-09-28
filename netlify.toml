@@ -1,0 +1,13 @@
+# Netlify build config. Netlify auto-detects Next.js and applies its adapter
+# (@netlify/plugin-nextjs), which turns pages/actions/proxy into functions.
+
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Only PRODUCTION deploys (merges to main) apply database migrations.
+# Deploy previews must never change the production database schema.
+[context.production]
+  command = "npm run db:deploy && npm run build"

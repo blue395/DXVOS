@@ -79,7 +79,11 @@ scripts/                      seed.ts (dev), create-admin.ts
 - `Role` enum is ready to gain `ANGEL`; `requireAdmin()` is the pattern for a future `requireCertifiedAngel()`.
 - Nav shows Angels / Portfolio as disabled placeholders.
 
-## Deployment (not yet done)
+## Deployment
 
-Any Node host + managed Postgres, in a UK/EU region (e.g. Vercel + Neon, or Railway).
-Run `npm run db:deploy` on release. Then add a Squarespace DNS record for `app.diversityxventures.com`.
+Netlify (app) + Supabase (Postgres, London region). Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+- `netlify.toml`: production deploys run `prisma migrate deploy` before building.
+- Two DB URLs in production: `DATABASE_URL` (pooled, for the app) and `DIRECT_URL` (for migrations).
+- Every table has Row Level Security enabled (no policies) so Supabase's Data API can't expose it.
+- Remote DB connections are always TLS-encrypted; `DATABASE_CA_CERT` adds server verification (`src/lib/db-ssl.ts`).
