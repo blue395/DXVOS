@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { MAX_TOTAL_SCORE, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
+import { aiDraftName, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { AiTag, buttonClass, Card, formatDateTime } from "@/components/ui";
 import { AutoRefresh } from "./eligibility-client";
 import { GenerateButton } from "./assessment/assessment-client";
@@ -18,8 +19,8 @@ export function AssessmentCard({
   canGenerate: boolean;
   hasDeck: boolean;
   latest: { number: number; status: DeckStatus; error: string | null; output: unknown; createdAt: Date; startedAt: Date | null; completedAt: Date | null } | null;
-  draft: { content: unknown; updatedAt: Date } | null;
-  reviewed: { version: number; content: unknown; createdAt: Date; createdBy: { name: string } } | null;
+  draft: { number: number; content: unknown; updatedAt: Date } | null;
+  reviewed: { issueNumber: number; content: unknown; createdAt: Date; createdBy: { name: string } } | null;
 }) {
   const eff = latest ? effectiveDeckStatus(latest) : null;
   const running = eff && (eff.status === "PENDING" || eff.status === "PROCESSING");
@@ -34,22 +35,22 @@ export function AssessmentCard({
         {running && (
           <p className="flex items-center gap-2 text-dxv-green" aria-live="polite">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
-            Drafting AI draft {latest!.number}… usually 1 to 3 minutes.
+            Drafting {aiDraftName(latest!.number)}… usually 1 to 3 minutes.
             <AutoRefresh />
           </p>
         )}
         {eff?.status === "FAILED" && (
           <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-2">
-            AI draft {latest!.number} failed: {eff.error}
+            {aiDraftName(latest!.number)} failed: {eff.error}
           </p>
         )}
 
         <div className="flex flex-wrap gap-3">
           {latest?.status === "COMPLETE" && !!latest.output && (
-            <Summary label={`AI draft ${latest.number}`} score={scoreOf(latest.output)} tag={<AiTag>AI</AiTag>} when={latest.completedAt ?? latest.createdAt} />
+            <Summary label={aiDraftName(latest.number)} score={scoreOf(latest.output)} tag={<AiTag>AI</AiTag>} when={latest.completedAt ?? latest.createdAt} />
           )}
-          {draft && <Summary label="Review copy (in progress)" score={scoreOf(draft.content)} when={draft.updatedAt} />}
-          {reviewed && <Summary label={`Reviewed v${reviewed.version}`} score={scoreOf(reviewed.content)} when={reviewed.createdAt} by={reviewed.createdBy.name} />}
+          {draft && <Summary label={`${reviewDraftName(draft.number)} (in progress)`} score={scoreOf(draft.content)} when={draft.updatedAt} />}
+          {reviewed && <Summary label={reviewIssueName(reviewed.issueNumber)} score={scoreOf(reviewed.content)} when={reviewed.createdAt} by={reviewed.createdBy.name} />}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

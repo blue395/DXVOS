@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { buttonClass, Field, inputClass } from "@/components/ui";
 import type { MemoContent, MemoScore } from "@/lib/memo-ai/schema";
-import { finaliseMemo, generateAssessment, saveMemoScore, saveMemoText, startReview } from "../../memo-actions";
+import { finaliseMemo, generateAssessment, reviseIssue, saveMemoScore, saveMemoText, startReview } from "../../memo-actions";
 import { ScoreBadge } from "./memo-view";
 
 /** A button that runs a server action with no form fields and shows its error inline. */
@@ -51,17 +51,35 @@ export function GenerateButton({ ventureId, again }: { ventureId: string; again:
   );
 }
 
-export function StartReviewButton({ analysisId, replacing, number }: { analysisId: string; replacing: boolean; number: number }) {
+export function StartReviewButton({
+  analysisId,
+  aiNumber,
+  draftNumber,
+  replacing,
+}: {
+  analysisId: string;
+  aiNumber: number;
+  draftNumber: number;
+  replacing: boolean;
+}) {
   return (
     <ActionButton
       run={() => startReview(analysisId)}
       confirm={
         replacing
-          ? `Start a new review copy from AI draft ${number}? The current review copy (and its score changes) is kept in history but no longer editable.`
+          ? `Restart DXV Review Draft ${draftNumber} from AI Draft ${aiNumber}? Your current edits are kept in history but no longer editable.`
           : undefined
       }
     >
-      Start review from AI draft {number}
+      {replacing ? `Restart DXV Review Draft ${draftNumber} from AI Draft ${aiNumber}` : `Start DXV Review Draft ${draftNumber}`}
+    </ActionButton>
+  );
+}
+
+export function ReviseIssueButton({ memoVersionId, draftName }: { memoVersionId: string; draftName: string }) {
+  return (
+    <ActionButton run={() => reviseIssue(memoVersionId)} variant="secondary">
+      Revise as {draftName}
     </ActionButton>
   );
 }
@@ -119,7 +137,7 @@ export function MemoTextForm({ draftId, m, version }: { draftId: string; m: Memo
         {area("followUpQuestions", joinLines(m.followUpQuestions), 5)}
       </Field>
 
-      <SubmitButton>Save memo text</SubmitButton>
+      <SubmitButton>Save draft</SubmitButton>
     </ActionForm>
   );
 }
@@ -168,13 +186,13 @@ export function ScoreRow({ draftId, s, ai, version }: { draftId: string; s: Memo
   );
 }
 
-export function FinaliseForm({ draftId }: { draftId: string }) {
+export function FinaliseForm({ draftId, issueName }: { draftId: string; issueName: string }) {
   return (
     <ActionForm action={finaliseMemo.bind(null, draftId)} className="space-y-3">
-      <Field label="Version note (optional)" hint="e.g. Reviewed by Blue and Anna, Round 3 pitch">
+      <Field label="Issue note (optional)" hint="e.g. Reviewed by Blue and Anna, Round 3 pitch">
         <input name="summary" className={inputClass} />
       </Field>
-      <SubmitButton>Finalise for the syndicate</SubmitButton>
+      <SubmitButton>Mark complete: release {issueName}</SubmitButton>
     </ActionForm>
   );
 }

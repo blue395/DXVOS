@@ -99,11 +99,12 @@ export async function startReview(analysisId: string): Promise<ActionResult> {
   const analysis = await db.memoAnalysis.findUnique({ where: { id: analysisId } });
   if (!analysis || analysis.status !== "COMPLETE" || !analysis.output) return { error: "That AI draft isn't ready." };
 
+  const issues = await db.memoVersion.count({ where: { ventureId: analysis.ventureId, kind: "REVIEWED_MEMO" } });
   await db.$transaction([
-    // Restarting archives the current working copy (kept, with its score log).
+    // Restarting archives the current working draft (kept, with its score log).
     db.memoDraft.updateMany({ where: { ventureId: analysis.ventureId, archivedAt: null }, data: { archivedAt: new Date() } }),
     db.memoDraft.create({
-      data: { ventureId: analysis.ventureId, analysisId, content: analysis.output, createdById: user.id },
+      data: { ventureId: analysis.ventureId, analysisId, number: issues + 1, content: analysis.output, createdById: user.id },
     }),
   ]);
   revalidateAssessment(analysis.ventureId);
@@ -152,7 +153,7 @@ export async function saveMemoText(draftId: string, _prev: ActionResult, formDat
   const parsed = TextSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const draft = await loadOpenDraft(draftId);
-  if (!draft) return { error: "This review copy is no longer open." };
+  if (!draft) return { error: "This draft is no longer open." };
   const f = parsed.data;
 
   const content: MemoContent = {
@@ -200,7 +201,7 @@ export async function saveMemoScore(draftId: string, _prev: ActionResult, formDa
   const parsed = ScoreFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const draft = await loadOpenDraft(draftId);
-  if (!draft) return { error: "This review copy is no longer open." };
+  if (!draft) return { error: "This draft is no longer open." };
   const { criterion, score, justification, reason } = parsed.data;
 
   const current = draft.content.scores.find((s) => s.criterion === criterion);
@@ -221,14 +222,13 @@ export async function saveMemoScore(draftId: string, _prev: ActionResult, formDa
   return { ok: true };
 }
 
-// ── Finalise: a locked, reviewed memo version for the syndicate ─────────────
+// ── Mark complete: DXV Review Draft N becomes DXV Review Issue N (locked) ────
 
 export async function finaliseMemo(draftId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
   const draft = await loadOpenDraft(draftId);
-  if (!draft) return { error: "This review copy is no longer open." };
+  if (!draft) return { error: "This draft is no longer open." };
   const note = String(formData.get("summary") ?? "").trim();
-  const analysis = await db.memoAnalysis.findUnique({ where: { id: draft.analysisId }, select: { number: true } });
 
   await db.$transaction(async (tx) => {
     const latest = await tx.memoVersion.findFirst({ where: { ventureId: draft.ventureId }, orderBy: { version: "desc" } });
@@ -239,11 +239,35 @@ export async function finaliseMemo(draftId: string, _prev: ActionResult, formDat
         kind: "REVIEWED_MEMO",
         content: draft.content,
         sourceAnalysisId: draft.analysisId,
-        summary: note || `Reviewed memo from AI draft ${analysis?.number ?? ""}`.trim(),
+        summary: note || null,
         createdById: user.id,
       },
     });
+    // The draft is done: it now lives on as the issue.
+    await tx.memoDraft.update({ where: { id: draftId }, data: { archivedAt: new Date() } });
   });
   revalidateAssessment(draft.ventureId);
+  return { ok: true };
+}
+
+/** Start DXV Review Draft N+1 from Issue N, to revise and re-issue. */
+export async function reviseIssue(memoVersionId: string): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const issue = await db.memoVersion.findUnique({ where: { id: memoVersionId } });
+  if (!issue || issue.kind !== "REVIEWED_MEMO" || !issue.content || !issue.sourceAnalysisId) return { error: "That issue can't be revised." };
+  if (await db.memoDraft.findFirst({ where: { ventureId: issue.ventureId, archivedAt: null } })) {
+    return { error: "A review draft is already open. Mark it complete (or keep editing it) first." };
+  }
+  const issues = await db.memoVersion.count({ where: { ventureId: issue.ventureId, kind: "REVIEWED_MEMO" } });
+  await db.memoDraft.create({
+    data: {
+      ventureId: issue.ventureId,
+      analysisId: issue.sourceAnalysisId,
+      number: issues + 1,
+      content: issue.content,
+      createdById: user.id,
+    },
+  });
+  revalidateAssessment(issue.ventureId);
   return { ok: true };
 }

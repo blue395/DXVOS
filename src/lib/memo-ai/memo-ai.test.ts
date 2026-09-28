@@ -70,3 +70,15 @@ describe("analyzeMemo", () => {
     await expect(analyzeMemo(fakeMemoClient({ memo: partial }), pdf, context)).rejects.toThrow(/didn't score/);
   });
 });
+
+describe("version names", () => {
+  it("numbers issues by position among reviewed versions, regardless of other memo versions", async () => {
+    const { issueNumbers, reviewIssueName, reviewDraftName, aiDraftName } = await import("./render");
+    const n = issueNumbers([
+      { id: "c", version: 5 },
+      { id: "a", version: 2 }, // version 1, 3, 4 are uploaded memo files
+    ]);
+    expect([n.get("a"), n.get("c")]).toEqual([1, 2]);
+    expect([aiDraftName(1), reviewDraftName(2), reviewIssueName(3)]).toEqual(["AI Draft 1", "DXV Review Draft 2", "DXV Review Issue 3"]);
+  });
+});

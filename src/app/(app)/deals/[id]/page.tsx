@@ -4,15 +4,13 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   GATE_LABELS,
-  MOMENTUM_THRESHOLD_GBP,
   PASS_REASON_LABELS,
   daysSince,
   dealWarnings,
-  eoiSummary,
+  commitmentTotal,
   formatGbp,
   latestVotePerAngel,
   stageLabel,
-  canDecideEligibility,
   canGenerateAssessment,
   roundOptionCount,
   isInvestedStage,
@@ -35,6 +33,7 @@ import { StageMover } from "./stage-mover";
 import { DocumentItem, DocumentsCard, type DocRow } from "./documents-card";
 import { DocumentUploader } from "@/components/document-uploader";
 import { EligibilityCard } from "./eligibility-card";
+import { issueNumbers, reviewIssueName } from "@/lib/memo-ai/render";
 import { AssessmentCard } from "./assessment-card";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
@@ -60,7 +59,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
         },
       },
       memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
-      memoDrafts: { where: { archivedAt: null }, take: 1, select: { content: true, updatedAt: true } },
+      memoDrafts: { where: { archivedAt: null }, take: 1, select: { number: true, content: true, updatedAt: true } },
       ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
       preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
       investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
@@ -76,20 +75,19 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const warnings = dealWarnings(v, now);
 
   // The EOI window opens when the deal (most recently) entered Investment Commitments.
-  const eoiStart = v.stageChanges.find((c) => c.toStage === "INVESTMENT_COMMITMENTS")?.changedAt ?? null;
-  const eoi = eoiSummary(v.investmentVotes, eoiStart, now);
+  const commitments = commitmentTotal(v.investmentVotes);
   const currentInvestmentVoteIds = new Set(latestVotePerAngel(v.investmentVotes).map((x) => x.id));
   const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
+  const issueNo = issueNumbers(v.memoVersions.filter((m) => m.kind === "REVIEWED_MEMO"));
   const docs: DocRow[] = v.documents.map((d) => ({ ...d, isMemoVersion: !!d.memoVersion }));
   const latestDeck = docs.find((d) => d.category === "DECK");
 
-  // At intake the eligibility decision is the next job, so show it first.
+
   const eligibility = (
     <EligibilityCard ventureId={v.id} stage={v.currentStage} analyses={v.deckAnalyses} reviews={v.eligibilityReviews} />
   );
-  const atIntake = canDecideEligibility(v.currentStage);
 
   return (
     <div className="space-y-6">
@@ -140,12 +138,14 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* ── Main column ── */}
         <div className="space-y-6">
-          {atIntake && eligibility}
 
           <Card title="Stage">
             {/* key: reset the dropdown whenever the stage changes elsewhere (board, eligibility decision) */}
             <StageMover key={v.currentStage} currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
           </Card>
+
+          {/* Page follows the dealflow: eligibility, assessment, memo, votes, commitments, DD. */}
+          {eligibility}
 
           {(canGenerateAssessment(v.currentStage) || v.memoAnalyses.length > 0) && (
             <AssessmentCard
@@ -154,7 +154,10 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               hasDeck={v.deckAnalyses.some((a) => a.status !== "PENDING")}
               latest={v.memoAnalyses[0] ?? null}
               draft={v.memoDrafts[0] ?? null}
-              reviewed={v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO") ?? null}
+              reviewed={(() => {
+                const latestIssue = v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO");
+                return latestIssue ? { ...latestIssue, issueNumber: issueNo.get(latestIssue.id)! } : null;
+              })()}
             />
           )}
 
@@ -170,7 +173,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                     <div>
                       {m.kind === "REVIEWED_MEMO" ? (
                         <Link href={`/deals/${v.id}/assessment?view=v-${m.version}`} className="font-medium text-dxv-green hover:underline">
-                          Version {m.version} · reviewed memo
+                          {reviewIssueName(issueNo.get(m.id)!)}
                         </Link>
                       ) : m.document ? (
                         <a href={`/api/documents/${m.document.id}`} target="_blank" rel="noreferrer" className="font-medium text-dxv-green hover:underline">
@@ -191,8 +194,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               <DocumentUploader ventureId={v.id} category="MEMO" label="Upload a memo file (PDF or Word) as a new version" />
             </div>
           </Card>
-
-          <DocumentsCard ventureId={v.id} docs={docs} />
 
           <Card
             title="Pre-Selection votes"
@@ -219,7 +220,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           </Card>
 
           <Card title="Investment commitments / EOI">
-            <Momentum eoi={eoi} />
+            <CommitmentsTotal totalGbp={commitments.totalGbp} interestedCount={commitments.interestedCount} />
             <VoteList
               votes={v.investmentVotes.map((x) => ({ ...x, current: currentInvestmentVoteIds.has(x.id) }))}
               emptyText="No expressions of interest recorded."
@@ -245,7 +246,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </ActionForm>
           </Card>
 
-          <Card title="Due diligence checklist" actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}>
+          <Card title="Due Diligence" actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}>
             {v.ddItems.length === 0 ? (
               <p className="text-sm text-black/55">No DD items yet.</p>
             ) : (
@@ -312,7 +313,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </ActionForm>
           </Card>
 
-          {!atIntake && eligibility}
+          <DocumentsCard ventureId={v.id} docs={docs} />
+
         </div>
 
         {/* ── Sidebar ── */}
@@ -469,31 +471,14 @@ function VoteList({ votes, emptyText, showTicket }: { votes: VoteRow[]; emptyTex
   );
 }
 
-function Momentum({ eoi }: { eoi: ReturnType<typeof eoiSummary> }) {
-  const pct = Math.min(100, Math.round((eoi.withinWindowGbp / MOMENTUM_THRESHOLD_GBP) * 100));
+/** Running total of commitments (each angel's latest vote). */
+function CommitmentsTotal({ totalGbp, interestedCount }: { totalGbp: number; interestedCount: number }) {
   return (
-    <div className="mb-4 rounded-md bg-dxv-green p-4 text-white">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm">
-          <span className="text-2xl font-semibold text-dxv-yellow">{formatGbp(eoi.withinWindowGbp)}</span>
-          <span className="text-white/75"> of {formatGbp(MOMENTUM_THRESHOLD_GBP)} momentum threshold</span>
-        </p>
-        <p className="text-xs text-white/75">
-          {eoi.windowStart
-            ? eoi.windowOpen
-              ? `Window open until ${formatDate(eoi.windowEnd)}`
-              : `Window closed ${formatDate(eoi.windowEnd)}`
-            : "Window opens when the deal enters Investment Commitments"}
-        </p>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
-        <div className="h-full rounded-full bg-dxv-yellow" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mt-2 text-xs text-white/75">
-        {eoi.thresholdMet ? "Threshold met. " : ""}
-        {eoi.interestedCount} interested angel{eoi.interestedCount === 1 ? "" : "s"} · {formatGbp(eoi.totalGbp)} total indicated
-        (including outside the window)
-      </p>
+    <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md bg-dxv-green px-4 py-3 text-white">
+      <span className="text-3xl font-semibold text-dxv-yellow tabular-nums">{formatGbp(totalGbp)}</span>
+      <span className="text-sm text-white/80">
+        committed so far · {interestedCount} interested angel{interestedCount === 1 ? "" : "s"}
+      </span>
     </div>
   );
 }
