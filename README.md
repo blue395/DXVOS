@@ -85,6 +85,10 @@ scripts/                      seed.ts (dev), create-admin.ts
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`
   (spec §10 principle, ready for angel logins later).
 - **Money in whole pounds** (`Int`).
+- **Few database round trips per page.** Production talks to Supabase over the network, so each round trip
+  is expensive. Prisma's `relationJoins` loads a record and its relations in one SQL query, and pages check
+  the admin and load their data in parallel (`requireAdminWith`). With 80ms simulated database latency the
+  deal page went from 555ms to 131ms. Keep Netlify's Functions region next to the database (London).
 
 ## Feel: feedback on every click
 

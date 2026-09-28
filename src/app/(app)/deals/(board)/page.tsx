@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cardOneLiner, daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
@@ -7,29 +7,31 @@ import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "../kanban-board";
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
-  await requireAdmin();
   const filter = parseRoundFilter((await searchParams).round);
 
-  // Counts per round for the filter pills (null = no round assigned).
-  const roundCounts = await db.venture.groupBy({ by: ["round"], _count: { _all: true }, orderBy: { round: "asc" } });
-
-  const ventures = await db.venture.findMany({
-    where: filter.kind === "round" ? { round: filter.round } : filter.kind === "none" ? { round: null } : {},
-    orderBy: { stageEnteredAt: "asc" }, // longest-waiting first within each column
-    select: {
-      id: true,
-      name: true,
-      sector: true,
-      round: true,
-      companyStage: true,
-      raiseAmountGbp: true,
-      description: true,
-      currentStage: true,
-      stageEnteredAt: true,
-      ddItems: { select: { dueDate: true, completedAt: true } },
-      _count: { select: { founderComms: { where: { status: "NOT_YET_SENT" } } } },
-    },
-  });
+  const [roundCounts, ventures] = await requireAdminWith(() =>
+    Promise.all([
+      // Counts per round for the filter pills (null = no round assigned).
+      db.venture.groupBy({ by: ["round"], _count: { _all: true }, orderBy: { round: "asc" } }),
+      db.venture.findMany({
+        where: filter.kind === "round" ? { round: filter.round } : filter.kind === "none" ? { round: null } : {},
+        orderBy: { stageEnteredAt: "asc" }, // longest-waiting first within each column
+        select: {
+          id: true,
+          name: true,
+          sector: true,
+          round: true,
+          companyStage: true,
+          raiseAmountGbp: true,
+          description: true,
+          currentStage: true,
+          stageEnteredAt: true,
+          ddItems: { select: { dueDate: true, completedAt: true } },
+          _count: { select: { founderComms: { where: { status: "NOT_YET_SENT" } } } },
+        },
+      }),
+    ]),
+  );
 
   // Per deal: when the deck was first uploaded (the "submitted" clock starts at the
   // upload for the eligibility check), and the latest AI one-line summary.

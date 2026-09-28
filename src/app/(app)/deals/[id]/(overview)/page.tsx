@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   GATE_LABELS,
@@ -37,44 +37,47 @@ import { DDDocumentPanel } from "../dd-document";
 import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
-  await requireAdmin();
   const { id } = await params;
 
-  const v = await db.venture.findUnique({
-    where: { id },
-    include: {
-      stageChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
-      memoVersions: {
-        where: { kind: { not: "DRIVE_LINK" } }, // Drive links retired 2026-09-28
-        orderBy: { version: "desc" },
-        include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true } } },
-      },
-      documents: {
-        where: { uploadedAt: { not: null }, archivedAt: null },
-        orderBy: { uploadedAt: "desc" },
+  const [v, { _max }] = await requireAdminWith(() =>
+    Promise.all([
+      db.venture.findUnique({
+        where: { id },
         include: {
-          uploadedBy: { select: { name: true } },
-          ddItem: { select: { title: true } },
-          memoVersion: { select: { id: true } },
+          stageChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
+          memoVersions: {
+            where: { kind: { not: "DRIVE_LINK" } }, // Drive links retired 2026-09-28
+            orderBy: { version: "desc" },
+            include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true } } },
+          },
+          documents: {
+            where: { uploadedAt: { not: null }, archivedAt: null },
+            orderBy: { uploadedAt: "desc" },
+            include: {
+              uploadedBy: { select: { name: true } },
+              ddItem: { select: { title: true } },
+              memoVersion: { select: { id: true } },
+            },
+          },
+          memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
+          memoDrafts: { where: { archivedAt: null }, take: 1, select: { number: true, content: true, updatedAt: true } },
+          ddReportJobs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true, archivedAt: true } } },
+          },
+          ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
+          preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
+          investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
+          founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
+          deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
+          eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
         },
-      },
-      memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
-      memoDrafts: { where: { archivedAt: null }, take: 1, select: { number: true, content: true, updatedAt: true } },
-      ddReportJobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true, archivedAt: true } } },
-      },
-      ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
-      preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
-      investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
-      founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
-      deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
-      eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
-    },
-  });
+      }),
+      db.venture.aggregate({ _max: { round: true } }),
+    ]),
+  );
   if (!v) notFound();
-  const { _max } = await db.venture.aggregate({ _max: { round: true } });
 
   const now = new Date();
   const warnings = dealWarnings(v, now);

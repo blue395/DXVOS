@@ -9,6 +9,10 @@
 
 generator client {
   provider = "prisma-client"
+  // Load a record and its relations in one SQL query (LATERAL joins) instead of one
+  // query per relation: far fewer round trips to Supabase. Preview feature; remove
+  // this line to go back to the default strategy.
+  previewFeatures = ["relationJoins"]
   output   = "../src/generated/prisma"
 }
 

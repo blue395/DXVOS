@@ -8,7 +8,8 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Palette is exactly `#fbe45b` (dxv-yellow), `#1a3c35` (dxv-green), white, black. Tints via opacity (`black/10`), never new colours. Warnings use yellow, not red.
 - Domain rules go in `src/lib/pipeline.ts` (pure + unit-tested), not in components.
 - Stage changes only via `moveVentureStage()` in `src/lib/ventures.ts`.
-- Every page and server action calls `requireAdmin()` itself; `src/proxy.ts` is not a security boundary.
+- Every page and server action calls `requireAdmin()` itself; `src/proxy.ts` is not a security boundary. Pages may use `requireAdminWith(() => load())` to check and read in parallel; actions always check before writing.
+- Speed: every database round trip costs ~80ms+ in production, so load a page's data in one `Promise.all` (Prisma `relationJoins` puts a record and its relations in one query); avoid sequential awaits.
 - Future angel logins: the **Dashboard and Activity pages stay admin-only** (Blue's requirement). When an angel role is added, keep `requireAdmin()` on them; the angel experience is still to be designed, so ask Blue before exposing any existing page to angels.
 - Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote): never add update/delete paths.
 - Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`. Every clickable thing gives feedback: buttons use `buttonClass` / `SubmitButton` / `ActionButton` (spinner + working label, "✓ Saved" after); no bare `<form action>` buttons.
