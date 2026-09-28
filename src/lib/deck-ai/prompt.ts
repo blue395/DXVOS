@@ -47,5 +47,5 @@ export const DECK_USER_INSTRUCTIONS = `The attached PDF is the founder deck. Pro
    - sector.note: any obvious viability concern, or "No concern"
    - teamStrength: one to two lines; say plainly if the deck has no team information
    - redFlags: anything that should stop this proceeding automatically; an empty list if none
-   - nextStep: "Proceed to DXV internal team review", "Decline: <reason>", or "Request from founder: <specific missing item>"
+   - nextStep: "Proceed to DXV partner review", "Decline: <reason>", or "Request from founder: <specific missing item>"
    A "Not stated" thesis fit alone is never a reason to decline: recommend asking the founder instead.`;

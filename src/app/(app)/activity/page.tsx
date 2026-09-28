@@ -41,7 +41,7 @@ export default async function ActivityPage() {
                   {c.passReason && <span className="text-black/60"> ({PASS_REASON_LABELS[c.passReason]})</span>}
                   {c.note && <span className="text-black/60"> · “{c.note}”</span>}
                 </td>
-                <td className="py-1.5 text-black/60">{c.changedBy.name}</td>
+                <td className="py-1.5 text-black/60">{c.changedBy?.name ?? "System"}</td>
               </tr>
             ))}
           </tbody>

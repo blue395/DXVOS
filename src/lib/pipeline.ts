@@ -13,39 +13,46 @@ export type StageMeta = {
   gate?: Gate;
   /** What the founder is told when the deal moves forward past this gate. */
   proceedDecision?: string;
-  /** Stages 1–2 are intake; formal pipeline tracking starts at "Add to pipeline". */
+  /** Stages 1–2 are intake (before DXV partner review). */
   intake?: boolean;
+  /** Optional final step: not every deal needs it (e.g. no S/EIS relief). */
+  optional?: boolean;
 };
 
 // Ordered. The index in this array IS the pipeline order.
+// Revised 2026-09-28: decision gates at stages 2 to 7.
 export const LINEAR_STAGES: StageMeta[] = [
-  { key: "FOUNDER_DECK", label: "Founder deck", intake: true },
+  { key: "SUBMITTED", label: "Submitted", intake: true },
   {
-    key: "ELIGIBILITY_SCREENING",
-    label: "Eligibility screening",
+    key: "ELIGIBILITY_SCREEN",
+    label: "Eligibility Screen",
     intake: true,
     gate: "ELIGIBILITY",
-    proceedDecision: "Proceed",
+    proceedDecision: "Eligible: proceeding to DXV partner review",
   },
-  { key: "ADD_TO_PIPELINE", label: "Add to pipeline" },
-  { key: "INTERNAL_REVIEW", label: "DXV internal team review" },
+  {
+    key: "PARTNER_REVIEW",
+    label: "DXV Partner Review",
+    gate: "PARTNER_REVIEW",
+    proceedDecision: "Shortlisted for member pitch selection",
+  },
   {
     key: "PITCH_SELECTION",
-    label: "Pitch selection",
+    label: "Member Pitch Selection",
     gate: "PITCH_SELECTION",
     proceedDecision: "Invited to pitch",
   },
   {
     key: "PITCH_OUTCOME",
-    label: "Pitch outcome",
+    label: "Pitch Outcome",
     gate: "PITCH_OUTCOME",
-    proceedDecision: "Proceeding to EOI",
+    proceedDecision: "Proceeding to investment commitments",
   },
   {
-    key: "INVESTMENT_VOTES",
-    label: "Investment votes",
-    gate: "INVESTMENT_VOTES",
-    proceedDecision: "Threshold met — proceeding to DD",
+    key: "INVESTMENT_COMMITMENTS",
+    label: "Investment Commitments",
+    gate: "INVESTMENT_COMMITMENTS",
+    proceedDecision: "Commitment threshold met: proceeding to due diligence",
   },
   {
     key: "DUE_DILIGENCE",
@@ -54,15 +61,20 @@ export const LINEAR_STAGES: StageMeta[] = [
     proceedDecision: "Proceeding to investment",
   },
   { key: "CAPITAL_TRANSFER", label: "Capital Transfer" },
-  { key: "INVESTMENT", label: "Investment" },
+  { key: "INVESTMENT_COMPLETE", label: "Investment Complete" },
+  { key: "SEIS_CERTIFICATE", label: "S/EIS Certificate", optional: true },
 ];
 
 export const PASSED_STAGE: StageMeta = { key: "PASSED", label: "Passed", gate: "PASSED" };
 
+/** Every stage a deal can be in today (what the board and stage pickers offer). */
 export const ALL_STAGES: StageMeta[] = [...LINEAR_STAGES, PASSED_STAGE];
 
+/** Stages no longer used, kept so old stage history still reads correctly. */
+const RETIRED_STAGES: StageMeta[] = [{ key: "ADD_TO_PIPELINE", label: "Add to pipeline (retired)" }];
+
 export function stageMeta(stage: Stage): StageMeta {
-  const meta = ALL_STAGES.find((s) => s.key === stage);
+  const meta = ALL_STAGES.find((s) => s.key === stage) ?? RETIRED_STAGES.find((s) => s.key === stage);
   if (!meta) throw new Error(`Unknown stage ${stage}`);
   return meta;
 }
@@ -71,18 +83,25 @@ export function stageLabel(stage: Stage): string {
   return stageMeta(stage).label;
 }
 
-/** Position in the linear pipeline; PASSED has no position (-1). */
+/** Position in the linear pipeline; PASSED and retired stages have none (-1). */
 export function stageIndex(stage: Stage): number {
   return LINEAR_STAGES.findIndex((s) => s.key === stage);
+}
+
+/** Deals still being worked on (not passed, and not through to Investment Complete). */
+export function isActiveStage(stage: Stage): boolean {
+  const i = stageIndex(stage);
+  return i >= 0 && i < stageIndex("INVESTMENT_COMPLETE");
 }
 
 // ── Gates ───────────────────────────────────────────────────────────────────
 
 export const GATE_LABELS: Record<Gate, string> = {
-  ELIGIBILITY: "After Eligibility screening",
-  PITCH_SELECTION: "After Pitch selection",
-  PITCH_OUTCOME: "After Pitch outcome",
-  INVESTMENT_VOTES: "After Investment votes",
+  ELIGIBILITY: "After Eligibility Screen",
+  PARTNER_REVIEW: "After DXV Partner Review",
+  PITCH_SELECTION: "After Member Pitch Selection",
+  PITCH_OUTCOME: "After Pitch Outcome",
+  INVESTMENT_COMMITMENTS: "After Investment Commitments",
   DUE_DILIGENCE: "After Due Diligence",
   PASSED: "Passed",
 };
@@ -102,11 +121,11 @@ export function gatesCrossed(from: Stage | null, to: Stage, passReason?: PassRea
     const why = passReason ? ` — ${PASS_REASON_LABELS[passReason]}` : "";
     return [{ gate: "PASSED", decision: `Decline${why}` }];
   }
-  if (from === null || from === "PASSED") return [];
+  if (from === null) return [];
 
   const fromIdx = stageIndex(from);
   const toIdx = stageIndex(to);
-  if (toIdx <= fromIdx) return [];
+  if (fromIdx < 0 || toIdx <= fromIdx) return []; // from Passed / a retired stage, or backwards
 
   return LINEAR_STAGES.slice(fromIdx, toIdx)
     .filter((s) => s.gate)
@@ -126,7 +145,7 @@ export const PASS_REASON_LABELS: Record<PassReason, string> = {
 
 export const PASS_REASONS = Object.keys(PASS_REASON_LABELS) as PassReason[];
 
-// ── Investment votes / momentum ─────────────────────────────────────────────
+// ── Investment commitments (EOI votes) / momentum ─────────────────────────────────────────────
 
 /** Spec §5: "currently £20k in one week". Change here if the syndicate changes the rule. */
 export const MOMENTUM_THRESHOLD_GBP = 20_000;
@@ -167,7 +186,7 @@ export type EoiSummary = {
 };
 
 /**
- * @param windowStart when the deal entered Investment votes (null if it hasn't yet)
+ * @param windowStart when the deal entered Investment Commitments (null if it hasn't yet)
  */
 export function eoiSummary(votes: EoiLike[], windowStart: Date | null, now: Date = new Date()): EoiSummary {
   const latest = latestVotePerAngel(votes).filter((v) => v.interested);
@@ -204,7 +223,7 @@ export type WarningInput = {
 
 export function dealWarnings(v: WarningInput, now: Date = new Date()): string[] {
   const warnings: string[] = [];
-  if (v.currentStage === "INVESTMENT_VOTES" && now.getTime() - v.stageEnteredAt.getTime() > EOI_WINDOW_DAYS * DAY_MS) {
+  if (v.currentStage === "INVESTMENT_COMMITMENTS" && now.getTime() - v.stageEnteredAt.getTime() > EOI_WINDOW_DAYS * DAY_MS) {
     warnings.push("Stalled past the EOI window");
   }
   if (v.currentStage !== "PASSED" && v.ddItems.some((i) => !i.completedAt && i.dueDate && i.dueDate < now)) {
@@ -229,12 +248,19 @@ export function formatGbp(n: number): string {
 
 /** A human can record an eligibility decision while the deal is still at intake. */
 export function canDecideEligibility(stage: Stage): boolean {
-  return stage === "FOUNDER_DECK" || stage === "ELIGIBILITY_SCREENING";
+  return stage === "SUBMITTED" || stage === "ELIGIBILITY_SCREEN";
 }
 
 /** Where each decision moves the deal. "Need more info" doesn't move it. */
 export const ELIGIBILITY_DECISION_TARGET = {
-  PROCEED: "ADD_TO_PIPELINE",
+  PROCEED: "PARTNER_REVIEW",
   DECLINE: "PASSED",
   NEED_MORE_INFO: null,
 } as const satisfies Record<string, Stage | null>;
+
+// ── Rounds ──────────────────────────────────────────────────────────────────
+
+/** How many rounds the Round dropdown offers: at least 12, and always two beyond the highest in use. */
+export function roundOptionCount(highestRoundInUse: number | null | undefined): number {
+  return Math.max(12, (highestRoundInUse ?? 0) + 2);
+}

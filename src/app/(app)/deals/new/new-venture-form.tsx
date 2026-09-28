@@ -8,7 +8,7 @@ import { EXTRACTED_FIELD_KEYS } from "@/lib/deck-ai/schema";
 import { createVenture } from "../actions";
 import { VentureFields } from "../venture-fields";
 
-export function NewVentureForm() {
+export function NewVentureForm({ roundOptions }: { roundOptions: number }) {
   const [deck, setDeck] = useState<DeckResult | null>(null);
   const extracted = deck?.extracted ?? null;
   const aiFields = extracted ? EXTRACTED_FIELD_KEYS.filter((k) => extracted[k] !== null && extracted[k] !== "") : [];
@@ -33,10 +33,10 @@ export function NewVentureForm() {
             </p>
           )}
           <p className="text-sm text-black/60">
-            New ventures start at <strong>Founder deck</strong>.
+            New ventures start at <strong>Submitted</strong>.
           </p>
           <input type="hidden" name="analysisId" value={deck?.analysisId ?? ""} />
-          <VentureFields v={extracted ?? {}} ai={aiFields} />
+          <VentureFields v={extracted ?? {}} ai={aiFields} roundOptions={roundOptions} />
           <SubmitButton>Create venture</SubmitButton>
         </ActionForm>
       </Card>

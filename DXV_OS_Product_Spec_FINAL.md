@@ -37,6 +37,15 @@ Dashboard · Angels · Deals · Portfolio · Activity, plus a **View as Angel** 
 
 ## 5. The Deals pipeline
 
+> **Amended 2026-09-28 (Blue): simplified stages.** The pipeline is now:
+> 1 Submitted, 2 Eligibility Screen, 3 DXV Partner Review, 4 Member Pitch Selection,
+> 5 Pitch Outcome, 6 Investment Commitments, 7 Due Diligence, 8 Capital Transfer,
+> 9 Investment Complete, 10 S/EIS Certificate (if applicable), plus Passed.
+> Pass/decline decision gates are at stages 2 to 7 (DXV Partner Review is now a gate).
+> "Add to pipeline" was retired; existing deals there moved to DXV Partner Review.
+> Each deal also has a **Round** (Round 1, Round 2, ...). The list below is the original
+> wording, kept for context; `src/lib/pipeline.ts` is the source of truth.
+
 Ten linear stages plus one cross-cutting terminal state:
 
 1. **Founder deck** — deck/materials received; admin-entered Venture record with a deck link

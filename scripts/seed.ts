@@ -16,16 +16,16 @@ const DEV_EMAIL = "admin@dxv.local";
 const DEV_PASSWORD = "dxv-dev-password";
 
 const SAMPLES: { name: string; sector: string; founderNames: string; stage: Stage; passReason?: PassReason }[] = [
-  { name: "Kora Health", sector: "Healthtech", founderNames: "Amara Okafor", stage: "FOUNDER_DECK" },
-  { name: "Loop Lending", sector: "Fintech", founderNames: "Priya Shah", stage: "ELIGIBILITY_SCREENING" },
-  { name: "Tessellate", sector: "Climate", founderNames: "Jordan Mensah", stage: "ADD_TO_PIPELINE" },
-  { name: "Halo Learning", sector: "Edtech", founderNames: "Sofia Reyes", stage: "INTERNAL_REVIEW" },
+  { name: "Kora Health", sector: "Healthtech", founderNames: "Amara Okafor", stage: "SUBMITTED" },
+  { name: "Loop Lending", sector: "Fintech", founderNames: "Priya Shah", stage: "ELIGIBILITY_SCREEN" },
+  { name: "Tessellate", sector: "Climate", founderNames: "Jordan Mensah", stage: "PARTNER_REVIEW" },
+  { name: "Halo Learning", sector: "Edtech", founderNames: "Sofia Reyes", stage: "PARTNER_REVIEW" },
   { name: "Brightside Care", sector: "Care", founderNames: "Kemi Adeyemi", stage: "PITCH_SELECTION" },
   { name: "Northstar Logistics", sector: "Logistics", founderNames: "Omar Haddad", stage: "PITCH_OUTCOME" },
-  { name: "Verdant Foods", sector: "Food", founderNames: "Lina Chen", stage: "INVESTMENT_VOTES" },
+  { name: "Verdant Foods", sector: "Food", founderNames: "Lina Chen", stage: "INVESTMENT_COMMITMENTS" },
   { name: "Mosaic Pay", sector: "Fintech", founderNames: "Daniel Asante", stage: "DUE_DILIGENCE" },
   { name: "Fable Robotics", sector: "Deeptech", founderNames: "Hana Ito", stage: "CAPITAL_TRANSFER" },
-  { name: "Ember Energy", sector: "Climate", founderNames: "Grace Nwosu", stage: "INVESTMENT" },
+  { name: "Ember Energy", sector: "Climate", founderNames: "Grace Nwosu", stage: "SEIS_CERTIFICATE" },
   { name: "Quill Legal", sector: "Legaltech", founderNames: "Sam Patel", stage: "PASSED", passReason: "VALUATION_GAP" },
 ];
 
@@ -45,9 +45,10 @@ async function main() {
         sector: s.sector,
         founderNames: s.founderNames,
         companyStage: "Pre-seed",
+        round: 1 + (SAMPLES.indexOf(s) % 3),
         deckUrl: "https://drive.google.com/",
         createdById: admin.id,
-        stageChanges: { create: { fromStage: null, toStage: "FOUNDER_DECK", changedById: admin.id } },
+        stageChanges: { create: { fromStage: null, toStage: "SUBMITTED", changedById: admin.id } },
       },
     });
 
