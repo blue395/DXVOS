@@ -101,9 +101,10 @@ From DXV Partner Review onwards, a partner can click **Generate AI assessment** 
 drafts a memo in DXV's template (header, executive summary, investment case, conclusion, eleven-criterion
 scoring table, SWOT, follow-up questions) from the stored deck plus what DXV OS already knows (eligibility
 screen, partner decisions, founder comms notes). Prompt: `src/lib/memo-ai/prompt.ts`.
-- `MemoAnalysis` = "AI draft N": immutable, records the context it was given. The review banner is added by the app.
-- `MemoDraft` = the partners' editable review copy; each score can be overruled individually, logged in `MemoScoreChange`.
-- **Finalise** writes a locked `MemoVersion` (kind `REVIEWED_MEMO`) alongside Drive-link versions.
+- Naming: **AI Draft N** (`MemoAnalysis`, immutable, records its context; banner added by the app) →
+  **DXV Review Draft N** (`MemoDraft`, one working draft per issue; saving updates it; scores overruled
+  individually, logged in `MemoScoreChange`) → **Mark complete** → **DXV Review Issue N** (locked `MemoVersion`,
+  kind `REVIEWED_MEMO`) → **Revise** → DXV Review Draft N+1 → Issue N+1.
 - Full memo UI at `/deals/[id]/assessment`; runs in the Netlify background function `analyze-memo-background`.
 
 ## Documents (DXV OS is the document store)

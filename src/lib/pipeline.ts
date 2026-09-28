@@ -52,7 +52,7 @@ export const LINEAR_STAGES: StageMeta[] = [
     key: "INVESTMENT_COMMITMENTS",
     label: "Investment Commitments",
     gate: "INVESTMENT_COMMITMENTS",
-    proceedDecision: "Commitment threshold met: proceeding to due diligence",
+    proceedDecision: "Proceeding to due diligence",
   },
   {
     key: "DUE_DILIGENCE",
@@ -145,11 +145,11 @@ export const PASS_REASON_LABELS: Record<PassReason, string> = {
 
 export const PASS_REASONS = Object.keys(PASS_REASON_LABELS) as PassReason[];
 
-// ── Investment commitments (EOI votes) / momentum ─────────────────────────────────────────────
+// ── Investment commitments (EOI votes) ──────────────────────────────────────
+// (The £20k-in-a-week momentum threshold was removed on 2026-09-28: a running total instead.)
 
-/** Spec §5: "currently £20k in one week". Change here if the syndicate changes the rule. */
-export const MOMENTUM_THRESHOLD_GBP = 20_000;
-export const EOI_WINDOW_DAYS = 7;
+/** A deal sitting in Investment Commitments longer than this gets a card warning. */
+export const COMMITMENTS_STALL_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -174,43 +174,10 @@ export function latestVotePerAngel<T extends { angelName: string; createdAt: Dat
   return [...latest.values()];
 }
 
-export type EoiSummary = {
-  interestedCount: number;
-  totalGbp: number;
-  /** Total from votes cast inside the EOI window — what the threshold is judged on. */
-  withinWindowGbp: number;
-  windowStart: Date | null;
-  windowEnd: Date | null;
-  windowOpen: boolean;
-  thresholdMet: boolean;
-};
-
-/**
- * @param windowStart when the deal entered Investment Commitments (null if it hasn't yet)
- */
-export function eoiSummary(votes: EoiLike[], windowStart: Date | null, now: Date = new Date()): EoiSummary {
-  const latest = latestVotePerAngel(votes).filter((v) => v.interested);
-  const totalGbp = sum(latest.map((v) => v.maxTicketGbp));
-
-  const windowEnd = windowStart ? new Date(windowStart.getTime() + EOI_WINDOW_DAYS * DAY_MS) : null;
-
-  // For the threshold, use each angel's latest vote *as of the window closing*.
-  const inWindow = windowStart
-    ? latestVotePerAngel(votes.filter((v) => v.createdAt >= windowStart && v.createdAt <= windowEnd!)).filter(
-        (v) => v.interested,
-      )
-    : [];
-  const withinWindowGbp = sum(inWindow.map((v) => v.maxTicketGbp));
-
-  return {
-    interestedCount: latest.length,
-    totalGbp,
-    withinWindowGbp,
-    windowStart,
-    windowEnd,
-    windowOpen: !!windowEnd && now <= windowEnd,
-    thresholdMet: withinWindowGbp >= MOMENTUM_THRESHOLD_GBP,
-  };
+/** Running total: each angel's latest vote counts; only "interested" votes add to the total. */
+export function commitmentTotal(votes: EoiLike[]): { totalGbp: number; interestedCount: number } {
+  const interested = latestVotePerAngel(votes).filter((v) => v.interested);
+  return { totalGbp: sum(interested.map((v) => v.maxTicketGbp)), interestedCount: interested.length };
 }
 
 // ── Card warnings (spec §13 — the two drafted conditions) ───────────────────
@@ -223,8 +190,8 @@ export type WarningInput = {
 
 export function dealWarnings(v: WarningInput, now: Date = new Date()): string[] {
   const warnings: string[] = [];
-  if (v.currentStage === "INVESTMENT_COMMITMENTS" && now.getTime() - v.stageEnteredAt.getTime() > EOI_WINDOW_DAYS * DAY_MS) {
-    warnings.push("Stalled past the EOI window");
+  if (v.currentStage === "INVESTMENT_COMMITMENTS" && now.getTime() - v.stageEnteredAt.getTime() > COMMITMENTS_STALL_DAYS * DAY_MS) {
+    warnings.push(`In Investment Commitments for over ${COMMITMENTS_STALL_DAYS} days`);
   }
   if (v.currentStage !== "PASSED" && v.ddItems.some((i) => !i.completedAt && i.dueDate && i.dueDate < now)) {
     warnings.push("Overdue DD item");

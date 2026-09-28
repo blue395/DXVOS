@@ -58,7 +58,9 @@ Dashboard · Angels · Deals · Portfolio · Activity, plus a **View as Angel** 
 > 9 Investment Complete, 10 S/EIS Certificate (if applicable), plus Passed.
 > Pass/decline decision gates are at stages 2 to 7 (DXV Partner Review is now a gate).
 > "Add to pipeline" was retired; existing deals there moved to DXV Partner Review.
-> Each deal also has a **Round** (Round 1, Round 2, ...). The list below is the original
+> Each deal also has a **Round** (Round 1, Round 2, ...).
+> **Amended again 2026-09-28:** the £20k-in-one-week momentum threshold is removed;
+> Investment Commitments shows a running total of commitments instead. The list below is the original
 > wording, kept for context; `src/lib/pipeline.ts` is the source of truth.
 
 Ten linear stages plus one cross-cutting terminal state:

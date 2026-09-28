@@ -193,10 +193,13 @@ model MemoAnalysis {
   @@unique([ventureId, number])
 }
 
-// Partners' editable working copy of a memo, started from an AI draft.
-// Restarting from a different AI draft archives the old copy (archivedAt).
+// "DXV Review Draft N": the partners' one working draft per issue, started from an
+// AI draft (or, for N > 1, from the previous issue). Saving updates it; "Mark complete"
+// turns it into "DXV Review Issue N" (a locked MemoVersion) and closes it (archivedAt).
+// Restarting from a different AI draft also archives the current one.
 model MemoDraft {
   id          String       @id @default(cuid())
+  number      Int          @default(1) // becomes DXV Review Issue <number>
   ventureId   String
   venture     Venture      @relation(fields: [ventureId], references: [id], onDelete: Cascade)
   analysisId  String

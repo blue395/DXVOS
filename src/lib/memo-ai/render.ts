@@ -39,3 +39,16 @@ export function renderMemo(m: MemoContent, opts: { banner: boolean; footer?: str
   ];
   return parts.join("\n\n");
 }
+
+// ── Version names (Blue's naming, 2026-09-28) ───────────────────────────────
+// AI Draft N (AI output) → DXV Review Draft N (one working draft per issue)
+// → DXV Review Issue N (locked, for the syndicate) → revise → Draft N+1 → Issue N+1.
+export const aiDraftName = (n: number) => `AI Draft ${n}`;
+export const reviewDraftName = (n: number) => `DXV Review Draft ${n}`;
+export const reviewIssueName = (n: number) => `DXV Review Issue ${n}`;
+
+/** Issue number of each reviewed memo version: its position among the venture's issues. */
+export function issueNumbers(reviewedVersions: { id: string; version: number }[]): Map<string, number> {
+  const sorted = [...reviewedVersions].sort((a, b) => a.version - b.version);
+  return new Map(sorted.map((v, i) => [v.id, i + 1]));
+}

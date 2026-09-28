@@ -3,15 +3,16 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
-import { renderMemo } from "@/lib/memo-ai/render";
+import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { totalScore, MAX_TOTAL_SCORE, type MemoContent } from "@/lib/memo-ai/schema";
 import { canGenerateAssessment } from "@/lib/pipeline";
 import { AiTag, Card, formatDateTime, StageBadge } from "@/components/ui";
 import { AutoRefresh, CopyButton } from "../eligibility-client";
-import { FinaliseForm, GenerateButton, MemoTextForm, ScoreRow, StartReviewButton } from "./assessment-client";
+import { FinaliseForm, GenerateButton, MemoTextForm, ReviseIssueButton, ScoreRow, StartReviewButton } from "./assessment-client";
 import { MemoView, ReviewBanner, TotalScore } from "./memo-view";
 
-// View is chosen by ?view=: "review", "ai-<n>" (AI draft n) or "v-<n>" (reviewed version n).
+// View is chosen by ?view=: "review" (the open DXV Review Draft), "ai-<n>" (AI Draft n)
+// or "v-<n>" (memo version n, shown as DXV Review Issue <k>).
 export default async function AssessmentPage({ params, searchParams }: PageProps<"/deals/[id]/assessment">) {
   await requireAdmin();
   const { id } = await params;
@@ -40,6 +41,8 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
   if (!v) notFound();
 
   const draft = v.memoDrafts[0] ?? null;
+  const issueNo = issueNumbers(v.memoVersions);
+  const nextIssue = v.memoVersions.length + 1;
   const analyses = v.memoAnalyses.map((a) => ({ ...a, effective: effectiveDeckStatus(a) }));
   const running = analyses.some((a) => a.effective.status === "PENDING" || a.effective.status === "PROCESSING");
   const latestComplete = analyses.find((a) => a.status === "COMPLETE");
@@ -56,21 +59,24 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
           ? { kind: "version" as const, version: Number(view.slice(2)) }
           : draft
             ? { kind: "review" as const }
-            : latestComplete
+            : v.memoVersions[0]
+              ? { kind: "version" as const, version: v.memoVersions[0].version }
+              : latestComplete
               ? { kind: "ai" as const, number: latestComplete.number }
               : null;
 
   const base = `/deals/${v.id}/assessment`;
   const tabs = [
-    ...(draft ? [{ href: `${base}?view=review`, label: "Review copy", active: selected?.kind === "review" }] : []),
+    // Newest first: AI drafts, then the open review draft, then issues, following the flow.
     ...v.memoVersions.map((m) => ({
       href: `${base}?view=v-${m.version}`,
-      label: `Reviewed v${m.version}`,
+      label: reviewIssueName(issueNo.get(m.id)!),
       active: selected?.kind === "version" && selected.version === m.version,
     })),
+    ...(draft ? [{ href: `${base}?view=review`, label: `${reviewDraftName(draft.number)} (in progress)`, active: selected?.kind === "review" }] : []),
     ...analyses.map((a) => ({
       href: `${base}?view=ai-${a.number}`,
-      label: `AI draft ${a.number}${a.effective.status === "COMPLETE" ? "" : a.effective.status === "FAILED" ? " (failed)" : " (drafting…)"}`,
+      label: `${aiDraftName(a.number)}${a.effective.status === "COMPLETE" ? "" : a.effective.status === "FAILED" ? " (failed)" : " (drafting…)"}`,
       active: selected?.kind === "ai" && selected.number === a.number,
     })),
   ];
@@ -86,7 +92,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
           <StageBadge stage={v.currentStage} />
         </div>
         <p className="text-sm text-black/60">
-          AI-assisted first pass for DXV Partner Review. Partners review and edit, then finalise a version for the syndicate.
+          AI Draft, then a DXV Review Draft you edit and save, then Mark complete to release a locked DXV Review Issue for the syndicate.
         </p>
       </div>
 
@@ -138,7 +144,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
           if (a.effective.status === "FAILED") {
             return (
               <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-2 text-sm">
-                AI draft {a.number} failed: {a.effective.error}
+                {aiDraftName(a.number)} failed: {a.effective.error}
               </p>
             );
           }
@@ -146,15 +152,15 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
           const m = a.output as MemoContent;
           return (
             <Card
-              title={`AI draft ${a.number}`}
-              actions={<StartReviewButton analysisId={a.id} number={a.number} replacing={!!draft} />}
+              title={aiDraftName(a.number)}
+              actions={<StartReviewButton analysisId={a.id} aiNumber={a.number} draftNumber={draft?.number ?? nextIssue} replacing={!!draft} />}
             >
               <div className="space-y-5">
                 <ReviewBanner />
                 <MemoView m={m} />
                 <div className="flex flex-wrap items-center gap-2 border-t border-black/10 pt-3 text-xs text-black/50">
                   <CopyButton text={renderMemo(m, { banner: true })} label="Copy as text" />
-                  <AiTag>AI draft</AiTag>
+                  <AiTag>AI Draft</AiTag>
                   <span>
                     {a.model} · run by {a.createdBy.name} · {formatDateTime(a.completedAt ?? a.createdAt)}
                   </span>
@@ -173,8 +179,10 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
           <div className="space-y-5">
             <ReviewBanner />
             <p className="text-sm text-black/60">
-              Review copy from <strong>AI draft {draft.analysis.number}</strong>
-              {draft.updatedBy ? `, last edited by ${draft.updatedBy.name} ${formatDateTime(draft.updatedAt)}` : ""}.
+              <strong>{reviewDraftName(draft.number)}</strong>, from {aiDraftName(draft.analysis.number)}
+              {draft.number > 1 ? ` via ${reviewIssueName(draft.number - 1)}` : ""}
+              {draft.updatedBy ? `. Last saved by ${draft.updatedBy.name} ${formatDateTime(draft.updatedAt)}` : ""}. Save as you go; it
+              stays {reviewDraftName(draft.number)} until you mark it complete.
             </p>
 
             <Card title="Memo text">
@@ -210,14 +218,14 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
               )}
             </Card>
 
-            <Card title="Finalise">
+            <Card title="Mark complete">
               <p className="mb-3 text-sm text-black/60">
-                Saves this review copy as a locked memo version ({totalScore(m.scores)}/{MAX_TOTAL_SCORE}) for sharing with the
-                syndicate before the Pre-Selection vote. You can keep editing and finalise again later; each becomes a new
-                version.
+                Releases {reviewDraftName(draft.number)} as <strong>{reviewIssueName(draft.number)}</strong> (
+                {totalScore(m.scores)}/{MAX_TOTAL_SCORE}): locked, for sharing with the syndicate before the Pre-Selection vote.
+                To change it later, revise it into {reviewDraftName(draft.number + 1)} and issue again.
               </p>
               <div className="flex flex-wrap items-end gap-3">
-                <FinaliseForm draftId={draft.id} />
+                <FinaliseForm draftId={draft.id} issueName={reviewIssueName(draft.number)} />
                 <CopyButton text={renderMemo(m, { banner: true })} label="Copy as text" />
               </div>
             </Card>
@@ -230,9 +238,19 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
         (() => {
           const mv = v.memoVersions.find((x) => x.version === selected.version)!;
           const m = mv.content as MemoContent;
-          const footer = `Reviewed memo v${mv.version}, finalised by ${mv.createdBy.name} on ${formatDateTime(mv.createdAt)}.`;
+          const name = reviewIssueName(issueNo.get(mv.id)!);
+          const isLatestIssue = mv.version === v.memoVersions[0]?.version;
+          const footer = `${name}, issued by ${mv.createdBy.name} on ${formatDateTime(mv.createdAt)}.`;
           return (
-            <Card title={`Reviewed memo v${mv.version}`} actions={<CopyButton text={renderMemo(m, { banner: false, footer })} label="Copy as text" />}>
+            <Card
+              title={name}
+              actions={
+                <span className="flex flex-wrap items-center gap-2">
+                  {isLatestIssue && !draft && <ReviseIssueButton memoVersionId={mv.id} draftName={reviewDraftName(nextIssue)} />}
+                  <CopyButton text={renderMemo(m, { banner: false, footer })} label="Copy as text" />
+                </span>
+              }
+            >
               <div className="space-y-5">
                 <p className="rounded-md bg-dxv-green px-4 py-2 text-sm text-white">
                   {footer}

@@ -13,10 +13,9 @@ import {
   roundOptionCount,
   stageLabel,
   dealWarnings,
-  eoiSummary,
+  commitmentTotal,
   gatesCrossed,
   latestVotePerAngel,
-  MOMENTUM_THRESHOLD_GBP,
 } from "./pipeline";
 
 const d = (iso: string) => new Date(iso);
@@ -76,47 +75,28 @@ describe("latestVotePerAngel", () => {
   });
 });
 
-describe("eoiSummary", () => {
-  const start = d("2026-03-01T10:00:00Z");
-
-  it("meets the threshold on latest interested votes inside the window", () => {
-    const s = eoiSummary(
-      [
-        { angelName: "A", interested: true, maxTicketGbp: 15_000, createdAt: d("2026-03-02") },
-        { angelName: "A", interested: true, maxTicketGbp: 10_000, createdAt: d("2026-03-03") }, // supersedes
-        { angelName: "B", interested: true, maxTicketGbp: 10_000, createdAt: d("2026-03-04") },
-        { angelName: "C", interested: false, maxTicketGbp: 50_000, createdAt: d("2026-03-04") },
-      ],
-      start,
-      d("2026-03-05"),
-    );
-    expect(s.withinWindowGbp).toBe(20_000);
-    expect(s.thresholdMet).toBe(true);
-    expect(s.interestedCount).toBe(2);
-    expect(s.windowOpen).toBe(true);
-  });
-
-  it("does not count votes cast after the window towards the threshold", () => {
-    const s = eoiSummary(
-      [{ angelName: "A", interested: true, maxTicketGbp: MOMENTUM_THRESHOLD_GBP, createdAt: d("2026-03-20") }],
-      start,
-      d("2026-03-21"),
-    );
-    expect(s.totalGbp).toBe(MOMENTUM_THRESHOLD_GBP);
-    expect(s.withinWindowGbp).toBe(0);
-    expect(s.thresholdMet).toBe(false);
-    expect(s.windowOpen).toBe(false);
+describe("commitmentTotal", () => {
+  it("sums each angel's latest interested vote", () => {
+    const t = commitmentTotal([
+      { angelName: "A", interested: true, maxTicketGbp: 15_000, createdAt: d("2026-03-02") },
+      { angelName: "A", interested: true, maxTicketGbp: 10_000, createdAt: d("2026-03-03") }, // supersedes
+      { angelName: "B", interested: true, maxTicketGbp: 10_000, createdAt: d("2026-03-04") },
+      { angelName: "C", interested: false, maxTicketGbp: 50_000, createdAt: d("2026-03-04") },
+      { angelName: "D", interested: true, maxTicketGbp: 5_000, createdAt: d("2026-03-01") },
+      { angelName: "D", interested: false, maxTicketGbp: 0, createdAt: d("2026-03-05") }, // withdrew
+    ]);
+    expect(t).toEqual({ totalGbp: 20_000, interestedCount: 2 });
   });
 });
 
 describe("dealWarnings", () => {
-  it("flags a deal stalled past the EOI window", () => {
+  it("flags a deal stalled in Investment Commitments", () => {
     expect(
       dealWarnings(
         { currentStage: "INVESTMENT_COMMITMENTS", stageEnteredAt: d("2026-03-01"), ddItems: [] },
         d("2026-03-10"),
       ),
-    ).toEqual(["Stalled past the EOI window"]);
+    ).toEqual(["In Investment Commitments for over 7 days"]);
   });
 
   it("flags an overdue, incomplete DD item", () => {
