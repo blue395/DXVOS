@@ -44,11 +44,13 @@ export function EligibilityCard({
   stage,
   analyses,
   reviews,
+  collapse,
 }: {
   ventureId: string;
   stage: Stage;
   analyses: Analysis[]; // newest first
   reviews: Review[]; // newest first
+  collapse?: { open: boolean; now: boolean };
 }) {
   const latest = analyses[0];
   const effective = latest ? effectiveDeckStatus(latest) : null;
@@ -61,6 +63,19 @@ export function EligibilityCard({
   return (
     <Card
       title="Eligibility screen"
+      id="eligibility"
+      collapse={
+        collapse && {
+          ...collapse,
+          summary: reviews[0]
+            ? `Decided: ${DECISION_TEXT[reviews[0].decision]}`
+            : screen
+              ? `AI recommends: ${screen.recommendation}`
+              : running
+                ? "Screening…"
+                : "No deck screened yet",
+        }
+      }
       actions={latest ? <a href={`/api/decks/${latest.id}`} className="text-xs text-dxv-green hover:underline">Download stored deck</a> : undefined}
     >
       <div className="space-y-4">

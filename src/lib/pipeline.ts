@@ -307,3 +307,42 @@ export function canGenerateAssessment(stage: Stage): boolean {
 export function canCreateDDDocument(stage: Stage): boolean {
   return canGenerateAssessment(stage);
 }
+
+// ── Deal page layout ────────────────────────────────────────────────────────
+
+/** The one-click "Advance" target: the next linear stage. Null when there's nowhere
+ *  to go, or when the move needs its own decision form (the eligibility decision). */
+export function advanceTarget(stage: Stage): Stage | null {
+  if (stage === "ADD_TO_PIPELINE") return "PARTNER_REVIEW"; // retired stage
+  if (stage === "PASSED" || stage === "ELIGIBILITY_SCREEN") return null;
+  const i = stageIndex(stage);
+  return i >= 0 && i < LINEAR_STAGES.length - 1 ? LINEAR_STAGES[i + 1].key : null;
+}
+
+export type DealSection = "eligibility" | "assessment" | "memo" | "preSelection" | "commitments" | "dd" | "documents";
+
+/** Sections that matter at a stage: shown open and marked "Now"; the rest start collapsed. */
+export function focusSections(stage: Stage): DealSection[] {
+  switch (stage) {
+    case "SUBMITTED":
+    case "ELIGIBILITY_SCREEN":
+      return ["eligibility", "documents"];
+    case "ADD_TO_PIPELINE":
+    case "PARTNER_REVIEW":
+      return ["assessment", "memo", "documents"];
+    case "PITCH_SELECTION":
+      return ["memo", "preSelection", "documents"];
+    case "PITCH_OUTCOME":
+      return ["preSelection", "commitments", "documents"];
+    case "INVESTMENT_COMMITMENTS":
+      return ["commitments", "dd", "documents"];
+    case "DUE_DILIGENCE":
+    case "CAPITAL_TRANSFER":
+      return ["dd", "commitments", "documents"];
+    case "INVESTMENT_COMPLETE":
+    case "SEIS_CERTIFICATE":
+      return ["commitments", "documents"];
+    case "PASSED":
+      return ["documents"];
+  }
+}

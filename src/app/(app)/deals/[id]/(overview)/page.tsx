@@ -14,8 +14,13 @@ import {
   canGenerateAssessment,
   roundOptionCount,
   isInvestedStage,
+  advanceTarget,
+  focusSections,
+  gatesCrossed,
+  type DealSection,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { Reveal } from "@/components/reveal";
 import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
 import { CommsStatus } from "@/generated/prisma/enums";
 import {
@@ -35,6 +40,7 @@ import { issueNumbers, reviewIssueName } from "@/lib/memo-ai/render";
 import { AssessmentCard } from "../assessment-card";
 import { DDDocumentPanel } from "../dd-document";
 import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
+import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
@@ -93,9 +99,35 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const latestDeck = docs.find((d) => d.category === "DECK");
 
 
-  const eligibility = (
-    <EligibilityCard ventureId={v.id} stage={v.currentStage} analyses={v.deckAnalyses} reviews={v.eligibilityReviews} />
-  );
+  // Layout follows the dealflow: sections that matter at this stage start open and
+  // are marked "Now"; the rest collapse to a one-line summary (rules in pipeline.ts).
+  const focus = new Set(focusSections(v.currentStage));
+  const collapse = (s: DealSection) => ({ open: focus.has(s), now: focus.has(s) && s !== "documents" });
+  const showAssessment = canGenerateAssessment(v.currentStage) || v.memoAnalyses.length > 0;
+  const latestMemo = v.memoVersions[0];
+  const latestMemoName = latestMemo
+    ? latestMemo.kind === "REVIEWED_MEMO"
+      ? reviewIssueName(issueNo.get(latestMemo.id)!)
+      : `Version ${latestMemo.version}`
+    : null;
+  const commitmentsSummary = `${formatGbp(commitments.totalGbp)} from ${commitments.interestedCount} angel${commitments.interestedCount === 1 ? "" : "s"}`;
+  const navItems: NavItem[] = [
+    { id: "eligibility", label: "Eligibility", now: focus.has("eligibility") },
+    ...(showAssessment ? [{ id: "assessment", label: "Assessment", now: focus.has("assessment") }] : []),
+    { id: "memo", label: "Memo", now: focus.has("memo") },
+    { id: "pre-selection", label: "Votes", now: focus.has("preSelection"), hint: `${preSelectionInterested}` },
+    { id: "commitments", label: "Commitments", now: focus.has("commitments"), hint: formatGbp(commitments.totalGbp) },
+    { id: "due-diligence", label: "DD", now: focus.has("dd"), hint: v.ddItems.length ? `${ddDone}/${v.ddItems.length}` : undefined },
+    { id: "documents", label: "Documents", now: false, hint: `${docs.length}` },
+  ];
+
+  // One-click move to the next stage; the confirm says what the founder is owed.
+  const target = advanceTarget(v.currentStage);
+  const owed = target ? gatesCrossed(v.currentStage, target) : [];
+  const advanceConfirm = target
+    ? `Move ${v.name} to ${stageLabel(target)}?` +
+      (owed.length ? ` This records "${owed.map((o) => o.decision).join('", "')}" and adds a founder update to send.` : "")
+    : "";
 
   return (
     <div className="space-y-6">
@@ -137,26 +169,40 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             {v.passNote ? ` — ${v.passNote}` : ""}
           </p>
         )}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {target && <AdvanceButton ventureId={v.id} to={target} label={stageLabel(target)} confirm={advanceConfirm} />}
+          {v.currentStage === "ELIGIBILITY_SCREEN" && (
+            <a href="#eligibility" className={buttonClass("primary")}>
+              Record the eligibility decision ↓
+            </a>
+          )}
+          <Reveal label={v.currentStage === "PASSED" ? "Reopen or move…" : "Other move…"}>
+            {/* key: reset the dropdown whenever the stage changes elsewhere (board, eligibility decision) */}
+            <StageMover key={v.currentStage} currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
+          </Reveal>
           {latestDeck && <ExternalLink href={`/api/documents/${latestDeck.id}`}>Deck</ExternalLink>}
           {v.website && <ExternalLink href={v.website}>Website</ExternalLink>}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        {/* ── Main column ── */}
-        <div className="space-y-6">
+      <SectionNav items={navItems} />
 
-          <Card title="Stage">
-            {/* key: reset the dropdown whenever the stage changes elsewhere (board, eligibility decision) */}
-            <StageMover key={v.currentStage} currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
-          </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        {/* ── Main column ── */}
+        <div className="min-w-0 space-y-6">
 
           {/* Page follows the dealflow: eligibility, assessment, memo, votes, commitments, DD. */}
-          {eligibility}
+          <EligibilityCard
+            ventureId={v.id}
+            stage={v.currentStage}
+            analyses={v.deckAnalyses}
+            reviews={v.eligibilityReviews}
+            collapse={collapse("eligibility")}
+          />
 
-          {(canGenerateAssessment(v.currentStage) || v.memoAnalyses.length > 0) && (
+          {showAssessment && (
             <AssessmentCard
+              collapse={collapse("assessment")}
               ventureId={v.id}
               canGenerate={canGenerateAssessment(v.currentStage)}
               hasDeck={v.deckAnalyses.some((a) => a.status !== "PENDING")}
@@ -169,10 +215,14 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             />
           )}
 
-          <Card title="Investment memo">
+          <Card
+            title="Investment memo"
+            id="memo"
+            collapse={{ ...collapse("memo"), summary: latestMemoName ? `Latest: ${latestMemoName}` : "No memo yet" }}
+          >
             {v.memoVersions.length === 0 ? (
               <p className="text-sm text-black/55">
-                No memo yet. Generate one with the AI assessment during DXV Partner Review, or upload a memo file.
+                No memo yet. Mark a DXV Review Draft complete in the assessment to issue one, or upload a memo file below.
               </p>
             ) : (
               <ul className="divide-y divide-black/10">
@@ -205,59 +255,84 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
           <Card
             title="Pre-Selection votes"
+            id="pre-selection"
+            collapse={{
+              ...collapse("preSelection"),
+              summary: `${preSelectionInterested} interested of ${currentPreSelectionIds.size} vote${currentPreSelectionIds.size === 1 ? "" : "s"}`,
+            }}
             actions={<span className="text-xs text-black/55">{preSelectionInterested} interested · pitch selection stage</span>}
           >
             <VoteList
               votes={v.preSelectionVotes.map((x) => ({ ...x, current: currentPreSelectionIds.has(x.id) }))}
-              emptyText="No pre-selection votes recorded."
+              emptyText="No votes yet. Record each angel's vote on whether this venture should pitch."
             />
-            <ActionForm action={addPreSelectionVote.bind(null, v.id)} className="mt-4 space-y-3 border-t border-black/10 pt-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Angel *">
-                  <input name="angelName" required className={inputClass} />
-                </Field>
-                <Field label="Interested? *">
-                  <InterestSelect />
-                </Field>
-                <Field label="Note">
-                  <input name="note" className={inputClass} />
-                </Field>
-              </div>
-              <SubmitButton variant="secondary">Record pre-selection vote</SubmitButton>
-            </ActionForm>
+            <div className="mt-4 border-t border-black/10 pt-4">
+              <Reveal label="+ Record pre-selection vote">
+                <ActionForm action={addPreSelectionVote.bind(null, v.id)} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Angel *">
+                      <input name="angelName" required className={inputClass} />
+                    </Field>
+                    <Field label="Interested? *">
+                      <InterestSelect />
+                    </Field>
+                    <Field label="Note">
+                      <input name="note" className={inputClass} />
+                    </Field>
+                  </div>
+                  <SubmitButton doneLabel="Recorded">Record vote</SubmitButton>
+                </ActionForm>
+              </Reveal>
+            </div>
           </Card>
 
-          <Card title="Investment commitments / EOI">
+          <Card
+            title="Investment commitments / EOI"
+            id="commitments"
+            collapse={{ ...collapse("commitments"), summary: commitmentsSummary }}
+          >
             <CommitmentsTotal totalGbp={commitments.totalGbp} interestedCount={commitments.interestedCount} />
             <VoteList
               votes={v.investmentVotes.map((x) => ({ ...x, current: currentInvestmentVoteIds.has(x.id) }))}
-              emptyText="No expressions of interest recorded."
+              emptyText="No expressions of interest yet. Record each angel's EOI and maximum ticket as they come in."
               showTicket
             />
-            <ActionForm action={addInvestmentVote.bind(null, v.id)} className="mt-4 space-y-3 border-t border-black/10 pt-4">
-              <div className="grid gap-3 sm:grid-cols-4">
-                <Field label="Angel *">
-                  <input name="angelName" required className={inputClass} />
-                </Field>
-                <Field label="Interested? *">
-                  <InterestSelect />
-                </Field>
-                <Field label="Max ticket (£)">
-                  <input name="maxTicketGbp" inputMode="numeric" className={inputClass} />
-                </Field>
-                <Field label="Note">
-                  <input name="note" className={inputClass} />
-                </Field>
-              </div>
-              <p className="text-xs text-black/50">A new vote from the same angel supersedes their earlier one; both are kept.</p>
-              <SubmitButton variant="secondary">Record EOI</SubmitButton>
-            </ActionForm>
+            <div className="mt-4 border-t border-black/10 pt-4">
+              <Reveal label="+ Record EOI">
+                <ActionForm action={addInvestmentVote.bind(null, v.id)} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <Field label="Angel *">
+                      <input name="angelName" required className={inputClass} />
+                    </Field>
+                    <Field label="Interested? *">
+                      <InterestSelect />
+                    </Field>
+                    <Field label="Max ticket (£)">
+                      <input name="maxTicketGbp" inputMode="numeric" className={inputClass} />
+                    </Field>
+                    <Field label="Note">
+                      <input name="note" className={inputClass} />
+                    </Field>
+                  </div>
+                  <p className="text-xs text-black/50">A new vote from the same angel supersedes their earlier one; both are kept.</p>
+                  <SubmitButton doneLabel="Recorded">Record EOI</SubmitButton>
+                </ActionForm>
+              </Reveal>
+            </div>
           </Card>
 
-          <Card title="Due Diligence" actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}>
+          <Card
+            title="Due Diligence"
+            id="due-diligence"
+            collapse={{
+              ...collapse("dd"),
+              summary: v.ddItems.length ? `${ddDone}/${v.ddItems.length} items done` : "No DD items yet",
+            }}
+            actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}
+          >
             <DDDocumentPanel ventureId={v.id} stage={v.currentStage} latest={v.ddReportJobs[0] ?? null} />
             {v.ddItems.length === 0 ? (
-              <p className="text-sm text-black/55">No DD items yet.</p>
+              <p className="text-sm text-black/55">No DD items yet. Add the checks the DD group will work through, with an owner and due date.</p>
             ) : (
               <ul className="divide-y divide-black/10">
                 {v.ddItems.map((item) => {
@@ -293,28 +368,32 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 })}
               </ul>
             )}
-            <ActionForm action={addDDItem.bind(null, v.id)} className="mt-4 space-y-3 border-t border-black/10 pt-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Item *">
-                  <input name="title" required className={inputClass} />
-                </Field>
-                <Field label="Owner">
-                  <input name="owner" className={inputClass} />
-                </Field>
-                <Field label="Due">
-                  <input name="dueDate" type="date" className={inputClass} />
-                </Field>
-              </div>
-              <SubmitButton variant="secondary">Add DD item</SubmitButton>
-            </ActionForm>
+            <div className="mt-4 border-t border-black/10 pt-4">
+              <Reveal label="+ Add DD item">
+                <ActionForm action={addDDItem.bind(null, v.id)} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Item *">
+                      <input name="title" required className={inputClass} />
+                    </Field>
+                    <Field label="Owner">
+                      <input name="owner" className={inputClass} />
+                    </Field>
+                    <Field label="Due">
+                      <input name="dueDate" type="date" className={inputClass} />
+                    </Field>
+                  </div>
+                  <SubmitButton doneLabel="Added">Add DD item</SubmitButton>
+                </ActionForm>
+              </Reveal>
+            </div>
           </Card>
 
-          <DocumentsCard ventureId={v.id} docs={docs} />
+          <DocumentsCard ventureId={v.id} docs={docs} collapse={collapse("documents")} />
 
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card title="Founder comms">
             {v.founderComms.length === 0 ? (
               <p className="text-sm text-black/55">No decision gates crossed yet. Comms appear here automatically when this deal passes a gate.</p>

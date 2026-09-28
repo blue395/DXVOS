@@ -2,6 +2,7 @@
 
 import { createContext, startTransition, useActionState, useContext, useEffect, useRef, useState } from "react";
 import type { ActionResult } from "@/lib/action-result";
+import { RevealContext } from "./reveal";
 import { buttonClass, Spinner, type ButtonVariant } from "./ui";
 
 type Props = {
@@ -29,9 +30,13 @@ export function ActionForm({ action, children, className, resetOnSuccess = true,
   const ref = useRef<HTMLFormElement>(null);
   const [seen, setSeen] = useState(state);
   const [justSaved, setJustSaved] = useState(false);
+  const reveal = useContext(RevealContext);
   const onSuccessRef = useRef(onSuccess);
   useEffect(() => {
-    onSuccessRef.current = onSuccess;
+    onSuccessRef.current = () => {
+      onSuccess?.();
+      reveal?.close(true); // inside a "+ Add" panel: close it, the button confirms
+    };
   });
 
   // A new result arrived: flag success for the button (adjust-state-on-change pattern, no effect).
@@ -81,7 +86,8 @@ export function SubmitButton({
   doneLabel?: string;
 }) {
   const { pending, justSaved } = useContext(FormStateContext);
-  return (
+  const reveal = useContext(RevealContext);
+  const button = (
     <button type="submit" disabled={pending} aria-busy={pending} className={buttonClass(variant)}>
       {pending ? (
         <>
@@ -97,5 +103,14 @@ export function SubmitButton({
         children
       )}
     </button>
+  );
+  if (!reveal) return button;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {button}
+      <button type="button" disabled={pending} onClick={() => reveal.close(false)} className="rounded px-2 py-1.5 text-sm text-black/60 transition hover:bg-black/5 hover:text-black">
+        Cancel
+      </button>
+    </span>
   );
 }

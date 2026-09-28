@@ -2,9 +2,56 @@
 import type { CommsStatus, Stage } from "@/generated/prisma/enums";
 import { stageLabel } from "@/lib/pipeline";
 
-export function Card({ title, children, actions }: { title?: string; children: React.ReactNode; actions?: React.ReactNode }) {
+export type CardCollapse = {
+  /** Open on page load (the section matters at the deal's current stage). */
+  open: boolean;
+  /** One line shown in the header while collapsed, e.g. "£20k from 2 angels". */
+  summary?: React.ReactNode;
+  /** Mark as relevant to the current stage. */
+  now?: boolean;
+};
+
+/**
+ * A titled panel. With `collapse`, it becomes a native <details> section: click the
+ * header to open or close it (no JavaScript needed). `id` makes it a jump target.
+ */
+export function Card({
+  title,
+  children,
+  actions,
+  id,
+  collapse,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+  id?: string;
+  collapse?: CardCollapse;
+}) {
+  if (collapse && title) {
+    return (
+      <details id={id} open={collapse.open} className="group scroll-mt-16 rounded-lg border border-black/10 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-2.5 transition hover:bg-dxv-green/[0.04] [&::-webkit-details-marker]:hidden">
+          <span className="flex min-w-0 items-center gap-2">
+            <span aria-hidden className="text-xs text-dxv-green transition-transform group-open:rotate-90">
+              ▶
+            </span>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">{title}</h2>
+            {collapse.now && (
+              <span className="rounded-full bg-dxv-yellow px-2 py-px text-[10px] font-semibold uppercase tracking-wide text-dxv-green">Now</span>
+            )}
+          </span>
+          <span className="flex min-w-0 items-center gap-3">
+            {collapse.summary && <span className="truncate text-xs text-black/55 group-open:hidden">{collapse.summary}</span>}
+            {actions && <span className="hidden group-open:inline">{actions}</span>}
+          </span>
+        </summary>
+        <div className="border-t border-black/10 p-4">{children}</div>
+      </details>
+    );
+  }
   return (
-    <section className="rounded-lg border border-black/10 bg-white">
+    <section id={id} className="scroll-mt-16 rounded-lg border border-black/10 bg-white">
       {title && (
         <header className="flex items-center justify-between border-b border-black/10 px-4 py-2.5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">{title}</h2>

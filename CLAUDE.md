@@ -14,6 +14,7 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Append-only tables (StageChange, MemoVersion, PreSelectionVote, InvestmentVote): never add update/delete paths.
 - Forms use `ActionForm` (`src/components/action-form.tsx`); actions return `ActionResult`. Every clickable thing gives feedback: buttons use `buttonClass` / `SubmitButton` / `ActionButton` (spinner + working label, "✓ Saved" after); no bare `<form action>` buttons.
 - Long AI jobs: call `announceJobStarted()` after starting one; the floating `JobTray` (`src/components/job-tray.tsx`, reads `/api/jobs`) shows progress and refreshes the page when done. Pages must not poll themselves.
+- Deal page layout follows the stage: `focusSections()` / `advanceTarget()` in `pipeline.ts` decide which sections start open ("Now") and where one-click Advance goes; other sections collapse (`Card collapse`). Entry forms sit behind `Reveal` ("+ Add…") buttons.
 - Every page has a `loading.tsx` skeleton next to it (route groups keep one route's skeleton from showing for another).
 - Helpers used by server components must not live in `"use client"` files.
 - Prisma 7: client is generated to `src/generated/prisma` (import from `@/generated/prisma/client` or `/enums`). Scripts run via `tsx --conditions=react-server`.
