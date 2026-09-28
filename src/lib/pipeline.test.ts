@@ -4,6 +4,7 @@ import {
   canDecideEligibility,
   isActiveStage,
   LINEAR_STAGES,
+  parseRoundFilter,
   roundOptionCount,
   stageLabel,
   dealWarnings,
@@ -179,5 +180,17 @@ describe("roundOptionCount", () => {
     expect(roundOptionCount(null)).toBe(12);
     expect(roundOptionCount(5)).toBe(12);
     expect(roundOptionCount(14)).toBe(16);
+  });
+});
+
+describe("parseRoundFilter", () => {
+  it("reads a round number, 'none', or falls back to all", () => {
+    expect(parseRoundFilter("3")).toEqual({ kind: "round", round: 3 });
+    expect(parseRoundFilter("none")).toEqual({ kind: "none" });
+    expect(parseRoundFilter(undefined)).toEqual({ kind: "all" });
+    expect(parseRoundFilter("abc")).toEqual({ kind: "all" });
+    expect(parseRoundFilter("0")).toEqual({ kind: "all" });
+    expect(parseRoundFilter("2.5")).toEqual({ kind: "all" });
+    expect(parseRoundFilter(["4", "5"])).toEqual({ kind: "round", round: 4 });
   });
 });

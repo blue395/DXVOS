@@ -76,7 +76,9 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
           {error}
         </p>
       )}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      {/* Fixed id: dnd-kit otherwise numbers its accessibility ids with a counter that
+          differs between server and browser rendering (a hydration mismatch). */}
+      <DndContext id="deals-board" sensors={sensors} onDragEnd={onDragEnd}>
         {/* The ten linear stages scroll horizontally; Passed is pinned to the right edge
             because it's reachable from every stage and must always be a visible drop target. */}
         <div className="flex gap-3 overflow-x-auto pb-4">

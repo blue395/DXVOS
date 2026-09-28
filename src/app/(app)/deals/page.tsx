@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { daysSince, dealWarnings } from "@/lib/pipeline";
+import { daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
 import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "./kanban-board";
 
-export default async function DealsPage() {
+export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   await requireAdmin();
+  const filter = parseRoundFilter((await searchParams).round);
+
+  // Counts per round for the filter pills (null = no round assigned).
+  const roundCounts = await db.venture.groupBy({ by: ["round"], _count: { _all: true }, orderBy: { round: "asc" } });
 
   const ventures = await db.venture.findMany({
+    where: filter.kind === "round" ? { round: filter.round } : filter.kind === "none" ? { round: null } : {},
     orderBy: { stageEnteredAt: "asc" }, // longest-waiting first within each column
     select: {
       id: true,
@@ -46,7 +51,47 @@ export default async function DealsPage() {
           + New venture
         </Link>
       </div>
+      <RoundFilterBar filter={filter} counts={roundCounts.map((r) => ({ round: r.round, count: r._count._all }))} />
       <KanbanBoard initialCards={cards} />
     </div>
+  );
+}
+
+/** Filter pills. Plain links, so a filtered board can be bookmarked or shared (/deals?round=3). */
+function RoundFilterBar({ filter, counts }: { filter: RoundFilter; counts: { round: number | null; count: number }[] }) {
+  const total = counts.reduce((a, c) => a + c.count, 0);
+  const unassigned = counts.find((c) => c.round === null)?.count ?? 0;
+  const pills = [
+    { href: "/deals", label: "All rounds", count: total, active: filter.kind === "all" },
+    ...counts
+      .filter((c) => c.round !== null)
+      .map((c) => ({
+        href: `/deals?round=${c.round}`,
+        label: `Round ${c.round}`,
+        count: c.count,
+        active: filter.kind === "round" && filter.round === c.round,
+      })),
+    ...(unassigned > 0 ? [{ href: "/deals?round=none", label: "No round", count: unassigned, active: filter.kind === "none" }] : []),
+  ];
+  // A round asked for in the URL that has no deals still shows as selected.
+  if (filter.kind === "round" && !counts.some((c) => c.round === filter.round)) {
+    pills.push({ href: `/deals?round=${filter.round}`, label: `Round ${filter.round}`, count: 0, active: true });
+  }
+
+  return (
+    <nav aria-label="Filter by round" className="flex flex-wrap gap-2">
+      {pills.map((p) => (
+        <Link
+          key={p.href}
+          href={p.href}
+          aria-current={p.active ? "page" : undefined}
+          className={`rounded-full border px-3 py-1 text-sm ${
+            p.active ? "border-dxv-green bg-dxv-green text-white" : "border-dxv-green/30 text-dxv-green hover:bg-dxv-green/5"
+          }`}
+        >
+          {p.label} <span className={p.active ? "text-dxv-yellow" : "text-black/45"}>{p.count}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }
