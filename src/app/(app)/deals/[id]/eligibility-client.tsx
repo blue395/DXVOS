@@ -66,7 +66,7 @@ export function CopyButton({ text }: { text: string }) {
 }
 
 const OPTIONS: { value: EligibilityDecision; label: string; hint: string }[] = [
-  { value: "PROCEED", label: "Proceed", hint: "Moves the deal to Add to pipeline." },
+  { value: "PROCEED", label: "Proceed", hint: "Moves the deal to DXV Partner Review." },
   { value: "DECLINE", label: "Decline", hint: "Moves the deal to Passed with the reason below." },
   { value: "NEED_MORE_INFO", label: "Request more information", hint: "Deal stays here; record what to ask the founder." },
 ];

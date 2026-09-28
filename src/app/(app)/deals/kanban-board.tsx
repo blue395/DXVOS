@@ -22,6 +22,7 @@ export type BoardCard = {
   id: string;
   name: string;
   sector: string | null;
+  round: number | null;
   currentStage: Stage;
   daysInStage: number;
   warnings: string[];
@@ -149,7 +150,12 @@ function DealCard({ card }: { card: BoardCard }) {
         </Link>
         {card.warnings.length > 0 && <WarningIcon title={card.warnings.join(" · ")} />}
       </div>
-      {card.sector && <p className="mt-0.5 text-xs text-black/55">{card.sector}</p>}
+      {(card.round || card.sector) && (
+        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-black/55">
+          {card.round && <span className="rounded bg-dxv-green/10 px-1.5 font-medium text-dxv-green">Round {card.round}</span>}
+          {card.sector}
+        </p>
+      )}
       <div className="mt-2 flex items-center justify-between text-[11px] text-black/50">
         <span>
           {card.daysInStage} day{card.daysInStage === 1 ? "" : "s"} in stage

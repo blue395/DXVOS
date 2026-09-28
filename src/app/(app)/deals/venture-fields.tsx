@@ -8,6 +8,7 @@ type VentureValues = {
   sector?: string | null;
   companyStage?: string | null;
   raiseAmountGbp?: number | null;
+  round?: number | null;
   description?: string | null;
   deckUrl?: string | null;
   driveFolderUrl?: string | null;
@@ -15,10 +16,23 @@ type VentureValues = {
 
 // Shared by "New venture" and the edit form on the deal page.
 // `ai` lists fields pre-filled from a deck, which get an "AI suggested" tag.
-export function VentureFields({ v = {}, ai = [] }: { v?: VentureValues; ai?: string[] }) {
+// `roundOptions`: how many rounds to offer in the Round dropdown.
+export function VentureFields({ v = {}, ai = [], roundOptions = 12 }: { v?: VentureValues; ai?: string[]; roundOptions?: number }) {
   const tag = (field: string) => ai.includes(field);
+  const rounds = Array.from({ length: Math.max(roundOptions, v.round ?? 0) }, (_, i) => i + 1);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Round" hint="Which DXV round this deal is in">
+        <select name="round" defaultValue={v.round ?? ""} className={inputClass}>
+          <option value="">Not assigned</option>
+          {rounds.map((r) => (
+            <option key={r} value={r}>
+              Round {r}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="hidden sm:block" />
       <Field aiSuggested={tag("name")} label="Company name *">
         <input name="name" required defaultValue={v.name ?? ""} className={inputClass} />
       </Field>

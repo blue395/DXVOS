@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ALL_STAGES, GATE_LABELS, daysSince, dealWarnings } from "@/lib/pipeline";
+import { ALL_STAGES, GATE_LABELS, daysSince, dealWarnings, isActiveStage } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
 
 export default async function DashboardPage() {
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
 
   const byStage = ALL_STAGES.map((s) => ({ ...s, count: ventures.filter((v) => v.currentStage === s.key).length }));
   const maxCount = Math.max(1, ...byStage.map((s) => s.count));
-  const active = ventures.filter((v) => v.currentStage !== "PASSED" && v.currentStage !== "INVESTMENT").length;
+  const active = ventures.filter((v) => isActiveStage(v.currentStage)).length;
   const flagged = ventures.filter((v) => dealWarnings(v, now).length > 0).length;
   // One row per founder/venture (that's what the headline counts), listing each gate owed.
   const awaitingByVenture = [...Map.groupBy(awaiting, (c) => c.venture.id).values()].map((comms) => ({

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALL_STAGES,
   canDecideEligibility,
+  isActiveStage,
+  LINEAR_STAGES,
+  roundOptionCount,
+  stageLabel,
   dealWarnings,
   eoiSummary,
   gatesCrossed,
@@ -12,21 +17,31 @@ const d = (iso: string) => new Date(iso);
 
 describe("gatesCrossed", () => {
   it("owes nothing when a deal is created", () => {
-    expect(gatesCrossed(null, "FOUNDER_DECK")).toEqual([]);
+    expect(gatesCrossed(null, "SUBMITTED")).toEqual([]);
   });
 
-  it("owes the eligibility decision when leaving eligibility screening", () => {
-    expect(gatesCrossed("ELIGIBILITY_SCREENING", "ADD_TO_PIPELINE")).toEqual([
-      { gate: "ELIGIBILITY", decision: "Proceed" },
+  it("owes the eligibility decision when leaving the eligibility screen", () => {
+    expect(gatesCrossed("ELIGIBILITY_SCREEN", "PARTNER_REVIEW")).toEqual([
+      { gate: "ELIGIBILITY", decision: "Eligible: proceeding to DXV partner review" },
     ]);
   });
 
+  it("makes DXV Partner Review a decision gate", () => {
+    expect(gatesCrossed("PARTNER_REVIEW", "PITCH_SELECTION").map((g) => g.gate)).toEqual(["PARTNER_REVIEW"]);
+  });
+
   it("owes nothing moving between non-gate stages", () => {
-    expect(gatesCrossed("ADD_TO_PIPELINE", "INTERNAL_REVIEW")).toEqual([]);
+    expect(gatesCrossed("SUBMITTED", "ELIGIBILITY_SCREEN")).toEqual([]);
+    expect(gatesCrossed("CAPITAL_TRANSFER", "INVESTMENT_COMPLETE")).toEqual([]);
+    expect(gatesCrossed("INVESTMENT_COMPLETE", "SEIS_CERTIFICATE")).toEqual([]);
+  });
+
+  it("owes nothing when moving on from the retired stage", () => {
+    expect(gatesCrossed("ADD_TO_PIPELINE", "PARTNER_REVIEW")).toEqual([]);
   });
 
   it("owes every gate that gets skipped over", () => {
-    expect(gatesCrossed("PITCH_SELECTION", "INVESTMENT_VOTES").map((g) => g.gate)).toEqual([
+    expect(gatesCrossed("PITCH_SELECTION", "INVESTMENT_COMMITMENTS").map((g) => g.gate)).toEqual([
       "PITCH_SELECTION",
       "PITCH_OUTCOME",
     ]);
@@ -34,11 +49,11 @@ describe("gatesCrossed", () => {
 
   it("owes nothing when moving backwards or reopening", () => {
     expect(gatesCrossed("DUE_DILIGENCE", "PITCH_OUTCOME")).toEqual([]);
-    expect(gatesCrossed("PASSED", "ADD_TO_PIPELINE")).toEqual([]);
+    expect(gatesCrossed("PASSED", "PARTNER_REVIEW")).toEqual([]);
   });
 
   it("always owes a decline when passing, from any stage", () => {
-    expect(gatesCrossed("FOUNDER_DECK", "PASSED", "INELIGIBLE")).toEqual([
+    expect(gatesCrossed("SUBMITTED", "PASSED", "INELIGIBLE")).toEqual([
       { gate: "PASSED", decision: "Decline — Ineligible" },
     ]);
   });
@@ -92,7 +107,7 @@ describe("dealWarnings", () => {
   it("flags a deal stalled past the EOI window", () => {
     expect(
       dealWarnings(
-        { currentStage: "INVESTMENT_VOTES", stageEnteredAt: d("2026-03-01"), ddItems: [] },
+        { currentStage: "INVESTMENT_COMMITMENTS", stageEnteredAt: d("2026-03-01"), ddItems: [] },
         d("2026-03-10"),
       ),
     ).toEqual(["Stalled past the EOI window"]);
@@ -115,15 +130,54 @@ describe("dealWarnings", () => {
   });
 });
 
+describe("stages", () => {
+  it("has the ten stages in order, with gates at 2 to 7", () => {
+    expect(LINEAR_STAGES.map((s) => s.label)).toEqual([
+      "Submitted",
+      "Eligibility Screen",
+      "DXV Partner Review",
+      "Member Pitch Selection",
+      "Pitch Outcome",
+      "Investment Commitments",
+      "Due Diligence",
+      "Capital Transfer",
+      "Investment Complete",
+      "S/EIS Certificate",
+    ]);
+    expect(LINEAR_STAGES.map((s, i) => (s.gate ? i + 1 : null)).filter(Boolean)).toEqual([2, 3, 4, 5, 6, 7]);
+  });
+
+  it("labels the retired stage for old history, but doesn't offer it", () => {
+    expect(stageLabel("ADD_TO_PIPELINE")).toBe("Add to pipeline (retired)");
+    expect(ALL_STAGES.some((s) => s.key === "ADD_TO_PIPELINE")).toBe(false);
+  });
+
+  it("counts deals as active until Investment Complete", () => {
+    expect(isActiveStage("SUBMITTED")).toBe(true);
+    expect(isActiveStage("CAPITAL_TRANSFER")).toBe(true);
+    expect(isActiveStage("INVESTMENT_COMPLETE")).toBe(false);
+    expect(isActiveStage("SEIS_CERTIFICATE")).toBe(false);
+    expect(isActiveStage("PASSED")).toBe(false);
+  });
+});
+
 describe("eligibility decisions", () => {
   it("are only allowed at intake", () => {
-    expect(canDecideEligibility("FOUNDER_DECK")).toBe(true);
-    expect(canDecideEligibility("ELIGIBILITY_SCREENING")).toBe(true);
-    expect(canDecideEligibility("ADD_TO_PIPELINE")).toBe(false);
+    expect(canDecideEligibility("SUBMITTED")).toBe(true);
+    expect(canDecideEligibility("ELIGIBILITY_SCREEN")).toBe(true);
+    expect(canDecideEligibility("PARTNER_REVIEW")).toBe(false);
     expect(canDecideEligibility("PASSED")).toBe(false);
   });
 
-  it("proceeding from eligibility owes the founder the eligibility decision", () => {
-    expect(gatesCrossed("ELIGIBILITY_SCREENING", "ADD_TO_PIPELINE").map((g) => g.gate)).toEqual(["ELIGIBILITY"]);
+  it("proceeding from the eligibility screen owes the founder the eligibility decision", () => {
+    expect(gatesCrossed("ELIGIBILITY_SCREEN", "PARTNER_REVIEW").map((g) => g.gate)).toEqual(["ELIGIBILITY"]);
+  });
+});
+
+describe("roundOptionCount", () => {
+  it("offers at least 12 rounds, and two beyond the highest in use", () => {
+    expect(roundOptionCount(null)).toBe(12);
+    expect(roundOptionCount(5)).toBe(12);
+    expect(roundOptionCount(14)).toBe(16);
   });
 });

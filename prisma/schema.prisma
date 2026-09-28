@@ -43,20 +43,22 @@ model User {
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
 
-// Ten linear stages + the cross-cutting terminal PASSED state (spec §5).
-// Order here matches pipeline order; src/lib/pipeline.ts is the source of truth
-// for ordering and labels in code.
+// Ten linear stages + the cross-cutting terminal PASSED state.
+// Stages revised 2026-09-28 (values renamed in place so existing data kept its
+// meaning). Order here matches pipeline order; src/lib/pipeline.ts is the source of
+// truth for ordering and labels in code.
 enum Stage {
-  FOUNDER_DECK
-  ELIGIBILITY_SCREENING
-  ADD_TO_PIPELINE
-  INTERNAL_REVIEW
+  SUBMITTED
+  ELIGIBILITY_SCREEN
+  ADD_TO_PIPELINE // RETIRED 2026-09-28: kept only so old stage history still reads correctly
+  PARTNER_REVIEW
   PITCH_SELECTION
   PITCH_OUTCOME
-  INVESTMENT_VOTES
+  INVESTMENT_COMMITMENTS
   DUE_DILIGENCE
   CAPITAL_TRANSFER
-  INVESTMENT
+  INVESTMENT_COMPLETE
+  SEIS_CERTIFICATE
   PASSED
 }
 
@@ -78,11 +80,12 @@ model Venture {
   sector         String?
   companyStage   String? // e.g. "Pre-seed", "Seed"
   raiseAmountGbp Int?
+  round          Int? // DXV round the deal belongs to (Round 1, Round 2, ...)
   description    String?
   deckUrl        String? // Google Drive link — files stay in Drive (spec §2)
   driveFolderUrl String?
 
-  currentStage   Stage       @default(FOUNDER_DECK)
+  currentStage   Stage       @default(SUBMITTED)
   stageEnteredAt DateTime    @default(now()) // denormalised from StageChange for fast "days in stage"
   passReason     PassReason? // set while currentStage = PASSED
   passNote       String?
@@ -105,6 +108,7 @@ model Venture {
 }
 
 // Append-only stage-history log (spec §5). fromStage is null for the creation row.
+// changedById is null for moves made by the system (e.g. a data migration).
 model StageChange {
   id          String      @id @default(cuid())
   ventureId   String
@@ -113,8 +117,8 @@ model StageChange {
   toStage     Stage
   passReason  PassReason?
   note        String?
-  changedById String
-  changedBy   User        @relation(fields: [changedById], references: [id])
+  changedById String?
+  changedBy   User?       @relation(fields: [changedById], references: [id], onDelete: Restrict) // never erase who moved a deal
   changedAt   DateTime    @default(now())
 
   @@index([ventureId, changedAt])
@@ -193,9 +197,10 @@ model InvestmentVote {
 
 enum Gate {
   ELIGIBILITY
+  PARTNER_REVIEW
   PITCH_SELECTION
   PITCH_OUTCOME
-  INVESTMENT_VOTES
+  INVESTMENT_COMMITMENTS
   DUE_DILIGENCE
   PASSED
 }

@@ -70,6 +70,12 @@ const VentureSchema = z.object({
   sector: optionalText,
   companyStage: optionalText,
   raiseAmountGbp: optionalPounds,
+  round: z
+    .string()
+    .trim()
+    .transform((s) => (s === "" ? null : Number(s)))
+    .refine((n) => n === null || (Number.isInteger(n) && n > 0), "Choose a round")
+    .optional(),
   description: optionalText,
   deckUrl: optionalUrl,
   driveFolderUrl: optionalUrl,
@@ -85,7 +91,7 @@ export async function createVenture(_prev: ActionResult, formData: FormData): Pr
     data: {
       ...parsed.data,
       createdById: user.id,
-      stageChanges: { create: { fromStage: null, toStage: "FOUNDER_DECK", changedById: user.id } },
+      stageChanges: { create: { fromStage: null, toStage: "SUBMITTED", changedById: user.id } },
     },
   });
 

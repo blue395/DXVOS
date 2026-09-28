@@ -13,6 +13,7 @@ import {
   latestVotePerAngel,
   stageLabel,
   canDecideEligibility,
+  roundOptionCount,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
@@ -50,12 +51,13 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
     },
   });
   if (!v) notFound();
+  const { _max } = await db.venture.aggregate({ _max: { round: true } });
 
   const now = new Date();
   const warnings = dealWarnings(v, now);
 
-  // The EOI window opens when the deal (most recently) entered Investment votes.
-  const eoiStart = v.stageChanges.find((c) => c.toStage === "INVESTMENT_VOTES")?.changedAt ?? null;
+  // The EOI window opens when the deal (most recently) entered Investment Commitments.
+  const eoiStart = v.stageChanges.find((c) => c.toStage === "INVESTMENT_COMMITMENTS")?.changedAt ?? null;
   const eoi = eoiSummary(v.investmentVotes, eoiStart, now);
   const currentInvestmentVoteIds = new Set(latestVotePerAngel(v.investmentVotes).map((x) => x.id));
   const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
@@ -86,7 +88,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           ))}
         </div>
         <p className="mt-1 text-sm text-black/60">
-          {[v.founderNames, v.sector, v.companyStage, v.raiseAmountGbp ? `Raising ${formatGbp(v.raiseAmountGbp)}` : null]
+          {[v.round ? `Round ${v.round}` : null, v.founderNames, v.sector, v.companyStage, v.raiseAmountGbp ? `Raising ${formatGbp(v.raiseAmountGbp)}` : null]
             .filter(Boolean)
             .join(" · ")}
         </p>
@@ -115,7 +117,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
           <Card title="Investment memo">
             {v.memoVersions.length === 0 ? (
-              <p className="text-sm text-black/55">No memo yet. Drafted during DXV internal team review.</p>
+              <p className="text-sm text-black/55">No memo yet. Drafted during DXV Partner Review.</p>
             ) : (
               <ul className="divide-y divide-black/10">
                 {v.memoVersions.map((m, i) => (
@@ -171,7 +173,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </ActionForm>
           </Card>
 
-          <Card title="Investment votes / EOI">
+          <Card title="Investment commitments / EOI">
             <Momentum eoi={eoi} />
             <VoteList
               votes={v.investmentVotes.map((x) => ({ ...x, current: currentInvestmentVoteIds.has(x.id) }))}
@@ -300,7 +302,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
               <ActionForm action={updateVenture.bind(null, v.id)} resetOnSuccess={false} className="mt-4 space-y-4">
-                <VentureFields v={v} />
+                <VentureFields v={v} roundOptions={roundOptionCount(_max.round)} />
                 <SubmitButton>Save details</SubmitButton>
               </ActionForm>
             </details>
@@ -333,7 +335,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                   {c.passReason && <p className="text-xs text-black/65">Reason: {PASS_REASON_LABELS[c.passReason]}</p>}
                   {c.note && <p className="text-xs text-black/65">“{c.note}”</p>}
                   <p className="text-xs text-black/45">
-                    {c.changedBy.name} · {formatDateTime(c.changedAt)}
+                    {c.changedBy?.name ?? "System"} · {formatDateTime(c.changedAt)}
                   </p>
                 </li>
               ))}
@@ -424,7 +426,7 @@ function Momentum({ eoi }: { eoi: ReturnType<typeof eoiSummary> }) {
             ? eoi.windowOpen
               ? `Window open until ${formatDate(eoi.windowEnd)}`
               : `Window closed ${formatDate(eoi.windowEnd)}`
-            : "Window opens when the deal enters Investment votes"}
+            : "Window opens when the deal enters Investment Commitments"}
         </p>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
