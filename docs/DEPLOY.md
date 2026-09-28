@@ -21,10 +21,11 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
 
    Use the *pooler* strings, not "Direct connection": that one is IPv6-only and
    Netlify's build machines can't reach it.
-4. **(Recommended) Download the SSL certificate.** Project Settings → **Database** →
-   *SSL Configuration* → **Download certificate**. Open the file in a text editor —
-   you'll paste its contents into Netlify as `DATABASE_CA_CERT`. With it, the app verifies
-   it's really talking to Supabase; without it, the connection is still encrypted but not verified.
+4. **Don't set `DATABASE_CA_CERT` (yet).** The certificate under Database settings → SSL
+   is for *direct* connections; the connection pooler (port 6543) presents a different chain,
+   so supplying it makes every query fail with `self-signed certificate in certificate chain`.
+   Without it, the connection is still encrypted, just not identity-verified. (Follow-up: find
+   the pooler's CA chain so verification can be switched on.)
 
 ## 2. Netlify — create the site
 
@@ -38,8 +39,7 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
    | `DATABASE_URL` | Transaction pooler string (port 6543) |
    | `DIRECT_URL` | Session pooler string (port 5432) |
    | `SESSION_SECRET` | 40+ random characters — e.g. generate a long password in your password manager. Never reuse it anywhere. |
-   | `DATABASE_CA_CERT` | *(recommended)* the full contents of the certificate file, including the `-----BEGIN/END CERTIFICATE-----` lines |
-
+   
 3. **Turn off Deploy Previews for now.** Site configuration → Build & deploy →
    *Deploy Previews* → "Don't deploy pull requests". Previews would otherwise run
    unmerged code against the **production** database. (We can add a separate
@@ -97,6 +97,6 @@ The brand site on the root domain is unaffected — only the `app.` subdomain po
 |---|---|
 | Build fails at `prisma migrate deploy` with `P1001 Can't reach database` | `DIRECT_URL` wrong or using the "Direct connection" (IPv6) string — use the Session pooler |
 | Build fails with `prepared statement ... already exists` during migrate | `DIRECT_URL` is the Transaction pooler (6543) — it must be the Session pooler (5432) |
-| Pages error with `self-signed certificate in certificate chain` | `DATABASE_CA_CERT` is incomplete/wrong — re-paste the whole file, or remove the variable |
+| Pages show "A server error occurred"; function log says `self-signed certificate in certificate chain` | `DATABASE_CA_CERT` is set — delete it and redeploy (see §1.4) |
 | Sign-in always says "Incorrect email or password" | Email in the `User` row isn't lowercase, or role isn't `ADMIN` |
 | Sign-in works then immediately logs out | `SESSION_SECRET` missing or shorter than 32 characters |

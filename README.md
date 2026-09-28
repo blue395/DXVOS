@@ -86,4 +86,4 @@ Netlify (app) + Supabase (Postgres, London region). Step-by-step: [`docs/DEPLOY.
 - `netlify.toml`: production deploys run `prisma migrate deploy` before building.
 - Two DB URLs in production: `DATABASE_URL` (pooled, for the app) and `DIRECT_URL` (for migrations).
 - Every table has Row Level Security enabled (no policies) so Supabase's Data API can't expose it.
-- Remote DB connections are always TLS-encrypted; `DATABASE_CA_CERT` adds server verification (`src/lib/db-ssl.ts`).
+- Remote DB connections are always TLS-encrypted (`src/lib/db-ssl.ts`). Server verification via `DATABASE_CA_CERT` is supported in code but **not yet usable** with Supabase's pooler — see `docs/DEPLOY.md` §1.4.
