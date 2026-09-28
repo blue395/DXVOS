@@ -16,3 +16,4 @@ Spec: `DXV_OS_Product_Spec_FINAL.md`. Architecture overview: `README.md`.
 - Deployed on Netlify + Supabase (`docs/DEPLOY.md`). Every migration that creates a table must also `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (Supabase Data API exposure).
 - AI deck reading: prompt/model in `src/lib/deck-ai/prompt.ts`; the AI suggests, humans decide (never auto-move a deal on AI output). Modules shared with `netlify/functions/` must not import `server-only` or use `@/` aliases.
 - Before pushing: `npm test && npm run typecheck && npm run lint && npm run build`.
+- PRs: Claude opens a PR for its work and may merge its own PRs once those checks pass (Blue's standing permission). Merging to `main` deploys to production and runs migrations, so always tell Blue what merged, and call out any database migration explicitly.
