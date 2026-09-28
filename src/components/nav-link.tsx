@@ -9,7 +9,7 @@ export function NavLink({ href, children, disabled }: { href: string; children: 
 
   if (disabled) {
     return (
-      <span title="Coming in week 2+" className="cursor-not-allowed rounded px-3 py-1.5 text-white/35">
+      <span title="Coming in week 2+" className="hidden cursor-not-allowed rounded px-3 py-1.5 text-white/35 sm:inline">
         {children}
       </span>
     );
@@ -17,7 +17,7 @@ export function NavLink({ href, children, disabled }: { href: string; children: 
   return (
     <Link
       href={href}
-      className={`rounded px-3 py-1.5 ${active ? "bg-dxv-yellow font-medium text-dxv-green" : "text-white/85 hover:bg-white/10"}`}
+      className={`shrink-0 rounded px-3 py-1.5 transition ${active ? "bg-dxv-yellow font-medium text-dxv-green" : "text-white/85 hover:bg-white/10"}`}
     >
       {children}
     </Link>

@@ -4,6 +4,8 @@ import {
   canDecideEligibility,
   canGenerateAssessment,
   canCreateDDDocument,
+  advanceTarget,
+  focusSections,
   cardOneLiner,
   formatGbpCompact,
   stagePhase,
@@ -246,5 +248,28 @@ describe("canCreateDDDocument", () => {
     expect(canCreateDDDocument("INVESTMENT_COMMITMENTS")).toBe(true);
     expect(canCreateDDDocument("DUE_DILIGENCE")).toBe(true);
     expect(canCreateDDDocument("PASSED")).toBe(false);
+  });
+});
+
+describe("advanceTarget", () => {
+  it("moves to the next stage, except where a decision form or nowhere applies", () => {
+    expect(advanceTarget("SUBMITTED")).toBe("ELIGIBILITY_SCREEN");
+    expect(advanceTarget("ELIGIBILITY_SCREEN")).toBeNull(); // eligibility decision form instead
+    expect(advanceTarget("PARTNER_REVIEW")).toBe("PITCH_SELECTION");
+    expect(advanceTarget("INVESTMENT_COMPLETE")).toBe("SEIS_CERTIFICATE");
+    expect(advanceTarget("SEIS_CERTIFICATE")).toBeNull();
+    expect(advanceTarget("PASSED")).toBeNull();
+    expect(advanceTarget("ADD_TO_PIPELINE")).toBe("PARTNER_REVIEW");
+  });
+});
+
+describe("focusSections", () => {
+  it("follows the dealflow, and always keeps documents open", () => {
+    expect(focusSections("ELIGIBILITY_SCREEN")).toContain("eligibility");
+    expect(focusSections("PARTNER_REVIEW")).toEqual(["assessment", "memo", "documents"]);
+    expect(focusSections("PITCH_SELECTION")).toContain("preSelection");
+    expect(focusSections("INVESTMENT_COMMITMENTS")).toContain("commitments");
+    expect(focusSections("DUE_DILIGENCE")[0]).toBe("dd");
+    for (const s of ALL_STAGES) expect(focusSections(s.key)).toContain("documents");
   });
 });

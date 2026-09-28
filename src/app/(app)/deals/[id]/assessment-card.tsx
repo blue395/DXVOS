@@ -13,6 +13,7 @@ export function AssessmentCard({
   latest,
   draft,
   reviewed,
+  collapse,
 }: {
   ventureId: string;
   canGenerate: boolean;
@@ -20,6 +21,7 @@ export function AssessmentCard({
   latest: { number: number; status: DeckStatus; error: string | null; output: unknown; createdAt: Date; startedAt: Date | null; completedAt: Date | null } | null;
   draft: { number: number; content: unknown; updatedAt: Date } | null;
   reviewed: { issueNumber: number; content: unknown; createdAt: Date; createdBy: { name: string } } | null;
+  collapse?: { open: boolean; now: boolean };
 }) {
   const eff = latest ? effectiveDeckStatus(latest) : null;
   const running = eff && (eff.status === "PENDING" || eff.status === "PROCESSING");
@@ -27,7 +29,24 @@ export function AssessmentCard({
   const href = `/deals/${ventureId}/assessment`;
 
   return (
-    <Card title="Investment assessment" actions={latest ? <Link href={href} className="text-xs text-dxv-green hover:underline">Open assessment →</Link> : undefined}>
+    <Card
+      title="Investment assessment"
+      id="assessment"
+      collapse={
+        collapse && {
+          ...collapse,
+          summary: reviewed
+            ? `${reviewIssueName(reviewed.issueNumber)} · ${scoreOf(reviewed.content)}/${MAX_TOTAL_SCORE}`
+            : draft
+              ? `${reviewDraftName(draft.number)} in progress`
+              : latest && eff?.status === "COMPLETE"
+                ? `${aiDraftName(latest.number)} · ${scoreOf(latest.output)}/${MAX_TOTAL_SCORE}`
+                : running
+                  ? "Drafting…"
+                  : "Not started",
+        }
+      }
+      actions={latest ? <Link href={href} className="text-xs text-dxv-green hover:underline">Open assessment →</Link> : undefined}>
       <div className="space-y-3 text-sm">
         {!latest && <p className="text-black/60">Get an AI-assisted first-draft memo in DXV&apos;s template, scored against the eleven criteria.</p>}
 

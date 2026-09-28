@@ -19,10 +19,14 @@ export type DocRow = {
 };
 
 /** Every document on the deal, grouped by category. DXV OS is the document store. */
-export function DocumentsCard({ ventureId, docs }: { ventureId: string; docs: DocRow[] }) {
+export function DocumentsCard({ ventureId, docs, collapse }: { ventureId: string; docs: DocRow[]; collapse?: { open: boolean; now: boolean } }) {
   const groups = CATEGORIES.map((c) => ({ category: c, docs: docs.filter((d) => d.category === c) })).filter((g) => g.docs.length);
   return (
-    <Card title="Documents" actions={<span className="text-xs text-black/55">{docs.length} file{docs.length === 1 ? "" : "s"}</span>}>
+    <Card
+      title="Documents"
+      id="documents"
+      collapse={collapse && { ...collapse, now: false, summary: `${docs.length} file${docs.length === 1 ? "" : "s"}` }}
+      actions={<span className="text-xs text-black/55">{docs.length} file{docs.length === 1 ? "" : "s"}</span>}>
       <div className="space-y-4">
         {groups.length === 0 && <p className="text-sm text-black/55">No documents yet. Decks, memos, DD papers and legal documents all live here.</p>}
         {groups.map((g) => (

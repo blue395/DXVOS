@@ -96,6 +96,14 @@ scripts/                      seed.ts (dev), create-admin.ts
 - **Buttons:** clear hover (lift + ring) and press states; spinner and a working label while running; "✓ Saved" after (`action-form.tsx`, `action-button.tsx`). DD ticks and board moves update instantly (optimistic) while the server saves.
 - **Long AI jobs** (eligibility screen, investment assessment, DD document): a floating tray, bottom right, on every page, with elapsed time and an estimated progress bar, then "ready: Open" (`job-tray.tsx` + `/api/jobs`). It only checks while something is running. In local dev, `DECK_AI_MOCK_DELAY_MS=15000` makes the fake AI slow enough to see it.
 
+## Deal page layout
+
+The deal page follows the dealflow. Sections that matter at the deal's stage start open and are marked
+**Now**; the others collapse to a one-line summary (e.g. "£20k from 2 angels"). Rules: `focusSections()` in
+`src/lib/pipeline.ts`. A sticky menu jumps to any section. The header has one-click **Advance to <next stage>**
+(the confirm says what founder update it queues; `advanceTarget()`), and **Other move…** for anything else,
+including Passed. Entry forms (votes, EOIs, DD items) open from "+ Record…" buttons and close after saving.
+
 ## AI deck reading & eligibility screen
 
 Upload a deck on **New venture** and Claude (Sonnet 5) pre-fills the form and drafts the

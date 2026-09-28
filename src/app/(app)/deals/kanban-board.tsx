@@ -97,7 +97,7 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
           {LINEAR_STAGES.map((stage) => (
             <Column key={stage.key} stage={stage} cards={cards.filter((c) => c.currentStage === stage.key)} saving={saving} />
           ))}
-          <div className="sticky right-0 shrink-0 bg-white pl-3 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.25)]">
+          <div className="sticky right-0 shrink-0 border-l border-dxv-green/15 bg-white pl-3 shadow-[-18px_0_18px_-14px_rgba(0,0,0,0.35)]">
             <Column stage={PASSED_STAGE} cards={cards.filter((c) => c.currentStage === "PASSED")} saving={saving} />
           </div>
         </div>
