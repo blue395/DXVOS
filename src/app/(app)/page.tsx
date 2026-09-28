@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ALL_STAGES, GATE_LABELS, daysSince, dashboardMetrics, formatGbp } from "@/lib/pipeline";
+import { ALL_STAGES, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
 
 // Admin-only (spec: angels must never see the Dashboard or Activity, even once they
@@ -145,9 +145,4 @@ function Metric({
   ) : (
     <div className={cls}>{body}</div>
   );
-}
-
-/** £1,250,000 as "£1.25M", so large totals fit the tile (full amount on hover). */
-function formatGbpCompact(n: number): string {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", notation: "compact", maximumFractionDigits: 2 }).format(n);
 }

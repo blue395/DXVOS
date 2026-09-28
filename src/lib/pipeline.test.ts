@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_STAGES,
   canDecideEligibility,
+  cardOneLiner,
+  formatGbpCompact,
+  stagePhase,
   dashboardMetrics,
   isActiveStage,
   LINEAR_STAGES,
@@ -212,5 +215,35 @@ describe("dashboardMetrics", () => {
 
   it("ignores amounts on deals that aren't invested", () => {
     expect(dashboardMetrics([{ currentStage: "PASSED", investedAmountGbp: 10_000 }]).investedTotalGbp).toBe(0);
+  });
+});
+
+describe("board presentation", () => {
+  it("groups stages into phases", () => {
+    expect(stagePhase("SUBMITTED")).toBe("intake");
+    expect(stagePhase("ELIGIBILITY_SCREEN")).toBe("intake");
+    expect(stagePhase("PARTNER_REVIEW")).toBe("review");
+    expect(stagePhase("PITCH_OUTCOME")).toBe("review");
+    expect(stagePhase("INVESTMENT_COMMITMENTS")).toBe("closing");
+    expect(stagePhase("CAPITAL_TRANSFER")).toBe("closing");
+    expect(stagePhase("INVESTMENT_COMPLETE")).toBe("invested");
+    expect(stagePhase("SEIS_CERTIFICATE")).toBe("invested");
+    expect(stagePhase("PASSED")).toBe("passed");
+  });
+
+  it("formats money compactly", () => {
+    expect(formatGbpCompact(950)).toBe("£950");
+    expect(formatGbpCompact(7_500)).toBe("£7.5k");
+    expect(formatGbpCompact(400_000)).toBe("£400k");
+    expect(formatGbpCompact(1_800_000)).toBe("£1.8m");
+    expect(formatGbpCompact(1_250_000)).toBe("£1.25m");
+  });
+
+  it("prefers the AI one-line summary, else the description's first sentence", () => {
+    expect(cardOneLiner("Booking marketplace for families.", "Long text. More.")).toBe("Booking marketplace for families.");
+    expect(cardOneLiner(null, "Refill packs for personal care. We sell online.")).toBe("Refill packs for personal care.");
+    expect(cardOneLiner(null, "No full stop here")).toBe("No full stop here");
+    expect(cardOneLiner(null, "  ")).toBeNull();
+    expect(cardOneLiner(null, "x".repeat(200))!.length).toBe(118);
   });
 });
