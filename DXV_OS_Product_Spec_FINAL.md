@@ -10,6 +10,14 @@ DXV may start charging angels a membership fee this winter. Nothing in this MVP 
 
 ## 2. Build approach
 
+> **Amended 2026-09-28 (Blue): DXV OS is the document store for the deal lifecycle.**
+> Decks, memos, DD papers, legal and financial documents (PDF, Word, Excel) are stored in
+> DXV OS (private Supabase Storage), not Google Drive. Drive links are removed from the app.
+> **Declined deals are kept, with their data and files**, to understand DXV's dealflow and
+> build feedback loops (a future "DXV brain"); nothing is automatically deleted. Founders
+> must be told this in the privacy notice on the submission form / website (UK GDPR
+> transparency; lawful basis: legitimate interests). Kevin to confirm the wording.
+
 - Built by Blue, hands-on, in Claude Code. Explain what's being built and why as you go — this is a learning project as much as a delivery, not a silent generate-and-hand-over.
 - Two weeks of focused build time available now, then ongoing at a 4-day-week pace.
 - Files (decks, memos) stay linked into the existing Google Drive structure rather than rebuilding file storage.

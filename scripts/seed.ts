@@ -46,7 +46,6 @@ async function main() {
         founderNames: s.founderNames,
         companyStage: "Pre-seed",
         round: 1 + (SAMPLES.indexOf(s) % 3),
-        deckUrl: "https://drive.google.com/",
         createdById: admin.id,
         stageChanges: { create: { fromStage: null, toStage: "SUBMITTED", changedById: admin.id } },
       },
@@ -89,9 +88,6 @@ async function main() {
         { ventureId: mosaic.id, title: "Founder references", owner: "Anna", dueDate: new Date(Date.now() + 5 * day) },
         { ventureId: mosaic.id, title: "FCA permissions check", completedAt: new Date() },
       ],
-    });
-    await db.memoVersion.create({
-      data: { ventureId: mosaic.id, version: 1, docUrl: "https://docs.google.com/", summary: "First draft", createdById: admin.id },
     });
   }
 

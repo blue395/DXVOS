@@ -123,6 +123,13 @@ A private copy of each deck is kept for re-running the screen (download it from 
 No new settings: it uses the same `ANTHROPIC_API_KEY` and the stored decks from §5. It runs in
 a second background function, `analyze-memo-background` (logs under Netlify → Logs → Functions).
 
+## 7. Documents
+
+No new settings. The deploy's migration creates a second private bucket, `documents` (PDF, Word,
+Excel; 50 MB max). Check it exists under Supabase → Storage; if not, create it by hand with those
+settings (Private). Storage use grows with every file: the free plan includes 1 GB, Pro 100 GB.
+Stored files aren't included in Supabase's database backups.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.

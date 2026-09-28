@@ -14,6 +14,7 @@ import { CommsStatus, PassReason, Stage } from "@/generated/prisma/enums";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { DomainError, moveVentureStage } from "@/lib/ventures";
+import { recordDeckDocument } from "@/lib/deck-documents";
 import type { ActionResult } from "@/lib/action-result";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -78,8 +79,6 @@ const VentureSchema = z.object({
     .refine((n) => n === null || (Number.isInteger(n) && n > 0), "Choose a round")
     .optional(),
   description: optionalText,
-  deckUrl: optionalUrl,
-  driveFolderUrl: optionalUrl,
 });
 
 export async function createVenture(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -101,6 +100,7 @@ export async function createVenture(_prev: ActionResult, formData: FormData): Pr
   const analysisId = formData.get("analysisId");
   if (typeof analysisId === "string" && analysisId) {
     await db.deckAnalysis.updateMany({ where: { id: analysisId, ventureId: null }, data: { ventureId: venture.id } });
+    await recordDeckDocument(analysisId); // and list the deck under the venture's Documents
   }
   revalidatePath("/deals");
   revalidatePath("/");
@@ -153,30 +153,6 @@ export async function moveVentureForm(ventureId: string, _prev: ActionResult, fo
     passReason: (data.passReason as PassReason) || null,
     note: (data.note as string) ?? null,
   });
-}
-
-// ── Memo versions (append-only) ─────────────────────────────────────────────
-
-const MemoSchema = z.object({
-  docUrl: z.string().trim().regex(/^https?:\/\//, "Paste the Google Drive link to the memo"),
-  summary: optionalText,
-});
-
-export async function addMemoVersion(ventureId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  const user = await requireAdmin();
-  const parsed = MemoSchema.safeParse(form(formData));
-  if (!parsed.success) return { error: firstError(parsed.error) };
-
-  // Next version number = latest + 1, inside a transaction so two admins saving at
-  // once can't both get the same number (the unique index would reject one anyway).
-  await db.$transaction(async (tx) => {
-    const latest = await tx.memoVersion.findFirst({ where: { ventureId }, orderBy: { version: "desc" } });
-    await tx.memoVersion.create({
-      data: { ventureId, version: (latest?.version ?? 0) + 1, createdById: user.id, ...parsed.data },
-    });
-  });
-  revalidateDeal(ventureId);
-  return { ok: true };
 }
 
 // ── DD checklist (editable working state) ───────────────────────────────────

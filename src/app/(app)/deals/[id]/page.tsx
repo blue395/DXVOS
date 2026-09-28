@@ -23,7 +23,6 @@ import { CommsStatus } from "@/generated/prisma/enums";
 import {
   addDDItem,
   addInvestmentVote,
-  addMemoVersion,
   addPreSelectionVote,
   deleteDDItem,
   moveVentureForm,
@@ -33,6 +32,8 @@ import {
 } from "../actions";
 import { VentureFields } from "../venture-fields";
 import { StageMover } from "./stage-mover";
+import { DocumentItem, DocumentsCard, type DocRow } from "./documents-card";
+import { DocumentUploader } from "@/components/document-uploader";
 import { EligibilityCard } from "./eligibility-card";
 import { AssessmentCard } from "./assessment-card";
 
@@ -44,7 +45,20 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
     where: { id },
     include: {
       stageChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
-      memoVersions: { orderBy: { version: "desc" }, include: { createdBy: { select: { name: true } } } },
+      memoVersions: {
+        where: { kind: { not: "DRIVE_LINK" } }, // Drive links retired 2026-09-28
+        orderBy: { version: "desc" },
+        include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true } } },
+      },
+      documents: {
+        where: { uploadedAt: { not: null }, archivedAt: null },
+        orderBy: { uploadedAt: "desc" },
+        include: {
+          uploadedBy: { select: { name: true } },
+          ddItem: { select: { title: true } },
+          memoVersion: { select: { id: true } },
+        },
+      },
       memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
       memoDrafts: { where: { archivedAt: null }, take: 1, select: { content: true, updatedAt: true } },
       ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
@@ -68,6 +82,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
+  const docs: DocRow[] = v.documents.map((d) => ({ ...d, isMemoVersion: !!d.memoVersion }));
+  const latestDeck = docs.find((d) => d.category === "DECK");
 
   // At intake the eligibility decision is the next job, so show it first.
   const eligibility = (
@@ -116,8 +132,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
-          {v.deckUrl && <ExternalLink href={v.deckUrl}>Deck</ExternalLink>}
-          {v.driveFolderUrl && <ExternalLink href={v.driveFolderUrl}>Drive folder</ExternalLink>}
+          {latestDeck && <ExternalLink href={`/api/documents/${latestDeck.id}`}>Deck</ExternalLink>}
           {v.website && <ExternalLink href={v.website}>Website</ExternalLink>}
         </div>
       </div>
@@ -145,7 +160,9 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
           <Card title="Investment memo">
             {v.memoVersions.length === 0 ? (
-              <p className="text-sm text-black/55">No memo yet. Drafted during DXV Partner Review.</p>
+              <p className="text-sm text-black/55">
+                No memo yet. Generate one with the AI assessment during DXV Partner Review, or upload a memo file.
+              </p>
             ) : (
               <ul className="divide-y divide-black/10">
                 {v.memoVersions.map((m, i) => (
@@ -155,11 +172,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                         <Link href={`/deals/${v.id}/assessment?view=v-${m.version}`} className="font-medium text-dxv-green hover:underline">
                           Version {m.version} · reviewed memo
                         </Link>
-                      ) : (
-                        <a href={m.docUrl ?? "#"} target="_blank" rel="noreferrer" className="font-medium text-dxv-green hover:underline">
-                          Version {m.version} ↗
+                      ) : m.document ? (
+                        <a href={`/api/documents/${m.document.id}`} target="_blank" rel="noreferrer" className="font-medium text-dxv-green hover:underline">
+                          Version {m.version} · {m.document.fileName}
                         </a>
-                      )}
+                      ) : null}
                       {i === 0 && <span className="ml-2 rounded bg-dxv-yellow px-1.5 text-xs font-medium text-dxv-green">Latest</span>}
                       {m.summary && <p className="text-black/65">{m.summary}</p>}
                     </div>
@@ -170,18 +187,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 ))}
               </ul>
             )}
-            <ActionForm action={addMemoVersion.bind(null, v.id)} className="mt-4 space-y-3 border-t border-black/10 pt-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Memo link (Google Drive) *">
-                  <input name="docUrl" type="url" required placeholder="https://docs.google.com/…" className={inputClass} />
-                </Field>
-                <Field label="What changed">
-                  <input name="summary" className={inputClass} />
-                </Field>
-              </div>
-              <SubmitButton variant="secondary">Add memo version</SubmitButton>
-            </ActionForm>
+            <div className="mt-4 border-t border-black/10 pt-4">
+              <DocumentUploader ventureId={v.id} category="MEMO" label="Upload a memo file (PDF or Word) as a new version" />
+            </div>
           </Card>
+
+          <DocumentsCard ventureId={v.id} docs={docs} />
 
           <Card
             title="Pre-Selection votes"
@@ -242,7 +253,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 {v.ddItems.map((item) => {
                   const overdue = !item.completedAt && item.dueDate && item.dueDate < now;
                   return (
-                    <li key={item.id} className="flex items-center gap-3 py-2 text-sm">
+                    <li key={item.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
                       <form action={toggleDDItem.bind(null, item.id)}>
                         <button
                           aria-label={item.completedAt ? "Mark not done" : "Mark done"}
@@ -268,6 +279,18 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                           ×
                         </button>
                       </form>
+                      <span className="w-full pl-8">
+                        {docs.filter((d) => d.ddItemId === item.id).length > 0 && (
+                          <ul>
+                            {docs
+                              .filter((d) => d.ddItemId === item.id)
+                              .map((d) => (
+                                <DocumentItem key={d.id} d={{ ...d, ddItem: null }} />
+                              ))}
+                          </ul>
+                        )}
+                        <DocumentUploader ventureId={v.id} category="DUE_DILIGENCE" ddItemId={item.id} compact />
+                      </span>
                     </li>
                   );
                 })}
