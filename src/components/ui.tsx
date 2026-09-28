@@ -19,10 +19,24 @@ export function Card({ title, children, actions }: { title?: string; children: R
 export const inputClass =
   "w-full rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-sm placeholder:text-black/40 focus:border-dxv-green focus:outline-none";
 
-export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+export function Field({
+  label,
+  children,
+  hint,
+  aiSuggested,
+}: {
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+  /** Marks a value pre-filled by AI, so the reviewer knows to check it. */
+  aiSuggested?: boolean;
+}) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-black/70">{label}</span>
+      <span className="flex items-center gap-1.5 text-xs font-medium text-black/70">
+        {label}
+        {aiSuggested && <AiTag />}
+      </span>
       {children}
       {hint && <span className="block text-xs text-black/50">{hint}</span>}
     </label>
@@ -60,6 +74,14 @@ export function CommsBadge({ status }: { status: CommsStatus }) {
         ? "bg-dxv-green/10 text-dxv-green"
         : "bg-dxv-green text-white";
   return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{COMMS_LABELS[status]}</span>;
+}
+
+export function AiTag({ children = "AI suggested" }: { children?: React.ReactNode }) {
+  return (
+    <span className="rounded bg-dxv-yellow px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-dxv-green">
+      {children}
+    </span>
+  );
 }
 
 export function WarningIcon({ title }: { title: string }) {

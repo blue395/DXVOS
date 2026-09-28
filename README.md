@@ -53,6 +53,12 @@ src/app/(app)/                Signed-in area (route group — the folder name is
   deals/[id]/page.tsx         Deal Review page
   deals/actions.ts            All deal server actions
   activity/page.tsx           Stage-history log
+  deals/deck-actions.ts       Deck upload, AI analysis trigger, eligibility decision
+  deals/[id]/eligibility-*    Eligibility screen card + human decision form
+src/lib/deck-ai/              AI deck reading: prompt (edit here), output schema, rendering, mock
+src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Claude, save)
+src/lib/deck-storage.ts       Supabase Storage (prod) / .data/decks (dev)
+netlify/functions/            analyze-deck-background: the long-running worker
 src/components/               Shared UI (ActionForm, Card, badges…)
 scripts/                      seed.ts (dev), create-admin.ts
 ```
@@ -72,6 +78,17 @@ scripts/                      seed.ts (dev), create-admin.ts
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`
   (spec §10 principle, ready for angel logins later).
 - **Money in whole pounds** (`Int`).
+
+## AI deck reading & eligibility screen
+
+Upload a deck on **New venture** and Claude (Sonnet 5) pre-fills the form and drafts the
+eligibility screen using DXV's prompt template (`src/lib/deck-ai/prompt.ts`).
+- AI output is stored separately (`DeckAnalysis`) and shown *alongside* human judgement, never in place of it.
+- Nothing moves without a person: Proceed / Decline / Request more info are recorded in
+  `EligibilityReview` (append-only) with who and when; Proceed/Decline go through `moveVentureStage()`.
+- "Not stated" thesis fit is flagged for a human to ask the founder, never auto-declined.
+- House style (no em-dashes, arrows, emoji) is enforced mechanically after the model responds.
+- Setup: `docs/DEPLOY.md` §5.
 
 ## Week 2 hooks already in place
 

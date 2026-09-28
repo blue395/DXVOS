@@ -224,3 +224,17 @@ function sum(ns: number[]): number {
 export function formatGbp(n: number): string {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(n);
 }
+
+// ── Eligibility decisions (human-in-the-loop on the AI screen) ──────────────
+
+/** A human can record an eligibility decision while the deal is still at intake. */
+export function canDecideEligibility(stage: Stage): boolean {
+  return stage === "FOUNDER_DECK" || stage === "ELIGIBILITY_SCREENING";
+}
+
+/** Where each decision moves the deal. "Need more info" doesn't move it. */
+export const ELIGIBILITY_DECISION_TARGET = {
+  PROCEED: "ADD_TO_PIPELINE",
+  DECLINE: "PASSED",
+  NEED_MORE_INFO: null,
+} as const satisfies Record<string, Stage | null>;

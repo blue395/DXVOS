@@ -88,6 +88,13 @@ export async function createVenture(_prev: ActionResult, formData: FormData): Pr
       stageChanges: { create: { fromStage: null, toStage: "FOUNDER_DECK", changedById: user.id } },
     },
   });
+
+  // If the form was pre-filled from a deck, attach that AI analysis (and its stored
+  // deck and eligibility screen) to the new venture.
+  const analysisId = formData.get("analysisId");
+  if (typeof analysisId === "string" && analysisId) {
+    await db.deckAnalysis.updateMany({ where: { id: analysisId, ventureId: null }, data: { ventureId: venture.id } });
+  }
   revalidatePath("/deals");
   revalidatePath("/");
   redirect(`/deals/${venture.id}`);

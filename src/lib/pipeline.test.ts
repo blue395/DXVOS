@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dealWarnings, eoiSummary, gatesCrossed, latestVotePerAngel, MOMENTUM_THRESHOLD_GBP } from "./pipeline";
+import {
+  canDecideEligibility,
+  dealWarnings,
+  eoiSummary,
+  gatesCrossed,
+  latestVotePerAngel,
+  MOMENTUM_THRESHOLD_GBP,
+} from "./pipeline";
 
 const d = (iso: string) => new Date(iso);
 
@@ -105,5 +112,18 @@ describe("dealWarnings", () => {
         d("2026-03-10"),
       ),
     ).toEqual(["Overdue DD item"]);
+  });
+});
+
+describe("eligibility decisions", () => {
+  it("are only allowed at intake", () => {
+    expect(canDecideEligibility("FOUNDER_DECK")).toBe(true);
+    expect(canDecideEligibility("ELIGIBILITY_SCREENING")).toBe(true);
+    expect(canDecideEligibility("ADD_TO_PIPELINE")).toBe(false);
+    expect(canDecideEligibility("PASSED")).toBe(false);
+  });
+
+  it("proceeding from eligibility owes the founder the eligibility decision", () => {
+    expect(gatesCrossed("ELIGIBILITY_SCREENING", "ADD_TO_PIPELINE").map((g) => g.gate)).toEqual(["ELIGIBILITY"]);
   });
 });
