@@ -45,6 +45,7 @@ model User {
   memoScoreChanges   MemoScoreChange[]
   documentsUploaded  Document[]          @relation("DocumentUploadedBy")
   documentsArchived  Document[]          @relation("DocumentArchivedBy")
+  ddReportJobs       DDReportJob[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ model Venture {
   memoAnalyses       MemoAnalysis[]
   memoDrafts         MemoDraft[]
   documents          Document[]
+  ddReportJobs       DDReportJob[]
 
   @@index([currentStage])
 }
@@ -424,7 +426,34 @@ model Document {
   archivedBy   User?            @relation("DocumentArchivedBy", fields: [archivedById], references: [id])
 
   memoVersion MemoVersion?
+  ddReportJob DDReportJob?
 
   @@unique([bucket, storagePath])
   @@index([ventureId, category])
+}
+
+// ── DD document generator ───────────────────────────────────────────────────
+
+// One "Create DD document" run: AI drafts a DD plan, the worker builds a DXV-branded
+// Word file and stores it as a Document (category Due diligence).
+model DDReportJob {
+  id           String             @id @default(cuid())
+  ventureId    String
+  venture      Venture            @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  context      Json // deal details, memo, eligibility screen, DD items, deck location
+  output       Json? // the AI's DD plan
+  documentId   String?            @unique
+  document     Document?          @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation(fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  @@index([ventureId, createdAt])
 }

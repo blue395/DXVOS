@@ -60,9 +60,11 @@ src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Clau
 src/lib/deck-storage.ts       Supabase Storage (prod) / .data/<bucket> (dev), for decks and documents
 src/lib/documents.ts          Document rules: allowed types (PDF/Word/Excel), 50 MB limit, categories
 src/app/(app)/deals/document-actions.ts   Upload, confirm, archive documents
-netlify/functions/            analyze-deck-background, analyze-memo-background: the long-running workers
+netlify/functions/            analyze-deck-background, analyze-memo-background, generate-dd-background: the long-running workers
 src/lib/memo-ai/              AI memo: prompt (edit here), schema + scoring criteria, rendering, context, mock
 src/lib/memo-worker.ts        Runs one memo assessment
+src/lib/dd-doc/               DD document: prompt (edit here), schema, context, Word builder (docx), mock
+src/lib/dd-worker.ts          Runs one DD document job (AI plan, build .docx, store under Documents)
 src/app/(app)/deals/[id]/assessment/   Full assessment page (AI drafts, review copy, reviewed versions)
 src/components/               Shared UI (ActionForm, Card, badges…)
 scripts/                      seed.ts (dev), create-admin.ts
@@ -78,8 +80,8 @@ scripts/                      seed.ts (dev), create-admin.ts
   creates a `FounderComm` row as *Not yet sent*, so the dashboard's "founders awaiting a decision
   update" can't be forgotten. Skipping stages creates one per gate skipped; moving backwards creates none.
 - **Passed is pinned** on the board's right edge — it's reachable from every stage, so it's always a drop target.
-- **Momentum threshold** (£20k within 7 days of entering Investment votes) is a constant in
-  `src/lib/pipeline.ts` — change it there if the syndicate's rule changes.
+- **Investment commitments** show a running total of each angel's latest interested EOI (no threshold);
+  a deal sitting in Investment Commitments for over 7 days gets a warning (`src/lib/pipeline.ts`).
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`
   (spec §10 principle, ready for angel logins later).
 - **Money in whole pounds** (`Int`).
@@ -106,6 +108,17 @@ screen, partner decisions, founder comms notes). Prompt: `src/lib/memo-ai/prompt
   individually, logged in `MemoScoreChange`) → **Mark complete** → **DXV Review Issue N** (locked `MemoVersion`,
   kind `REVIEWED_MEMO`) → **Revise** → DXV Review Draft N+1 → Issue N+1.
 - Full memo UI at `/deals/[id]/assessment`; runs in the Netlify background function `analyze-memo-background`.
+
+## Due Diligence document (AI first draft, Word)
+
+On the deal's **Due Diligence** card (DXV Partner Review onwards), **Create DD document** asks Claude (Sonnet 5)
+for a DD plan built on UK pre-seed/seed best practice, using the deck, the latest memo (Issue, else Review Draft,
+else AI Draft), the eligibility screen and existing DD items. DXV OS turns it into a DXV-branded Word file
+(cover and deal summary, purpose and scope, priority risks, eight DD areas each with questions, evidence to
+request, what to watch for and a findings box, documents-requested tracker, conclusion and sign-off) and stores
+it under Documents → Due diligence. Each run is recorded in `DDReportJob`; a new run makes a new file (old ones
+are kept). Prompt: `src/lib/dd-doc/prompt.ts`; layout: `src/lib/dd-doc/build.ts`. Runs in the Netlify background
+function `generate-dd-background`.
 
 ## Documents (DXV OS is the document store)
 

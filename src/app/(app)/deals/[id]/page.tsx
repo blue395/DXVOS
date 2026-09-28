@@ -35,6 +35,7 @@ import { DocumentUploader } from "@/components/document-uploader";
 import { EligibilityCard } from "./eligibility-card";
 import { issueNumbers, reviewIssueName } from "@/lib/memo-ai/render";
 import { AssessmentCard } from "./assessment-card";
+import { DDDocumentPanel } from "./dd-document";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   await requireAdmin();
@@ -60,6 +61,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       },
       memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
       memoDrafts: { where: { archivedAt: null }, take: 1, select: { number: true, content: true, updatedAt: true } },
+      ddReportJobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { createdBy: { select: { name: true } }, document: { select: { id: true, fileName: true, archivedAt: true } } },
+      },
       ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
       preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
       investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
@@ -247,6 +253,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           </Card>
 
           <Card title="Due Diligence" actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}>
+            <DDDocumentPanel ventureId={v.id} stage={v.currentStage} latest={v.ddReportJobs[0] ?? null} />
             {v.ddItems.length === 0 ? (
               <p className="text-sm text-black/55">No DD items yet.</p>
             ) : (
