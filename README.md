@@ -58,7 +58,10 @@ src/app/(app)/                Signed-in area (route group — the folder name is
 src/lib/deck-ai/              AI deck reading: prompt (edit here), output schema, rendering, mock
 src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Claude, save)
 src/lib/deck-storage.ts       Supabase Storage (prod) / .data/decks (dev)
-netlify/functions/            analyze-deck-background: the long-running worker
+netlify/functions/            analyze-deck-background, analyze-memo-background: the long-running workers
+src/lib/memo-ai/              AI memo: prompt (edit here), schema + scoring criteria, rendering, context, mock
+src/lib/memo-worker.ts        Runs one memo assessment
+src/app/(app)/deals/[id]/assessment/   Full assessment page (AI drafts, review copy, reviewed versions)
 src/components/               Shared UI (ActionForm, Card, badges…)
 scripts/                      seed.ts (dev), create-admin.ts
 ```
@@ -89,6 +92,17 @@ eligibility screen using DXV's prompt template (`src/lib/deck-ai/prompt.ts`).
 - "Not stated" thesis fit is flagged for a human to ask the founder, never auto-declined.
 - House style (no em-dashes, arrows, emoji) is enforced mechanically after the model responds.
 - Setup: `docs/DEPLOY.md` §5.
+
+## AI-assisted investment assessment (DXV Partner Review)
+
+From DXV Partner Review onwards, a partner can click **Generate AI assessment** on a deal. Claude (Sonnet 5)
+drafts a memo in DXV's template (header, executive summary, investment case, conclusion, eleven-criterion
+scoring table, SWOT, follow-up questions) from the stored deck plus what DXV OS already knows (eligibility
+screen, partner decisions, founder comms notes). Prompt: `src/lib/memo-ai/prompt.ts`.
+- `MemoAnalysis` = "AI draft N": immutable, records the context it was given. The review banner is added by the app.
+- `MemoDraft` = the partners' editable review copy; each score can be overruled individually, logged in `MemoScoreChange`.
+- **Finalise** writes a locked `MemoVersion` (kind `REVIEWED_MEMO`) alongside Drive-link versions.
+- Full memo UI at `/deals/[id]/assessment`; runs in the Netlify background function `analyze-memo-background`.
 
 ## Week 2 hooks already in place
 

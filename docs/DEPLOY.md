@@ -118,6 +118,11 @@ A private copy of each deck is kept for re-running the screen (download it from 
 **Local development without keys:** leave the Supabase variables unset (decks are saved in
 `.data/decks/`) and run `DECK_AI_MOCK=true npm run dev` to get a canned AI result.
 
+## 6. AI investment assessment
+
+No new settings: it uses the same `ANTHROPIC_API_KEY` and the stored decks from §5. It runs in
+a second background function, `analyze-memo-background` (logs under Netlify → Logs → Functions).
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.

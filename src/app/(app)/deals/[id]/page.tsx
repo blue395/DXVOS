@@ -13,6 +13,7 @@ import {
   latestVotePerAngel,
   stageLabel,
   canDecideEligibility,
+  canGenerateAssessment,
   roundOptionCount,
   isInvestedStage,
 } from "@/lib/pipeline";
@@ -33,6 +34,7 @@ import {
 import { VentureFields } from "../venture-fields";
 import { StageMover } from "./stage-mover";
 import { EligibilityCard } from "./eligibility-card";
+import { AssessmentCard } from "./assessment-card";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   await requireAdmin();
@@ -43,6 +45,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
     include: {
       stageChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
       memoVersions: { orderBy: { version: "desc" }, include: { createdBy: { select: { name: true } } } },
+      memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
+      memoDrafts: { where: { archivedAt: null }, take: 1, select: { content: true, updatedAt: true } },
       ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
       preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
       investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
@@ -128,6 +132,17 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <StageMover key={v.currentStage} currentStage={v.currentStage} action={moveVentureForm.bind(null, v.id)} />
           </Card>
 
+          {(canGenerateAssessment(v.currentStage) || v.memoAnalyses.length > 0) && (
+            <AssessmentCard
+              ventureId={v.id}
+              canGenerate={canGenerateAssessment(v.currentStage)}
+              hasDeck={v.deckAnalyses.some((a) => a.status !== "PENDING")}
+              latest={v.memoAnalyses[0] ?? null}
+              draft={v.memoDrafts[0] ?? null}
+              reviewed={v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO") ?? null}
+            />
+          )}
+
           <Card title="Investment memo">
             {v.memoVersions.length === 0 ? (
               <p className="text-sm text-black/55">No memo yet. Drafted during DXV Partner Review.</p>
@@ -136,9 +151,15 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 {v.memoVersions.map((m, i) => (
                   <li key={m.id} className="flex items-start justify-between gap-3 py-2 text-sm">
                     <div>
-                      <a href={m.docUrl} target="_blank" rel="noreferrer" className="font-medium text-dxv-green hover:underline">
-                        Version {m.version}
-                      </a>
+                      {m.kind === "REVIEWED_MEMO" ? (
+                        <Link href={`/deals/${v.id}/assessment?view=v-${m.version}`} className="font-medium text-dxv-green hover:underline">
+                          Version {m.version} · reviewed memo
+                        </Link>
+                      ) : (
+                        <a href={m.docUrl ?? "#"} target="_blank" rel="noreferrer" className="font-medium text-dxv-green hover:underline">
+                          Version {m.version} ↗
+                        </a>
+                      )}
                       {i === 0 && <span className="ml-2 rounded bg-dxv-yellow px-1.5 text-xs font-medium text-dxv-green">Latest</span>}
                       {m.summary && <p className="text-black/65">{m.summary}</p>}
                     </div>
