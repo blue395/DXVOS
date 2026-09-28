@@ -264,3 +264,13 @@ export const ELIGIBILITY_DECISION_TARGET = {
 export function roundOptionCount(highestRoundInUse: number | null | undefined): number {
   return Math.max(12, (highestRoundInUse ?? 0) + 2);
 }
+
+export type RoundFilter = { kind: "all" } | { kind: "none" } | { kind: "round"; round: number };
+
+/** Reads the board's ?round= filter: a round number, "none" (unassigned), or anything else = all. */
+export function parseRoundFilter(value: string | string[] | undefined): RoundFilter {
+  const v = Array.isArray(value) ? value[0] : value;
+  if (v === "none") return { kind: "none" };
+  const n = Number(v);
+  return v && Number.isInteger(n) && n > 0 ? { kind: "round", round: n } : { kind: "all" };
+}
