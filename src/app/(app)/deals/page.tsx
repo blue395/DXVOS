@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
+import { cardOneLiner, daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
+import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "./kanban-board";
 
@@ -20,12 +21,30 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       name: true,
       sector: true,
       round: true,
+      companyStage: true,
+      raiseAmountGbp: true,
+      description: true,
       currentStage: true,
       stageEnteredAt: true,
       ddItems: { select: { dueDate: true, completedAt: true } },
       _count: { select: { founderComms: { where: { status: "NOT_YET_SENT" } } } },
     },
   });
+
+  // Per deal: when the deck was first uploaded (the "submitted" clock starts at the
+  // upload for the eligibility check), and the latest AI one-line summary.
+  const ids = ventures.map((v) => v.id);
+  const [firstUploads, screens] = await Promise.all([
+    db.deckAnalysis.groupBy({ by: ["ventureId"], where: { ventureId: { in: ids } }, _min: { createdAt: true } }),
+    db.deckAnalysis.findMany({
+      where: { ventureId: { in: ids }, status: "COMPLETE" },
+      orderBy: { completedAt: "desc" },
+      distinct: ["ventureId"],
+      select: { ventureId: true, screen: true },
+    }),
+  ]);
+  const deckSince = new Map(firstUploads.map((u) => [u.ventureId, u._min.createdAt]));
+  const aiSummary = new Map(screens.map((a) => [a.ventureId, (a.screen as EligibilityScreen | null)?.oneLineSummary]));
 
   const now = new Date();
   // Shape exactly what the client needs — nothing more crosses to the browser.
@@ -34,6 +53,10 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     name: v.name,
     sector: v.sector,
     round: v.round,
+    companyStage: v.companyStage,
+    raiseAmountGbp: v.raiseAmountGbp,
+    oneLiner: cardOneLiner(aiSummary.get(v.id), v.description),
+    deckDaysAgo: deckSince.get(v.id) ? daysSince(deckSince.get(v.id)!, now) : null,
     currentStage: v.currentStage,
     daysInStage: daysSince(v.stageEnteredAt, now),
     warnings: dealWarnings(v, now),

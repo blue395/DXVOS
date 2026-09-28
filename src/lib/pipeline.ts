@@ -297,3 +297,32 @@ export function dashboardMetrics(ventures: { currentStage: Stage; investedAmount
     investedTotalGbp: sum(invested.map((v) => v.investedAmountGbp ?? 0)),
   };
 }
+
+// ── Board presentation rules ────────────────────────────────────────────────
+
+/** Broad phases the board colours columns by (brand tints, not extra colours). */
+export type StagePhase = "intake" | "review" | "closing" | "invested" | "passed";
+
+export function stagePhase(stage: Stage): StagePhase {
+  if (stage === "PASSED") return "passed";
+  if (isInvestedStage(stage)) return "invested";
+  if (stageMeta(stage).intake) return "intake";
+  if (stage === "INVESTMENT_COMMITMENTS" || stage === "DUE_DILIGENCE" || stage === "CAPITAL_TRANSFER") return "closing";
+  return "review";
+}
+
+/** Short money for cards and tiles: £950, £400k, £1.8m, £1.25m. */
+export function formatGbpCompact(n: number): string {
+  if (n < 1000) return `£${n}`;
+  if (n < 1_000_000) return `£${+(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
+  return `£${+(n / 1_000_000).toFixed(2)}m`;
+}
+
+/** The card's one-liner: the AI screen's summary if there is one, else the description's first sentence. */
+export function cardOneLiner(aiSummary: string | null | undefined, description: string | null | undefined): string | null {
+  if (aiSummary?.trim()) return aiSummary.trim();
+  const d = description?.trim();
+  if (!d) return null;
+  const first = d.match(/^.*?[.!?](\s|$)/)?.[0]?.trim() ?? d;
+  return first.length > 120 ? `${first.slice(0, 117).trimEnd()}…` : first;
+}
