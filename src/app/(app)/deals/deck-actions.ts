@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { createUploadTarget, deckPath, MAX_DECK_BYTES, type UploadTarget } from "@/lib/deck-storage";
 import { runDeckAnalysis } from "@/lib/deck-worker";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
+import { recordDeckDocument } from "@/lib/deck-documents";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { canDecideEligibility, ELIGIBILITY_DECISION_TARGET } from "@/lib/pipeline";
 import { DomainError, moveVentureStage } from "@/lib/ventures";
@@ -57,6 +58,7 @@ export async function beginDeckAnalysis(analysisId: string): Promise<ActionResul
   await requireAdmin();
   const analysis = await db.deckAnalysis.findUnique({ where: { id: analysisId } });
   if (!analysis || analysis.status !== "PENDING") return { error: "This upload can't be analysed." };
+  await recordDeckDocument(analysisId); // a deck uploaded on an existing venture: list it under Documents
   await triggerWorker(analysisId);
   return { ok: true };
 }

@@ -43,6 +43,8 @@ model User {
   memoDraftsCreated  MemoDraft[]         @relation("MemoDraftCreatedBy")
   memoDraftsUpdated  MemoDraft[]         @relation("MemoDraftUpdatedBy")
   memoScoreChanges   MemoScoreChange[]
+  documentsUploaded  Document[]          @relation("DocumentUploadedBy")
+  documentsArchived  Document[]          @relation("DocumentArchivedBy")
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ model Venture {
   eligibilityReviews EligibilityReview[]
   memoAnalyses       MemoAnalysis[]
   memoDrafts         MemoDraft[]
+  documents          Document[]
 
   @@index([currentStage])
 }
@@ -135,8 +138,9 @@ model StageChange {
 // ── Deal review ─────────────────────────────────────────────────────────────
 
 enum MemoVersionKind {
-  DRIVE_LINK // a memo document in Google Drive
+  DRIVE_LINK // RETIRED 2026-09-28: a memo in Google Drive (no longer created or shown)
   REVIEWED_MEMO // a partner-reviewed memo finalised in DXV OS (content stored here)
+  UPLOADED_FILE // a memo file uploaded to DXV OS (see documentId)
 }
 
 // Investment memo, versioned and append-only (one version per pitch round, per spec).
@@ -151,6 +155,8 @@ model MemoVersion {
   content          Json? // REVIEWED_MEMO only: the finalised memo
   sourceAnalysisId String? // REVIEWED_MEMO: which AI draft it started from
   sourceAnalysis   MemoAnalysis?   @relation(fields: [sourceAnalysisId], references: [id], onDelete: SetNull)
+  documentId       String?         @unique // UPLOADED_FILE: the memo document
+  document         Document?       @relation(fields: [documentId], references: [id], onDelete: Restrict)
   summary          String?
   createdById      String
   createdBy        User            @relation(fields: [createdById], references: [id])
@@ -229,14 +235,15 @@ model MemoScoreChange {
 // Due-diligence checklist item. This is working state (ticked/unticked), not history,
 // so it is editable.
 model DDItem {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   ventureId   String
-  venture     Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  venture     Venture    @relation(fields: [ventureId], references: [id], onDelete: Cascade)
   title       String
   owner       String? // free text until Angels module links DD group members
   dueDate     DateTime?
   completedAt DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime   @default(now())
+  documents   Document[]
 
   @@index([ventureId])
 }
@@ -376,4 +383,45 @@ model EligibilityReview {
   decidedAt   DateTime            @default(now())
 
   @@index([ventureId, decidedAt])
+}
+
+// ── Documents (DXV OS is the deal-lifecycle document store) ─────────────────
+
+enum DocumentCategory {
+  DECK
+  MEMO
+  DUE_DILIGENCE
+  LEGAL
+  FINANCIALS
+  OTHER
+}
+
+// A file stored in DXV OS (Supabase Storage). Never deleted: DXV keeps all deal
+// material, including declined deals, to learn from its dealflow. Mistaken uploads
+// are archived (hidden), not deleted.
+model Document {
+  id           String           @id @default(cuid())
+  ventureId    String
+  venture      Venture          @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  category     DocumentCategory
+  bucket       String // Supabase Storage bucket ("documents", or "decks" for AI-screened decks)
+  storagePath  String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  ddItemId     String? // attached to a DD checklist item
+  ddItem       DDItem?          @relation(fields: [ddItemId], references: [id], onDelete: SetNull)
+  note         String?
+  uploadedById String
+  uploadedBy   User             @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  createdAt    DateTime         @default(now())
+  uploadedAt   DateTime? // set once the browser confirms the upload finished (null = incomplete)
+  archivedAt   DateTime?
+  archivedById String?
+  archivedBy   User?            @relation("DocumentArchivedBy", fields: [archivedById], references: [id])
+
+  memoVersion MemoVersion?
+
+  @@unique([bucket, storagePath])
+  @@index([ventureId, category])
 }

@@ -11,8 +11,6 @@ type VentureValues = {
   round?: number | null;
   investedAmountGbp?: number | null;
   description?: string | null;
-  deckUrl?: string | null;
-  driveFolderUrl?: string | null;
 };
 
 // Shared by "New venture" and the edit form on the deal page.
@@ -71,12 +69,6 @@ export function VentureFields({
       </Field>
       <Field aiSuggested={tag("raiseAmountGbp")} label="Raise amount (£)">
         <input name="raiseAmountGbp" inputMode="numeric" defaultValue={v.raiseAmountGbp ?? ""} className={inputClass} />
-      </Field>
-      <Field aiSuggested={tag("deckUrl")} label="Deck link" hint="Google Drive link — files stay in Drive">
-        <input name="deckUrl" type="url" placeholder="https://drive.google.com/…" defaultValue={v.deckUrl ?? ""} className={inputClass} />
-      </Field>
-      <Field aiSuggested={tag("driveFolderUrl")} label="Drive folder link">
-        <input name="driveFolderUrl" type="url" placeholder="https://drive.google.com/…" defaultValue={v.driveFolderUrl ?? ""} className={inputClass} />
       </Field>
       <div className="sm:col-span-2">
         <Field aiSuggested={tag("description")} label="Description / eligibility notes" hint="Stage, sector, team and thesis-fit against DXV's underestimated-founder criteria">

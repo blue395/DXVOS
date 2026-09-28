@@ -57,7 +57,9 @@ src/app/(app)/                Signed-in area (route group — the folder name is
   deals/[id]/eligibility-*    Eligibility screen card + human decision form
 src/lib/deck-ai/              AI deck reading: prompt (edit here), output schema, rendering, mock
 src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Claude, save)
-src/lib/deck-storage.ts       Supabase Storage (prod) / .data/decks (dev)
+src/lib/deck-storage.ts       Supabase Storage (prod) / .data/<bucket> (dev), for decks and documents
+src/lib/documents.ts          Document rules: allowed types (PDF/Word/Excel), 50 MB limit, categories
+src/app/(app)/deals/document-actions.ts   Upload, confirm, archive documents
 netlify/functions/            analyze-deck-background, analyze-memo-background: the long-running workers
 src/lib/memo-ai/              AI memo: prompt (edit here), schema + scoring criteria, rendering, context, mock
 src/lib/memo-worker.ts        Runs one memo assessment
@@ -103,6 +105,17 @@ screen, partner decisions, founder comms notes). Prompt: `src/lib/memo-ai/prompt
 - `MemoDraft` = the partners' editable review copy; each score can be overruled individually, logged in `MemoScoreChange`.
 - **Finalise** writes a locked `MemoVersion` (kind `REVIEWED_MEMO`) alongside Drive-link versions.
 - Full memo UI at `/deals/[id]/assessment`; runs in the Netlify background function `analyze-memo-background`.
+
+## Documents (DXV OS is the document store)
+
+Every deal has a **Documents** section: PDF, Word and Excel files up to 50 MB, tagged Deck, Memo, Due
+diligence, Legal, Financials or Other, stored in the private Supabase bucket `documents` (browser uploads
+straight to storage via one-time signed URLs; an upload only appears once confirmed in storage).
+- Decks uploaded for the AI eligibility screen are listed automatically (bucket `decks`).
+- DD checklist items can have files attached. Uploading a Memo file also creates a memo version.
+- Nothing is deleted (declined deals included); mistaken uploads are **archived** (hidden, kept).
+- Google Drive links were retired on 2026-09-28. The old `Venture.deckUrl` / `driveFolderUrl` columns and
+  `DRIVE_LINK` memo versions are no longer used or shown; drop them once confirmed empty.
 
 ## Week 2 hooks already in place
 

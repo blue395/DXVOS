@@ -55,7 +55,7 @@ export function DeckUploader({
       if (start.target.kind === "supabase") {
         const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
         const { error } = await sb.storage
-          .from("decks")
+          .from(start.target.bucket)
           .uploadToSignedUrl(start.target.path, start.target.token, file, { contentType: "application/pdf" });
         if (error) throw new Error(`Upload failed: ${error.message}`);
       } else {
