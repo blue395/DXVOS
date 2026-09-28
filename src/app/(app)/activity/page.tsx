@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
 import { Card, formatDateTime } from "@/components/ui";
@@ -8,12 +8,13 @@ import { Card, formatDateTime } from "@/components/ui";
 // Admin-only (spec: angels must never see Activity or the Dashboard, even once they
 // can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function ActivityPage() {
-  await requireAdmin();
-  const changes = await db.stageChange.findMany({
-    orderBy: { changedAt: "desc" },
-    take: 200,
-    include: { venture: { select: { id: true, name: true } }, changedBy: { select: { name: true } } },
-  });
+  const changes = await requireAdminWith(() =>
+    db.stageChange.findMany({
+      orderBy: { changedAt: "desc" },
+      take: 200,
+      include: { venture: { select: { id: true, name: true } }, changedBy: { select: { name: true } } },
+    }),
+  );
 
   return (
     <div className="space-y-4">

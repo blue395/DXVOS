@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ALL_STAGES, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
@@ -7,20 +7,21 @@ import { Card, formatDate } from "@/components/ui";
 // Admin-only (spec: angels must never see the Dashboard or Activity, even once they
 // can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function DashboardPage() {
-  await requireAdmin();
   const now = new Date();
 
-  const [ventures, awaiting] = await Promise.all([
-    db.venture.findMany({
-      select: { currentStage: true, investedAmountGbp: true },
-    }),
-    // Spec §6: ventures at a crossed gate whose founder comm isn't marked Sent yet.
-    db.founderComm.findMany({
-      where: { status: "NOT_YET_SENT" },
-      orderBy: { createdAt: "asc" },
-      include: { venture: { select: { id: true, name: true } } },
-    }),
-  ]);
+  const [ventures, awaiting] = await requireAdminWith(() =>
+    Promise.all([
+      db.venture.findMany({
+        select: { currentStage: true, investedAmountGbp: true },
+      }),
+      // Spec §6: ventures at a crossed gate whose founder comm isn't marked Sent yet.
+      db.founderComm.findMany({
+        where: { status: "NOT_YET_SENT" },
+        orderBy: { createdAt: "asc" },
+        include: { venture: { select: { id: true, name: true } } },
+      }),
+    ]),
+  );
 
   const byStage = ALL_STAGES.map((s) => ({ ...s, count: ventures.filter((v) => v.currentStage === s.key).length }));
   const maxCount = Math.max(1, ...byStage.map((s) => s.count));

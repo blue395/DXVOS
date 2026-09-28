@@ -23,3 +23,14 @@ export async function requireAdmin() {
   if (!user || user.role !== "ADMIN") redirect("/login");
   return user;
 }
+
+/**
+ * Pages: check the admin and load the page's data at the same time (saves one
+ * round trip to the database per page view). The data is only returned if the
+ * check passes; if it fails, requireAdmin() redirects to /login.
+ * Reads only: server actions must call requireAdmin() before they write anything.
+ */
+export async function requireAdminWith<T>(load: () => Promise<T>): Promise<T> {
+  const [, data] = await Promise.all([requireAdmin(), load()]);
+  return data;
+}

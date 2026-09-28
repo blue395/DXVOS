@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
 import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
@@ -14,30 +14,31 @@ import { MemoView, ReviewBanner, TotalScore } from "./memo-view";
 // View is chosen by ?view=: "review" (the open DXV Review Draft), "ai-<n>" (AI Draft n)
 // or "v-<n>" (memo version n, shown as DXV Review Issue <k>).
 export default async function AssessmentPage({ params, searchParams }: PageProps<"/deals/[id]/assessment">) {
-  await requireAdmin();
   const { id } = await params;
   const view = String((await searchParams).view ?? "");
 
-  const v = await db.venture.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      currentStage: true,
-      memoAnalyses: { orderBy: { number: "desc" }, include: { createdBy: { select: { name: true } } } },
-      memoDrafts: {
-        where: { archivedAt: null },
-        take: 1,
-        include: {
-          analysis: { select: { number: true, output: true } },
-          updatedBy: { select: { name: true } },
-          scoreChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
+  const v = await requireAdminWith(() =>
+    db.venture.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        currentStage: true,
+        memoAnalyses: { orderBy: { number: "desc" }, include: { createdBy: { select: { name: true } } } },
+        memoDrafts: {
+          where: { archivedAt: null },
+          take: 1,
+          include: {
+            analysis: { select: { number: true, output: true } },
+            updatedBy: { select: { name: true } },
+            scoreChanges: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
+          },
         },
+        memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, include: { createdBy: { select: { name: true } } } },
+        deckAnalyses: { where: { status: { not: "PENDING" } }, take: 1, select: { id: true } },
       },
-      memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, include: { createdBy: { select: { name: true } } } },
-      deckAnalyses: { where: { status: { not: "PENDING" } }, take: 1, select: { id: true } },
-    },
-  });
+    }),
+  );
   if (!v) notFound();
 
   const draft = v.memoDrafts[0] ?? null;

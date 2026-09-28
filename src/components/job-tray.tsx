@@ -85,8 +85,12 @@ export function JobTray() {
     checkRef.current = () => void check();
   }, [check]);
 
-  // Look on first load and on every page change (someone else may have started a job).
+  // Look on first load and on page changes (someone else may have started a job),
+  // at most every 15 seconds unless something is already being watched.
+  const lastPageCheck = useRef(0);
   useEffect(() => {
+    if (Date.now() - lastPageCheck.current < 15_000) return;
+    lastPageCheck.current = Date.now();
     void check();
   }, [check, pathname]);
 
