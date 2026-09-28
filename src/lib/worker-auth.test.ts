@@ -15,3 +15,9 @@ describe("worker tokens", () => {
     expect(verifyWorkerToken("garbage", SECRET)).toBeNull();
   });
 });
+
+describe("job-kind prefixes", () => {
+  it("keeps the memo prefix in the verified subject", () => {
+    expect(verifyWorkerToken(createWorkerToken("memo:abc-123", SECRET), SECRET)).toBe("memo:abc-123");
+  });
+});

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_STAGES,
   canDecideEligibility,
+  canGenerateAssessment,
   cardOneLiner,
   formatGbpCompact,
   stagePhase,
@@ -245,5 +246,15 @@ describe("board presentation", () => {
     expect(cardOneLiner(null, "No full stop here")).toBe("No full stop here");
     expect(cardOneLiner(null, "  ")).toBeNull();
     expect(cardOneLiner(null, "x".repeat(200))!.length).toBe(118);
+  });
+});
+
+describe("canGenerateAssessment", () => {
+  it("is available from DXV Partner Review onwards, not at intake or once passed", () => {
+    expect(canGenerateAssessment("SUBMITTED")).toBe(false);
+    expect(canGenerateAssessment("ELIGIBILITY_SCREEN")).toBe(false);
+    expect(canGenerateAssessment("PARTNER_REVIEW")).toBe(true);
+    expect(canGenerateAssessment("DUE_DILIGENCE")).toBe(true);
+    expect(canGenerateAssessment("PASSED")).toBe(false);
   });
 });

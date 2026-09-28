@@ -8,7 +8,8 @@ const handler = async (req: Request) => {
   const secret = process.env.SESSION_SECRET;
   const token = req.headers.get("x-dxv-worker-token") ?? "";
   const analysisId = secret && req.method === "POST" ? verifyWorkerToken(token, secret) : null;
-  if (!analysisId) {
+  if (!analysisId || analysisId.includes(":")) {
+    // (a "memo:" token is for the memo worker, not this one)
     console.warn("Rejected deck worker call without a valid token");
     return;
   }

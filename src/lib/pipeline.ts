@@ -326,3 +326,10 @@ export function cardOneLiner(aiSummary: string | null | undefined, description: 
   const first = d.match(/^.*?[.!?](\s|$)/)?.[0]?.trim() ?? d;
   return first.length > 120 ? `${first.slice(0, 117).trimEnd()}…` : first;
 }
+
+// ── AI investment assessment ────────────────────────────────────────────────
+
+/** The AI assessment runs from DXV Partner Review onwards (after the eligibility screen); not for passed deals. */
+export function canGenerateAssessment(stage: Stage): boolean {
+  return stageIndex(stage) >= stageIndex("PARTNER_REVIEW");
+}

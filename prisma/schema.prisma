@@ -31,14 +31,18 @@ model User {
   role         Role     @default(ADMIN)
   createdAt    DateTime @default(now())
 
-  stageChanges      StageChange[]
-  memoVersions      MemoVersion[]
-  preSelectionVotes PreSelectionVote[]
-  investmentVotes   InvestmentVote[]
-  founderCommsSent  FounderComm[]
-  venturesCreated   Venture[]
-  deckAnalyses      DeckAnalysis[]
+  stageChanges       StageChange[]
+  memoVersions       MemoVersion[]
+  preSelectionVotes  PreSelectionVote[]
+  investmentVotes    InvestmentVote[]
+  founderCommsSent   FounderComm[]
+  venturesCreated    Venture[]
+  deckAnalyses       DeckAnalysis[]
   eligibilityReviews EligibilityReview[]
+  memoAnalyses       MemoAnalysis[]
+  memoDraftsCreated  MemoDraft[]         @relation("MemoDraftCreatedBy")
+  memoDraftsUpdated  MemoDraft[]         @relation("MemoDraftUpdatedBy")
+  memoScoreChanges   MemoScoreChange[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -72,19 +76,19 @@ enum PassReason {
 }
 
 model Venture {
-  id             String   @id @default(cuid())
-  name           String
-  founderNames   String?
-  founderEmail   String?
-  website        String?
-  sector         String?
-  companyStage   String? // e.g. "Pre-seed", "Seed"
-  raiseAmountGbp Int?
-  round          Int? // DXV round the deal belongs to (Round 1, Round 2, ...)
+  id                String  @id @default(cuid())
+  name              String
+  founderNames      String?
+  founderEmail      String?
+  website           String?
+  sector            String?
+  companyStage      String? // e.g. "Pre-seed", "Seed"
+  raiseAmountGbp    Int?
+  round             Int? // DXV round the deal belongs to (Round 1, Round 2, ...)
   investedAmountGbp Int? // what DXV actually invested, entered once the investment completes
-  description    String?
-  deckUrl        String? // Google Drive link — files stay in Drive (spec §2)
-  driveFolderUrl String?
+  description       String?
+  deckUrl           String? // Google Drive link — files stay in Drive (spec §2)
+  driveFolderUrl    String?
 
   currentStage   Stage       @default(SUBMITTED)
   stageEnteredAt DateTime    @default(now()) // denormalised from StageChange for fast "days in stage"
@@ -96,14 +100,16 @@ model Venture {
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id])
 
-  stageChanges      StageChange[]
-  memoVersions      MemoVersion[]
-  ddItems           DDItem[]
-  preSelectionVotes PreSelectionVote[]
-  investmentVotes   InvestmentVote[]
-  founderComms      FounderComm[]
-  deckAnalyses      DeckAnalysis[]
+  stageChanges       StageChange[]
+  memoVersions       MemoVersion[]
+  ddItems            DDItem[]
+  preSelectionVotes  PreSelectionVote[]
+  investmentVotes    InvestmentVote[]
+  founderComms       FounderComm[]
+  deckAnalyses       DeckAnalysis[]
   eligibilityReviews EligibilityReview[]
+  memoAnalyses       MemoAnalysis[]
+  memoDrafts         MemoDraft[]
 
   @@index([currentStage])
 }
@@ -128,19 +134,96 @@ model StageChange {
 
 // ── Deal review ─────────────────────────────────────────────────────────────
 
-// Investment memo, versioned and append-only. The document itself lives in Drive.
+enum MemoVersionKind {
+  DRIVE_LINK // a memo document in Google Drive
+  REVIEWED_MEMO // a partner-reviewed memo finalised in DXV OS (content stored here)
+}
+
+// Investment memo, versioned and append-only (one version per pitch round, per spec).
+// Either a Drive link, or a reviewed memo finalised in DXV OS from an AI draft.
 model MemoVersion {
-  id          String   @id @default(cuid())
-  ventureId   String
-  venture     Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
-  version     Int
-  docUrl      String
-  summary     String?
-  createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
+  id               String          @id @default(cuid())
+  ventureId        String
+  venture          Venture         @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  version          Int
+  kind             MemoVersionKind @default(DRIVE_LINK)
+  docUrl           String? // DRIVE_LINK only
+  content          Json? // REVIEWED_MEMO only: the finalised memo
+  sourceAnalysisId String? // REVIEWED_MEMO: which AI draft it started from
+  sourceAnalysis   MemoAnalysis?   @relation(fields: [sourceAnalysisId], references: [id], onDelete: SetNull)
+  summary          String?
+  createdById      String
+  createdBy        User            @relation(fields: [createdById], references: [id])
+  createdAt        DateTime        @default(now())
 
   @@unique([ventureId, version])
+}
+
+// ── AI-assisted investment assessment (DXV Partner Review) ──────────────────
+
+// One AI assessment run: "AI draft N". Immutable once complete, so what the AI
+// actually said is always on record. `context` snapshots what it was given.
+model MemoAnalysis {
+  id           String             @id @default(cuid())
+  ventureId    String
+  venture      Venture            @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  number       Int // AI draft number, per venture
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  context      Json // venture details, eligibility screen and notes, deck location
+  output       Json? // the structured memo
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation(fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  drafts   MemoDraft[]
+  versions MemoVersion[]
+
+  @@unique([ventureId, number])
+}
+
+// Partners' editable working copy of a memo, started from an AI draft.
+// Restarting from a different AI draft archives the old copy (archivedAt).
+model MemoDraft {
+  id          String       @id @default(cuid())
+  ventureId   String
+  venture     Venture      @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  analysisId  String
+  analysis    MemoAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  content     Json
+  createdById String
+  createdBy   User         @relation("MemoDraftCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?        @relation("MemoDraftUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  archivedAt  DateTime?
+
+  scoreChanges MemoScoreChange[]
+
+  @@index([ventureId, archivedAt])
+}
+
+// Append-only log of a partner overruling a score in a draft.
+model MemoScoreChange {
+  id            String    @id @default(cuid())
+  draftId       String
+  draft         MemoDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  criterion     String
+  fromScore     Int
+  toScore       Int
+  justification String? // the justification as saved with this change
+  reason        String?
+  changedById   String
+  changedBy     User      @relation(fields: [changedById], references: [id])
+  changedAt     DateTime  @default(now())
+
+  @@index([draftId, changedAt])
 }
 
 // Due-diligence checklist item. This is working state (ticked/unticked), not history,

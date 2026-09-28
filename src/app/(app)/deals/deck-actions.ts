@@ -5,7 +5,6 @@
 // background worker → getDeckAnalysisStatus (polled) → human decides.
 
 import { randomUUID } from "node:crypto";
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { EligibilityDecision, PassReason } from "@/generated/prisma/enums";
@@ -13,7 +12,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createUploadTarget, deckPath, MAX_DECK_BYTES, type UploadTarget } from "@/lib/deck-storage";
 import { runDeckAnalysis } from "@/lib/deck-worker";
-import { createWorkerToken } from "@/lib/worker-auth";
+import { triggerBackgroundJob } from "@/lib/trigger-worker";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { canDecideEligibility, ELIGIBILITY_DECISION_TARGET } from "@/lib/pipeline";
 import { DomainError, moveVentureStage } from "@/lib/ventures";
@@ -105,32 +104,13 @@ export async function getDeckAnalysisStatus(analysisId: string): Promise<Analysi
   };
 }
 
-/**
- * Start the worker. On Netlify, call the background function (it replies 202 and
- * keeps running). In local development there is no such endpoint, so run it
- * in-process instead (a long-lived dev server has no timeout).
- */
 async function triggerWorker(analysisId: string) {
-  const secret = process.env.SESSION_SECRET!;
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
-
-  try {
-    const res = await fetch(`${proto}://${host}/.netlify/functions/analyze-deck-background`, {
-      method: "POST",
-      headers: { "x-dxv-worker-token": createWorkerToken(analysisId, secret) },
-    });
-    if (res.status === 202) return;
-  } catch {
-    // fall through
-  }
-
-  if (process.env.NODE_ENV !== "production" || process.env.DECK_WORKER_INLINE === "true") {
-    void runDeckAnalysis(analysisId); // fire and forget; the page polls for the result
-    return;
-  }
-  await markFailed(analysisId, "The background worker couldn't be reached. Check the Netlify function deployed.");
+  const started = await triggerBackgroundJob({
+    functionName: "analyze-deck-background",
+    subject: analysisId,
+    runInline: () => runDeckAnalysis(analysisId),
+  });
+  if (!started) await markFailed(analysisId, "The background worker couldn't be reached. Check the Netlify function deployed.");
 }
 
 async function markFailed(id: string, error: string) {
