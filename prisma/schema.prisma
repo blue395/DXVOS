@@ -8,12 +8,12 @@
 //  - Money is stored in whole pounds (Int) — angel tickets are whole-pound amounts.
 
 generator client {
-  provider = "prisma-client"
+  provider        = "prisma-client"
   // Load a record and its relations in one SQL query (LATERAL joins) instead of one
   // query per relation: far fewer round trips to Supabase. Preview feature; remove
   // this line to go back to the default strategy.
   previewFeatures = ["relationJoins"]
-  output   = "../src/generated/prisma"
+  output          = "../src/generated/prisma"
 }
 
 datasource db {
@@ -35,21 +35,26 @@ model User {
   role         Role     @default(ADMIN)
   createdAt    DateTime @default(now())
 
-  stageChanges       StageChange[]
-  memoVersions       MemoVersion[]
-  preSelectionVotes  PreSelectionVote[]
-  investmentVotes    InvestmentVote[]
-  founderCommsSent   FounderComm[]
-  venturesCreated    Venture[]
-  deckAnalyses       DeckAnalysis[]
-  eligibilityReviews EligibilityReview[]
-  memoAnalyses       MemoAnalysis[]
-  memoDraftsCreated  MemoDraft[]         @relation("MemoDraftCreatedBy")
-  memoDraftsUpdated  MemoDraft[]         @relation("MemoDraftUpdatedBy")
-  memoScoreChanges   MemoScoreChange[]
-  documentsUploaded  Document[]          @relation("DocumentUploadedBy")
-  documentsArchived  Document[]          @relation("DocumentArchivedBy")
-  ddReportJobs       DDReportJob[]
+  stageChanges            StageChange[]
+  memoVersions            MemoVersion[]
+  preSelectionVotes       PreSelectionVote[]
+  investmentVotes         InvestmentVote[]
+  founderCommsSent        FounderComm[]
+  venturesCreated         Venture[]
+  deckAnalyses            DeckAnalysis[]
+  eligibilityReviews      EligibilityReview[]
+  memoAnalyses            MemoAnalysis[]
+  memoDraftsCreated       MemoDraft[]         @relation("MemoDraftCreatedBy")
+  memoDraftsUpdated       MemoDraft[]         @relation("MemoDraftUpdatedBy")
+  memoScoreChanges        MemoScoreChange[]
+  documentsUploaded       Document[]          @relation("DocumentUploadedBy")
+  documentsArchived       Document[]          @relation("DocumentArchivedBy")
+  ddReportJobs            DDReportJob[]
+  investmentVotesRemoved  InvestmentVote[]    @relation("InvestmentVoteRemovedBy")
+  finalInvestmentsCreated FinalInvestment[]   @relation("FinalInvestmentCreatedBy")
+  finalInvestmentsPaid    FinalInvestment[]   @relation("FinalInvestmentPaidBy")
+  finalInvestmentsRemoved FinalInvestment[]   @relation("FinalInvestmentRemovedBy")
+  entryAudits             EntryAudit[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -67,7 +72,7 @@ enum Stage {
   PITCH_OUTCOME
   INVESTMENT_COMMITMENTS
   DUE_DILIGENCE
-  CAPITAL_TRANSFER
+  CAPITAL_TRANSFER // RETIRED 2026-09-29: payments are tracked in Final Investment; kept for old stage history
   INVESTMENT_COMPLETE
   SEIS_CERTIFICATE
   PASSED
@@ -92,15 +97,17 @@ model Venture {
   companyStage      String? // e.g. "Pre-seed", "Seed"
   raiseAmountGbp    Int?
   round             Int? // DXV round the deal belongs to (Round 1, Round 2, ...)
-  investedAmountGbp Int? // what DXV actually invested, entered once the investment completes
+  investedAmountGbp Int? // LEGACY: typed-in invested amount; counts only if the deal has no Final Investment entries
+  leadAngel         String? // DXV lead angel (Blué, Anna C, Kevin W, or another name)
   description       String?
   deckUrl           String? // Google Drive link — files stay in Drive (spec §2)
   driveFolderUrl    String?
 
-  currentStage   Stage       @default(SUBMITTED)
-  stageEnteredAt DateTime    @default(now()) // denormalised from StageChange for fast "days in stage"
-  passReason     PassReason? // set while currentStage = PASSED
-  passNote       String?
+  currentStage    Stage       @default(SUBMITTED)
+  stageEnteredAt  DateTime    @default(now()) // denormalised from StageChange for fast "days in stage"
+  passReason      PassReason? // set while currentStage = PASSED
+  passNote        String?
+  passedFromStage Stage? // where in the dealflow it was declined (set while currentStage = PASSED)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -119,6 +126,8 @@ model Venture {
   memoDrafts         MemoDraft[]
   documents          Document[]
   ddReportJobs       DDReportJob[]
+  finalInvestments   FinalInvestment[]
+  entryAudits        EntryAudit[]
 
   @@index([currentStage])
 }
@@ -278,19 +287,79 @@ model PreSelectionVote {
 // Investment-votes stage (EOI): interest + max ticket. Append-only; the latest
 // record per angel is the one that counts towards the momentum threshold.
 model InvestmentVote {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   ventureId    String
-  venture      Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  venture      Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
   angelName    String
   angelId      String?
   interested   Boolean
-  maxTicketGbp Int      @default(0)
+  maxTicketGbp Int       @default(0)
   note         String?
   recordedById String
-  recordedBy   User     @relation(fields: [recordedById], references: [id])
-  createdAt    DateTime @default(now())
+  recordedBy   User      @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime  @default(now())
+  // Editable and removable since 2026-09-29 (Blue's decision); every change is logged in
+  // EntryAudit, and removed entries are hidden, not deleted.
+  editedAt     DateTime?
+  removedAt    DateTime?
+  removedById  String?
+  removedBy    User?     @relation("InvestmentVoteRemovedBy", fields: [removedById], references: [id])
 
   @@index([ventureId, createdAt])
+}
+
+// Final investment: each angel's actual ticket, and whether the money has arrived.
+// Paid tickets on deals at Investment Complete (or S/EIS) make the dashboard's Investment Total.
+// Edits, payment ticks and removals are logged in EntryAudit; removed rows are hidden, not deleted.
+model FinalInvestment {
+  id          String    @id @default(cuid())
+  ventureId   String
+  venture     Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  angelName   String
+  ticketGbp   Int
+  note        String?
+  paidAt      DateTime?
+  paidById    String?
+  paidBy      User?     @relation("FinalInvestmentPaidBy", fields: [paidById], references: [id])
+  createdById String
+  createdBy   User      @relation("FinalInvestmentCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  editedAt    DateTime?
+  removedAt   DateTime?
+  removedById String?
+  removedBy   User?     @relation("FinalInvestmentRemovedBy", fields: [removedById], references: [id])
+
+  @@index([ventureId, createdAt])
+}
+
+enum AuditEntity {
+  INVESTMENT_VOTE
+  FINAL_INVESTMENT
+}
+
+enum AuditAction {
+  EDIT
+  REMOVE
+  PAID
+  UNPAID
+}
+
+// Append-only log of edits and removals on EOIs and final investments: the values
+// before (and after) each change, and who made it.
+model EntryAudit {
+  id          String      @id @default(cuid())
+  ventureId   String
+  venture     Venture     @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  entity      AuditEntity
+  entryId     String
+  action      AuditAction
+  before      Json
+  after       Json?
+  changedById String
+  changedBy   User        @relation(fields: [changedById], references: [id])
+  changedAt   DateTime    @default(now())
+
+  @@index([ventureId, changedAt])
 }
 
 // ── Decision gates & founder comms (spec §6) ────────────────────────────────

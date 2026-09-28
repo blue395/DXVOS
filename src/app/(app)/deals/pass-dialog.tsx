@@ -28,9 +28,9 @@ export function PassDialog({
           if (reason && !needsNote) onConfirm(reason, note);
         }}
       >
-        <h2 className="text-lg font-semibold text-dxv-green">Pass on {ventureName}?</h2>
+        <h2 className="text-lg font-semibold text-dxv-green">Decline {ventureName}?</h2>
         <p className="text-sm text-black/60">
-          The deal moves to Passed (it isn&apos;t deleted), and a founder decision update will be flagged as owed.
+          The deal moves to Declined (it isn&apos;t deleted), and a founder decision update will be flagged as owed.
         </p>
         <Field label="Reason">
           <select autoFocus required value={reason} onChange={(e) => setReason(e.target.value as PassReason)} className={inputClass}>
@@ -50,7 +50,7 @@ export function PassDialog({
             Cancel
           </button>
           <button type="submit" disabled={!reason || needsNote} className={buttonClass("primary")}>
-            Pass on deal
+            Decline deal
           </button>
         </div>
       </form>

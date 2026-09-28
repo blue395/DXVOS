@@ -36,6 +36,7 @@ export async function moveVentureStage(opts: {
         stageEnteredAt: now,
         passReason,
         passNote: to === "PASSED" ? note : null,
+        passedFromStage: to === "PASSED" ? from : null, // where in the dealflow it was declined
       },
     });
 
@@ -44,12 +45,14 @@ export async function moveVentureStage(opts: {
     });
 
     // One comm per (venture, gate). If one already exists (e.g. the deal went back
-    // and forward again) we keep it as-is rather than wiping its Sent status.
+    // and forward again) we keep it as-is rather than wiping its Sent status —
+    // except a new decline: that's a new outcome the founder must be told.
     for (const owed of gatesCrossed(from, to, passReason)) {
+      const fresh = { decision: owed.decision, status: "NOT_YET_SENT" as const, sentAt: null, sentById: null, acknowledgedAt: null };
       await tx.founderComm.upsert({
         where: { ventureId_gate: { ventureId, gate: owed.gate } },
         create: { ventureId, gate: owed.gate, decision: owed.decision },
-        update: {},
+        update: owed.gate === "PASSED" ? fresh : {},
       });
     }
 

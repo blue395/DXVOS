@@ -20,7 +20,8 @@ export type StageMeta = {
 };
 
 // Ordered. The index in this array IS the pipeline order.
-// Revised 2026-09-28: decision gates at stages 2 to 7.
+// Revised 2026-09-28: decision gates at stages 2 to 7. Capital Transfer retired 2026-09-29
+// (payments are ticked off in the Final Investment section instead).
 export const LINEAR_STAGES: StageMeta[] = [
   { key: "SUBMITTED", label: "Submitted", intake: true },
   {
@@ -60,18 +61,28 @@ export const LINEAR_STAGES: StageMeta[] = [
     gate: "DUE_DILIGENCE",
     proceedDecision: "Proceeding to investment",
   },
-  { key: "CAPITAL_TRANSFER", label: "Capital Transfer" },
   { key: "INVESTMENT_COMPLETE", label: "Investment Complete" },
   { key: "SEIS_CERTIFICATE", label: "S/EIS Certificate", optional: true },
 ];
 
-export const PASSED_STAGE: StageMeta = { key: "PASSED", label: "Passed", gate: "PASSED" };
+// Stored as PASSED; shown as "Declined" (Blue's wording since 2026-09-29).
+export const PASSED_STAGE: StageMeta = { key: "PASSED", label: "Declined", gate: "PASSED" };
 
 /** Every stage a deal can be in today (what the board and stage pickers offer). */
 export const ALL_STAGES: StageMeta[] = [...LINEAR_STAGES, PASSED_STAGE];
 
 /** Stages no longer used, kept so old stage history still reads correctly. */
-const RETIRED_STAGES: StageMeta[] = [{ key: "ADD_TO_PIPELINE", label: "Add to pipeline (retired)" }];
+const RETIRED_STAGES: StageMeta[] = [
+  { key: "ADD_TO_PIPELINE", label: "Add to pipeline (retired)" },
+  { key: "CAPITAL_TRANSFER", label: "Capital Transfer (retired)" },
+];
+
+/** The board shows S/EIS Certificate deals in the Investment Complete column (no column of its own). */
+export const BOARD_STAGES: StageMeta[] = LINEAR_STAGES.filter((s) => s.key !== "SEIS_CERTIFICATE");
+
+export function boardColumn(stage: Stage): Stage {
+  return stage === "SEIS_CERTIFICATE" ? "INVESTMENT_COMPLETE" : stage;
+}
 
 export function stageMeta(stage: Stage): StageMeta {
   const meta = ALL_STAGES.find((s) => s.key === stage) ?? RETIRED_STAGES.find((s) => s.key === stage);
@@ -103,7 +114,7 @@ export const GATE_LABELS: Record<Gate, string> = {
   PITCH_OUTCOME: "After Pitch Outcome",
   INVESTMENT_COMMITMENTS: "After Investment Commitments",
   DUE_DILIGENCE: "After Due Diligence",
-  PASSED: "Passed",
+  PASSED: "Declined",
 };
 
 export type OwedComm = { gate: Gate; decision: string };
@@ -111,15 +122,16 @@ export type OwedComm = { gate: Gate; decision: string };
 /**
  * Which founder comms become owed when a deal moves from `from` to `to`.
  *
- * - Moving to PASSED: always owed a response (one "Decline" message).
+ * - Moving to PASSED (declined): always owed a response, naming where it was declined.
  * - Moving forward: every gate stage we leave behind is owed its "proceed" message.
  *   (Usually one; more if an admin skips stages.)
  * - Moving backwards, or re-opening from PASSED: nothing new is owed.
  */
 export function gatesCrossed(from: Stage | null, to: Stage, passReason?: PassReason | null): OwedComm[] {
   if (to === "PASSED") {
-    const why = passReason ? ` — ${PASS_REASON_LABELS[passReason]}` : "";
-    return [{ gate: "PASSED", decision: `Decline${why}` }];
+    const why = passReason ? `: ${PASS_REASON_LABELS[passReason]}` : "";
+    const at = from && from !== "PASSED" ? ` at ${stageLabel(from)}` : "";
+    return [{ gate: "PASSED", decision: `Declined${at}${why}` }];
   }
   if (from === null) return [];
 
@@ -132,7 +144,12 @@ export function gatesCrossed(from: Stage | null, to: Stage, passReason?: PassRea
     .map((s) => ({ gate: s.gate!, decision: s.proceedDecision! }));
 }
 
-// ── Passing ─────────────────────────────────────────────────────────────────
+// ── Declining (stored as PASSED) ────────────────────────────────────────────
+
+/** A deal can be declined at any live stage (not once invested, and not twice). */
+export function canDecline(stage: Stage): boolean {
+  return isActiveStage(stage);
+}
 
 export const PASS_REASON_LABELS: Record<PassReason, string> = {
   INSUFFICIENT_INTEREST: "Insufficient interest",
@@ -174,7 +191,8 @@ export function latestVotePerAngel<T extends { angelName: string; createdAt: Dat
   return [...latest.values()];
 }
 
-/** Running total: each angel's latest vote counts; only "interested" votes add to the total. */
+/** Running total: each angel's latest vote counts; only "interested" votes add to the total.
+ *  (Pass only live entries: removed ones are filtered out by the caller.) */
 export function commitmentTotal(votes: EoiLike[]): { totalGbp: number; interestedCount: number } {
   const interested = latestVotePerAngel(votes).filter((v) => v.interested);
   return { totalGbp: sum(interested.map((v) => v.maxTicketGbp)), interestedCount: interested.length };
@@ -251,17 +269,42 @@ export function isInvestedStage(stage: Stage): boolean {
 
 export type DashboardMetrics = { liveDeals: number; inDueDiligence: number; investments: number; investedTotalGbp: number };
 
+// ── Final investment ────────────────────────────────────────────────────────
+
+type FinalLike = { ticketGbp: number; paidAt: Date | null };
+
+/** Totals for the Final Investment section (live entries only). */
+export function finalInvestmentTotals(entries: FinalLike[]) {
+  const paid = entries.filter((e) => e.paidAt);
+  return {
+    committedGbp: sum(entries.map((e) => e.ticketGbp)),
+    paidGbp: sum(paid.map((e) => e.ticketGbp)),
+    angels: entries.length,
+    paidCount: paid.length,
+  };
+}
+
 /**
- * Live deals: not passed and not yet invested. Investment total: sum of what DXV
- * actually invested (entered per deal); deals without an amount count as £0.
+ * What DXV invested in a deal: the paid Final Investment tickets. Deals from before
+ * Final Investment existed have no entries, so their typed-in amount counts instead.
  */
-export function dashboardMetrics(ventures: { currentStage: Stage; investedAmountGbp: number | null }[]): DashboardMetrics {
+export function investedGbp(v: { investedAmountGbp: number | null; finalInvestments: FinalLike[] }): number {
+  return v.finalInvestments.length > 0 ? finalInvestmentTotals(v.finalInvestments).paidGbp : (v.investedAmountGbp ?? 0);
+}
+
+/**
+ * Live deals: not declined and not yet invested. Investments: deals at Investment
+ * Complete (or S/EIS). Investment total: their paid final investment tickets.
+ */
+export function dashboardMetrics(
+  ventures: { currentStage: Stage; investedAmountGbp: number | null; finalInvestments: FinalLike[] }[],
+): DashboardMetrics {
   const invested = ventures.filter((v) => isInvestedStage(v.currentStage));
   return {
     liveDeals: ventures.filter((v) => isActiveStage(v.currentStage)).length,
     inDueDiligence: ventures.filter((v) => v.currentStage === "DUE_DILIGENCE").length,
     investments: invested.length,
-    investedTotalGbp: sum(invested.map((v) => v.investedAmountGbp ?? 0)),
+    investedTotalGbp: sum(invested.map(investedGbp)),
   };
 }
 
@@ -274,7 +317,7 @@ export function stagePhase(stage: Stage): StagePhase {
   if (stage === "PASSED") return "passed";
   if (isInvestedStage(stage)) return "invested";
   if (stageMeta(stage).intake) return "intake";
-  if (stage === "INVESTMENT_COMMITMENTS" || stage === "DUE_DILIGENCE" || stage === "CAPITAL_TRANSFER") return "closing";
+  if (stage === "INVESTMENT_COMMITMENTS" || stage === "DUE_DILIGENCE") return "closing";
   return "review";
 }
 
@@ -313,13 +356,14 @@ export function canCreateDDDocument(stage: Stage): boolean {
 /** The one-click "Advance" target: the next linear stage. Null when there's nowhere
  *  to go, or when the move needs its own decision form (the eligibility decision). */
 export function advanceTarget(stage: Stage): Stage | null {
-  if (stage === "ADD_TO_PIPELINE") return "PARTNER_REVIEW"; // retired stage
+  if (stage === "ADD_TO_PIPELINE") return "PARTNER_REVIEW"; // retired stages
+  if (stage === "CAPITAL_TRANSFER") return "INVESTMENT_COMPLETE";
   if (stage === "PASSED" || stage === "ELIGIBILITY_SCREEN") return null;
   const i = stageIndex(stage);
   return i >= 0 && i < LINEAR_STAGES.length - 1 ? LINEAR_STAGES[i + 1].key : null;
 }
 
-export type DealSection = "eligibility" | "assessment" | "memo" | "preSelection" | "commitments" | "dd" | "documents";
+export type DealSection = "eligibility" | "assessment" | "preSelection" | "commitments" | "dd" | "final" | "documents";
 
 /** Sections that matter at a stage: shown open and marked "Now"; the rest start collapsed. */
 export function focusSections(stage: Stage): DealSection[] {
@@ -329,20 +373,25 @@ export function focusSections(stage: Stage): DealSection[] {
       return ["eligibility", "documents"];
     case "ADD_TO_PIPELINE":
     case "PARTNER_REVIEW":
-      return ["assessment", "memo", "documents"];
+      return ["assessment", "documents"];
     case "PITCH_SELECTION":
-      return ["memo", "preSelection", "documents"];
+      return ["assessment", "preSelection", "documents"];
     case "PITCH_OUTCOME":
       return ["preSelection", "commitments", "documents"];
     case "INVESTMENT_COMMITMENTS":
       return ["commitments", "dd", "documents"];
     case "DUE_DILIGENCE":
     case "CAPITAL_TRANSFER":
-      return ["dd", "commitments", "documents"];
+      return ["dd", "final", "documents"];
     case "INVESTMENT_COMPLETE":
     case "SEIS_CERTIFICATE":
-      return ["commitments", "documents"];
+      return ["final", "documents"];
     case "PASSED":
       return ["documents"];
   }
 }
+
+// ── Lead angel ──────────────────────────────────────────────────────────────
+
+/** The usual DXV lead angels (anyone else is entered as free text under "Other"). */
+export const LEAD_ANGELS = ["Blué", "Anna C", "Kevin W"] as const;

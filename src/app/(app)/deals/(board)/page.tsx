@@ -24,6 +24,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           companyStage: true,
           raiseAmountGbp: true,
           description: true,
+          leadAngel: true,
           currentStage: true,
           stageEnteredAt: true,
           ddItems: { select: { dueDate: true, completedAt: true } },
@@ -63,6 +64,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     daysInStage: daysSince(v.stageEnteredAt, now),
     warnings: dealWarnings(v, now),
     commsOwed: v._count.founderComms,
+    leadAngel: v.leadAngel,
   }));
 
   return (

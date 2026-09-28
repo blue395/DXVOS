@@ -8,7 +8,7 @@ import { Field, inputClass } from "@/components/ui";
 import type { ActionResult } from "@/lib/action-result";
 
 // Stage control on the deal page. Client component only so the pass-reason field
-// can appear when "Passed" is chosen; the actual rules are enforced server-side.
+// can appear when "Declined" is chosen; the actual rules are enforced server-side.
 export function StageMover({
   currentStage,
   action,
@@ -32,7 +32,7 @@ export function StageMover({
           </select>
         </Field>
         {to === "PASSED" && (
-          <Field label="Reason for passing *">
+          <Field label="Reason for declining *">
             <select name="passReason" required defaultValue="" className={inputClass}>
               <option value="" disabled>
                 Choose a reason…

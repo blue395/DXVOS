@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import type { PassReason, Stage } from "@/generated/prisma/enums";
-import { formatGbpCompact, LINEAR_STAGES, PASSED_STAGE, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
+import { BOARD_STAGES, boardColumn, formatGbpCompact, PASSED_STAGE, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
 import { Spinner, WarningIcon } from "@/components/ui";
 import { moveVenture } from "./actions";
 import { PassDialog } from "./pass-dialog";
@@ -32,6 +32,7 @@ export type BoardCard = {
   daysInStage: number;
   warnings: string[];
   commsOwed: number;
+  leadAngel: string | null;
 };
 
 export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
@@ -76,7 +77,7 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
   function onDragEnd(e: DragEndEvent) {
     const card = cards.find((c) => c.id === e.active.id);
     const to = e.over?.id as Stage | undefined;
-    if (!card || !to || to === card.currentStage) return;
+    if (!card || !to || to === boardColumn(card.currentStage)) return; // (S/EIS deals sit in Investment Complete)
     if (to === "PASSED") setPendingPass(card);
     else move(card, to);
   }
@@ -91,11 +92,11 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
       {/* Fixed id: dnd-kit otherwise numbers its accessibility ids with a counter that
           differs between server and browser rendering (a hydration mismatch). */}
       <DndContext id="deals-board" sensors={sensors} onDragEnd={onDragEnd}>
-        {/* The ten linear stages scroll horizontally; Passed is pinned to the right edge
+        {/* The linear stages scroll horizontally; Declined is pinned to the right edge
             because it's reachable from every stage and must always be a visible drop target. */}
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {LINEAR_STAGES.map((stage) => (
-            <Column key={stage.key} stage={stage} cards={cards.filter((c) => c.currentStage === stage.key)} saving={saving} />
+          {BOARD_STAGES.map((stage) => (
+            <Column key={stage.key} stage={stage} cards={cards.filter((c) => boardColumn(c.currentStage) === stage.key)} saving={saving} />
           ))}
           <div className="sticky right-0 shrink-0 border-l border-dxv-green/15 bg-white pl-3 shadow-[-18px_0_18px_-14px_rgba(0,0,0,0.35)]">
             <Column stage={PASSED_STAGE} cards={cards.filter((c) => c.currentStage === "PASSED")} saving={saving} />
@@ -123,7 +124,7 @@ const PHASE_STYLE: Record<StagePhase, { column: string; header: string; dot: str
   review: { column: "bg-dxv-green/[0.03] border-dxv-green/15", header: "border-dxv-green/15", dot: "bg-dxv-green/40", label: "Review & pitch" },
   closing: { column: "bg-dxv-green/[0.07] border-dxv-green/20", header: "border-dxv-green/20", dot: "bg-dxv-green/70", label: "Closing" },
   invested: { column: "bg-dxv-green/[0.12] border-dxv-green/30", header: "border-dxv-green/30", dot: "bg-dxv-green", label: "Invested" },
-  passed: { column: "bg-black/[0.03] border-black/15", header: "border-black/10", dot: "bg-black/60", label: "Declined" },
+  passed: { column: "bg-black/[0.03] border-black/15", header: "border-black/10", dot: "bg-black/60", label: "Kept for learning" },
 };
 
 function Column({ stage, cards, saving }: { stage: StageMeta; cards: BoardCard[]; saving: Set<string> }) {
@@ -171,7 +172,7 @@ function Pill({ children, className }: { children: React.ReactNode; className: s
 function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const hasPills = card.companyStage || card.sector || card.round;
+  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE";
 
   return (
     <div
@@ -205,6 +206,7 @@ function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean 
           {card.companyStage && <Pill className="bg-white text-black/75 ring-1 ring-black/15">{card.companyStage}</Pill>}
           {card.sector && <Pill className="bg-dxv-green/10 text-dxv-green">{card.sector}</Pill>}
           {card.round && <Pill className="bg-dxv-yellow text-dxv-green">Round {card.round}</Pill>}
+          {card.currentStage === "SEIS_CERTIFICATE" && <Pill className="bg-dxv-green text-white">S/EIS</Pill>}
         </div>
       )}
 
@@ -213,6 +215,12 @@ function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean 
           {card.deckDaysAgo === null ? "No deck yet" : `Deck ${card.deckDaysAgo}d ago`}
           <span className="text-black/30"> · </span>
           {card.daysInStage}d in stage
+          {card.leadAngel && (
+            <>
+              <span className="text-black/30"> · </span>
+              <span title="Lead angel">Lead {card.leadAngel}</span>
+            </>
+          )}
         </span>
         {card.commsOwed > 0 && (
           <span className="whitespace-nowrap rounded-full bg-dxv-yellow px-1.5 py-0.5 font-medium text-dxv-green" title="Founder is owed a decision update">

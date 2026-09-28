@@ -14,6 +14,9 @@ import {
   canGenerateAssessment,
   roundOptionCount,
   isInvestedStage,
+  investedGbp,
+  canDecline,
+  PASS_REASONS,
   advanceTarget,
   focusSections,
   gatesCrossed,
@@ -25,7 +28,7 @@ import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLab
 import { CommsStatus } from "@/generated/prisma/enums";
 import {
   addDDItem,
-  addInvestmentVote,
+  declineVenture,
   addPreSelectionVote,
   moveVentureForm,
   updateFounderComm,
@@ -41,6 +44,7 @@ import { AssessmentCard } from "../assessment-card";
 import { DDDocumentPanel } from "../dd-document";
 import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
+import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../investment-sections";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
@@ -74,7 +78,17 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           },
           ddItems: { orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { dueDate: { sort: "asc", nulls: "last" } }] },
           preSelectionVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
-          investmentVotes: { orderBy: { createdAt: "desc" }, include: { recordedBy: { select: { name: true } } } },
+          investmentVotes: {
+            where: { removedAt: null }, // removed EOIs are hidden (kept in the audit log)
+            orderBy: { createdAt: "desc" },
+            include: { recordedBy: { select: { name: true } } },
+          },
+          finalInvestments: {
+            where: { removedAt: null },
+            orderBy: { createdAt: "asc" },
+            include: { createdBy: { select: { name: true } }, paidBy: { select: { name: true } } },
+          },
+          entryAudits: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
           founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
           deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
           eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
@@ -90,7 +104,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
   // The EOI window opens when the deal (most recently) entered Investment Commitments.
   const commitments = commitmentTotal(v.investmentVotes);
-  const currentInvestmentVoteIds = new Set(latestVotePerAngel(v.investmentVotes).map((x) => x.id));
   const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
@@ -103,21 +116,21 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   // are marked "Now"; the rest collapse to a one-line summary (rules in pipeline.ts).
   const focus = new Set(focusSections(v.currentStage));
   const collapse = (s: DealSection) => ({ open: focus.has(s), now: focus.has(s) && s !== "documents" });
-  const showAssessment = canGenerateAssessment(v.currentStage) || v.memoAnalyses.length > 0;
+  const invested = investedGbp(v);
+  const audits = (entity: "INVESTMENT_VOTE" | "FINAL_INVESTMENT"): AuditEntry[] => v.entryAudits.filter((a) => a.entity === entity);
   const latestMemo = v.memoVersions[0];
   const latestMemoName = latestMemo
     ? latestMemo.kind === "REVIEWED_MEMO"
       ? reviewIssueName(issueNo.get(latestMemo.id)!)
       : `Version ${latestMemo.version}`
     : null;
-  const commitmentsSummary = `${formatGbp(commitments.totalGbp)} from ${commitments.interestedCount} angel${commitments.interestedCount === 1 ? "" : "s"}`;
   const navItems: NavItem[] = [
     { id: "eligibility", label: "Eligibility", now: focus.has("eligibility") },
-    ...(showAssessment ? [{ id: "assessment", label: "Assessment", now: focus.has("assessment") }] : []),
-    { id: "memo", label: "Memo", now: focus.has("memo") },
+    { id: "assessment", label: "Assessment & memo", now: focus.has("assessment") },
     { id: "pre-selection", label: "Votes", now: focus.has("preSelection"), hint: `${preSelectionInterested}` },
     { id: "commitments", label: "Commitments", now: focus.has("commitments"), hint: formatGbp(commitments.totalGbp) },
     { id: "due-diligence", label: "DD", now: focus.has("dd"), hint: v.ddItems.length ? `${ddDone}/${v.ddItems.length}` : undefined },
+    { id: "final-investment", label: "Final investment", now: focus.has("final"), hint: v.finalInvestments.length ? formatGbp(invested) : undefined },
     { id: "documents", label: "Documents", now: false, hint: `${docs.length}` },
   ];
 
@@ -149,24 +162,26 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
         <p className="mt-1 text-sm text-black/60">
           {[
             v.round ? `Round ${v.round}` : null,
+            v.leadAngel ? `Lead angel: ${v.leadAngel}` : null,
             v.founderNames,
             v.sector,
             v.companyStage,
             v.raiseAmountGbp ? `Raising ${formatGbp(v.raiseAmountGbp)}` : null,
-            v.investedAmountGbp ? `DXV invested ${formatGbp(v.investedAmountGbp)}` : null,
+            isInvestedStage(v.currentStage) && invested > 0 ? `DXV invested ${formatGbp(invested)}` : null,
           ]
             .filter(Boolean)
             .join(" · ")}
         </p>
-        {isInvestedStage(v.currentStage) && v.investedAmountGbp === null && (
+        {isInvestedStage(v.currentStage) && invested === 0 && (
           <p className="mt-2 inline-block rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-1 text-sm">
-            Add the amount DXV invested under <strong>Details → Edit venture details</strong> so it counts towards the dashboard total.
+            No paid tickets yet: tick payments in <a href="#final-investment" className="font-medium underline">Final investment</a> so this
+            deal counts towards the dashboard&apos;s Investment Total.
           </p>
         )}
         {v.currentStage === "PASSED" && v.passReason && (
           <p className="mt-2 inline-block rounded bg-black px-3 py-1 text-sm text-white">
-            Passed: {PASS_REASON_LABELS[v.passReason]}
-            {v.passNote ? ` — ${v.passNote}` : ""}
+            Declined{v.passedFromStage ? ` at ${stageLabel(v.passedFromStage)}` : ""}: {PASS_REASON_LABELS[v.passReason]}
+            {v.passNote ? `. ${v.passNote}` : ""}
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -175,6 +190,36 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <a href="#eligibility" className={buttonClass("primary")}>
               Record the eligibility decision ↓
             </a>
+          )}
+          {canDecline(v.currentStage) && (
+            <Reveal label="Decline" buttonClassName={declinePillClass}>
+              <ActionForm action={declineVenture.bind(null, v.id)} className="space-y-3">
+                <p className="text-sm">
+                  Decline <strong>{v.name}</strong> at <strong>{stageLabel(v.currentStage)}</strong>. The deal is kept (for dealflow
+                  learning) and a founder update is flagged as owed in Founder comms.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Reason *">
+                    <select name="passReason" required defaultValue="" className={inputClass}>
+                      <option value="" disabled>
+                        Choose a reason…
+                      </option>
+                      {PASS_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {PASS_REASON_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Note" hint="Required for Other; saved to stage history">
+                    <input name="note" className={inputClass} />
+                  </Field>
+                </div>
+                <SubmitButton pendingLabel="Declining…" doneLabel="Declined">
+                  Decline deal
+                </SubmitButton>
+              </ActionForm>
+            </Reveal>
           )}
           <Reveal label={v.currentStage === "PASSED" ? "Reopen or move…" : "Other move…"}>
             {/* key: reset the dropdown whenever the stage changes elsewhere (board, eligibility decision) */}
@@ -200,29 +245,22 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             collapse={collapse("eligibility")}
           />
 
-          {showAssessment && (
-            <AssessmentCard
-              collapse={collapse("assessment")}
-              ventureId={v.id}
-              canGenerate={canGenerateAssessment(v.currentStage)}
-              hasDeck={v.deckAnalyses.some((a) => a.status !== "PENDING")}
-              latest={v.memoAnalyses[0] ?? null}
-              draft={v.memoDrafts[0] ?? null}
-              reviewed={(() => {
-                const latestIssue = v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO");
-                return latestIssue ? { ...latestIssue, issueNumber: issueNo.get(latestIssue.id)! } : null;
-              })()}
-            />
-          )}
-
-          <Card
-            title="Investment memo"
-            id="memo"
-            collapse={{ ...collapse("memo"), summary: latestMemoName ? `Latest: ${latestMemoName}` : "No memo yet" }}
+          <AssessmentCard
+            collapse={collapse("assessment")}
+            ventureId={v.id}
+            canGenerate={canGenerateAssessment(v.currentStage)}
+            hasDeck={v.deckAnalyses.some((a) => a.status !== "PENDING")}
+            latest={v.memoAnalyses[0] ?? null}
+            draft={v.memoDrafts[0] ?? null}
+            reviewed={(() => {
+              const latestIssue = v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO");
+              return latestIssue ? { ...latestIssue, issueNumber: issueNo.get(latestIssue.id)! } : null;
+            })()}
+            memoSummary={latestMemoName ? `Latest memo: ${latestMemoName}` : null}
           >
             {v.memoVersions.length === 0 ? (
               <p className="text-sm text-black/55">
-                No memo yet. Mark a DXV Review Draft complete in the assessment to issue one, or upload a memo file below.
+                No memo yet. Mark a DXV Review Draft complete to issue one, or upload a memo file below.
               </p>
             ) : (
               <ul className="divide-y divide-black/10">
@@ -248,10 +286,10 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 ))}
               </ul>
             )}
-            <div className="mt-4 border-t border-black/10 pt-4">
+            <div className="mt-3">
               <DocumentUploader ventureId={v.id} category="MEMO" label="Upload a memo file (PDF or Word) as a new version" />
             </div>
-          </Card>
+          </AssessmentCard>
 
           <Card
             title="Pre-Selection votes"
@@ -286,40 +324,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </div>
           </Card>
 
-          <Card
-            title="Investment commitments / EOI"
-            id="commitments"
-            collapse={{ ...collapse("commitments"), summary: commitmentsSummary }}
-          >
-            <CommitmentsTotal totalGbp={commitments.totalGbp} interestedCount={commitments.interestedCount} />
-            <VoteList
-              votes={v.investmentVotes.map((x) => ({ ...x, current: currentInvestmentVoteIds.has(x.id) }))}
-              emptyText="No expressions of interest yet. Record each angel's EOI and maximum ticket as they come in."
-              showTicket
-            />
-            <div className="mt-4 border-t border-black/10 pt-4">
-              <Reveal label="+ Record EOI">
-                <ActionForm action={addInvestmentVote.bind(null, v.id)} className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    <Field label="Angel *">
-                      <input name="angelName" required className={inputClass} />
-                    </Field>
-                    <Field label="Interested? *">
-                      <InterestSelect />
-                    </Field>
-                    <Field label="Max ticket (£)">
-                      <input name="maxTicketGbp" inputMode="numeric" className={inputClass} />
-                    </Field>
-                    <Field label="Note">
-                      <input name="note" className={inputClass} />
-                    </Field>
-                  </div>
-                  <p className="text-xs text-black/50">A new vote from the same angel supersedes their earlier one; both are kept.</p>
-                  <SubmitButton doneLabel="Recorded">Record EOI</SubmitButton>
-                </ActionForm>
-              </Reveal>
-            </div>
-          </Card>
+          <CommitmentsCard
+            ventureId={v.id}
+            votes={v.investmentVotes}
+            audits={audits("INVESTMENT_VOTE")}
+            collapse={collapse("commitments")}
+          />
 
           <Card
             title="Due Diligence"
@@ -388,6 +398,14 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </div>
           </Card>
 
+          <FinalInvestmentCard
+            ventureId={v.id}
+            entries={v.finalInvestments}
+            audits={audits("FINAL_INVESTMENT")}
+            canAddFromEois={commitments.interestedCount > 0}
+            collapse={collapse("final")}
+          />
+
           <DocumentsCard ventureId={v.id} docs={docs} collapse={collapse("documents")} />
 
         </div>
@@ -436,7 +454,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
               <ActionForm action={updateVenture.bind(null, v.id)} resetOnSuccess={false} className="mt-4 space-y-4">
-                <VentureFields v={v} roundOptions={roundOptionCount(_max.round)} showInvested />
+                <VentureFields v={v} roundOptions={roundOptionCount(_max.round)} />
                 <SubmitButton>Save details</SubmitButton>
               </ActionForm>
             </details>
@@ -546,14 +564,5 @@ function VoteList({ votes, emptyText, showTicket }: { votes: VoteRow[]; emptyTex
   );
 }
 
-/** Running total of commitments (each angel's latest vote). */
-function CommitmentsTotal({ totalGbp, interestedCount }: { totalGbp: number; interestedCount: number }) {
-  return (
-    <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md bg-dxv-green px-4 py-3 text-white">
-      <span className="text-3xl font-semibold text-dxv-yellow tabular-nums">{formatGbp(totalGbp)}</span>
-      <span className="text-sm text-white/80">
-        committed so far · {interestedCount} interested angel{interestedCount === 1 ? "" : "s"}
-      </span>
-    </div>
-  );
-}
+const declinePillClass =
+  "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black bg-white px-3.5 py-1.5 text-sm font-medium text-black transition hover:-translate-y-px hover:bg-black hover:text-white active:translate-y-0";
