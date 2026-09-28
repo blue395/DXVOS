@@ -3,6 +3,7 @@ import {
   ALL_STAGES,
   canDecideEligibility,
   canGenerateAssessment,
+  canCreateDDDocument,
   cardOneLiner,
   formatGbpCompact,
   stagePhase,
@@ -236,5 +237,14 @@ describe("canGenerateAssessment", () => {
     expect(canGenerateAssessment("PARTNER_REVIEW")).toBe(true);
     expect(canGenerateAssessment("DUE_DILIGENCE")).toBe(true);
     expect(canGenerateAssessment("PASSED")).toBe(false);
+  });
+});
+
+describe("canCreateDDDocument", () => {
+  it("follows the assessment rule", () => {
+    expect(canCreateDDDocument("ELIGIBILITY_SCREEN")).toBe(false);
+    expect(canCreateDDDocument("INVESTMENT_COMMITMENTS")).toBe(true);
+    expect(canCreateDDDocument("DUE_DILIGENCE")).toBe(true);
+    expect(canCreateDDDocument("PASSED")).toBe(false);
   });
 });

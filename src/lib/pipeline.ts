@@ -300,3 +300,10 @@ export function cardOneLiner(aiSummary: string | null | undefined, description: 
 export function canGenerateAssessment(stage: Stage): boolean {
   return stageIndex(stage) >= stageIndex("PARTNER_REVIEW");
 }
+
+// ── DD document ─────────────────────────────────────────────────────────────
+
+/** The AI-assisted DD document follows the same rule as the assessment: Partner Review onwards, not passed. */
+export function canCreateDDDocument(stage: Stage): boolean {
+  return canGenerateAssessment(stage);
+}

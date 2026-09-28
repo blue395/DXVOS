@@ -111,3 +111,14 @@ export const createUploadTarget = (storagePath: string, analysisId: string) =>
 export const saveLocalDeck = (storagePath: string, bytes: Buffer) => saveLocalObject(DECK_BUCKET, storagePath, bytes);
 export const readDeck = (storagePath: string) => readObject(DECK_BUCKET, storagePath);
 export const signedDownloadUrl = (storagePath: string, fileName: string) => signedObjectUrl(DECK_BUCKET, storagePath, fileName);
+
+/** Server-side upload (used by background workers to store generated files). */
+export async function uploadObject(bucket: string, storagePath: string, bytes: Buffer, contentType: string): Promise<void> {
+  const sb = supabase();
+  if (sb) {
+    const { error } = await sb.storage.from(bucket).upload(storagePath, bytes, { contentType, upsert: false });
+    if (error) throw new Error(`Couldn't store the file: ${error.message}`);
+    return;
+  }
+  await saveLocalObject(bucket, storagePath, bytes);
+}

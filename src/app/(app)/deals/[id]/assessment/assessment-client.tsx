@@ -8,7 +8,7 @@ import { finaliseMemo, generateAssessment, reviseIssue, saveMemoScore, saveMemoT
 import { ScoreBadge } from "./memo-view";
 
 /** A button that runs a server action with no form fields and shows its error inline. */
-function ActionButton({
+export function ActionButton({
   run,
   children,
   variant = "primary",
