@@ -120,7 +120,12 @@ export function CommsBadge({ status }: { status: CommsStatus }) {
       : status === "SENT"
         ? "bg-dxv-green/10 text-dxv-green"
         : "bg-dxv-green text-white";
-  return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{COMMS_LABELS[status]}</span>;
+  // Fixed width, one line: badges line up whatever the status.
+  return (
+    <span className={`inline-flex w-40 shrink-0 justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+      {COMMS_LABELS[status]}
+    </span>
+  );
 }
 
 export function AiTag({ children = "AI suggested" }: { children?: React.ReactNode }) {

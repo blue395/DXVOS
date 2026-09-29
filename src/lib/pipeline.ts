@@ -144,6 +144,20 @@ export function gatesCrossed(from: Stage | null, to: Stage, passReason?: PassRea
     .map((s) => ({ gate: s.gate!, decision: s.proceedDecision! }));
 }
 
+// ── Founder comms ───────────────────────────────────────────────────────────
+
+/**
+ * The deal page shows the most recent comm (sent or not) and folds the rest away.
+ * `earlierPending` counts hidden comms not yet sent, so the toggle can say so.
+ */
+export function splitLatestComm<T extends { createdAt: Date; status: string; gate: Gate }>(comms: T[]) {
+  // Comms created by one move share a timestamp: then the later gate in the dealflow is the newer one.
+  const gateOrder = (g: Gate) => (g === "PASSED" ? Infinity : LINEAR_STAGES.findIndex((s) => s.gate === g));
+  const newestFirst = [...comms].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || gateOrder(b.gate) - gateOrder(a.gate));
+  const [latest = null, ...earlier] = newestFirst;
+  return { latest, earlier, earlierPending: earlier.filter((c) => c.status === "NOT_YET_SENT").length };
+}
+
 // ── Declining (stored as PASSED) ────────────────────────────────────────────
 
 /** A deal can be declined at any live stage (not once invested, and not twice). */
