@@ -129,7 +129,7 @@ export function JobTray() {
   };
 
   return (
-    <div aria-live="polite" className="fixed right-4 bottom-4 z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
+    <div aria-live="polite" className="fixed right-4 bottom-20 z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
       {visible.map((j) => {
         const kind = JOB_KINDS[j.kind];
         const elapsed = now - new Date(j.startedAt).getTime();

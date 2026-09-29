@@ -60,6 +60,7 @@ model User {
   lessonsApproved         Lesson[]            @relation("LessonApprovedBy")
   lessonsUpdated          Lesson[]            @relation("LessonUpdatedBy")
   lessonJobs              LessonJob[]
+  brainConversations      BrainConversation[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -635,4 +636,52 @@ model LessonJob {
   lessons      Lesson[]
 
   @@index([ventureId, createdAt])
+}
+
+// ── DXV Brain: the team's AI assistant ──────────────────────────────────────
+
+// A chat with the DXV Brain. Private to the person who started it. Archived, not deleted.
+model BrainConversation {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  title      String
+  context    Json // snapshot for the whole chat: Playbook versions and approved lessons the Brain was given
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  archivedAt DateTime?
+  messages   BrainMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+enum BrainRole {
+  USER
+  ASSISTANT
+}
+
+// One turn. `content` is exactly what was sent to (user) or returned by (assistant)
+// Claude, replayed unchanged on the next question; `text` is what the person sees.
+// Assistant replies are written by a background worker (status, live text, activity).
+model BrainMessage {
+  id             String             @id @default(cuid())
+  conversationId String
+  conversation   BrainConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           BrainRole
+  text           String             @default("")
+  content        Json?
+  pagePath       String? // user turns: the page it was asked from
+  ventureId      String? // user turns: the deal on that page, if any
+  status         DeckAnalysisStatus @default(COMPLETE)
+  activity       String? // assistant, while working: e.g. "Searching the web"
+  sources        Json? // assistant: web pages it cited, [{ title, url }]
+  error          String?
+  model          String?
+  inputTokens    Int?
+  outputTokens   Int?
+  createdAt      DateTime           @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  @@index([conversationId, createdAt])
 }

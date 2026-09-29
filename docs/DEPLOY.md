@@ -124,7 +124,15 @@ A private copy of each deck is kept for re-running the screen (download it from 
 No new settings: it uses the same `ANTHROPIC_API_KEY` and the stored decks from §5. It runs in
 a second background function, `analyze-memo-background` (logs under Netlify → Logs → Functions).
 
-## 7. Documents
+## 7. DXV Brain
+
+Uses the same `ANTHROPIC_API_KEY`, with Claude Opus 5.5 and Anthropic's **web search** tool. Web search is an
+organisation-level setting in the Anthropic Console: make sure it's allowed there. If it's off, the Brain still
+answers from DXV OS and Claude's knowledge, but can't search. Replies run in the
+background function `brain-reply-background` (logs under Netlify → Logs → Functions). Web searches are billed
+per search on top of tokens.
+
+## 8. Documents
 
 No new settings. The deploy's migration creates a second private bucket, `documents` (PDF, Word,
 Excel; 50 MB max). Check it exists under Supabase → Storage; if not, create it by hand with those
