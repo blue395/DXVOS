@@ -4,6 +4,8 @@ import Link from "next/link";
 import { buttonClass, formatDate } from "@/components/ui";
 import { CERTIFICATION_LABELS, certState, canSeeLiveDeals, type CertLike } from "@/lib/pipeline";
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
+import type { DealListItem } from "@/lib/portal-deals";
+import { PhaseBadge } from "./deal-room";
 
 export type PortalAngel = {
   name: string;
@@ -17,9 +19,22 @@ export type PortalAngel = {
   restrictedDeclaredAt: Date | null;
 };
 
-export function PortalHome({ angel, cert, preview = false }: { angel: PortalAngel; cert: (CertLike & { type: CertificationType }) | null; preview?: boolean }) {
+export function PortalHome({
+  angel,
+  cert,
+  deals,
+  dealHref = (id) => `/portal/deals/${id}`,
+  preview = false,
+}: {
+  angel: PortalAngel;
+  cert: (CertLike & { type: CertificationType }) | null;
+  /** The deals shared with members (only passed when this angel may see deals). */
+  deals: DealListItem[];
+  dealHref?: (id: string) => string;
+  preview?: boolean;
+}) {
   const state = certState(cert);
-  const access = canSeeLiveDeals(angel, cert);
+  const access = canSeeLiveDeals(angel, cert) && !angel.restrictedDeclaredAt;
   const first = angel.name.split(" ")[0];
   return (
     <div className="space-y-5">
@@ -66,11 +81,25 @@ export function PortalHome({ angel, cert, preview = false }: { angel: PortalAnge
 
         <section className="rounded-lg border border-black/10 bg-white p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Deals</h2>
-          <p className="mt-2 text-sm text-black/65">
-            {access
-              ? "No deals are shared with you right now. When DXV opens a deal for members' pitch selection vote, it will appear here with its pitch deck."
-              : "Deals appear here for members with a current investor statement."}
-          </p>
+          {access && deals.length > 0 ? (
+            <ul className="mt-2 divide-y divide-black/10">
+              {deals.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                  <Link href={dealHref(d.id)} className="min-w-0 flex-1 font-medium text-dxv-green hover:underline">
+                    {d.name}
+                    {d.sector && <span className="font-normal text-black/55"> · {d.sector}</span>}
+                  </Link>
+                  <PhaseBadge phase={d.phase} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-black/65">
+              {access
+                ? "No deals are shared with you right now. When DXV opens a deal for members' pitch selection vote, it will appear here with its pitch deck."
+                : "Deals appear here for members with a current investor statement."}
+            </p>
+          )}
         </section>
 
         <section className="rounded-lg border border-black/10 bg-white p-4">

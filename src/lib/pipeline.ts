@@ -712,3 +712,64 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
 
 /** Minimum password length for angel logins. */
 export const MIN_PASSWORD_LENGTH = 10;
+
+// ── Deal room (what angels see of a deal; Blue, 2026-10-04) ────────────────
+
+/**
+ * Deal-room phases: members see the pitch deck from Member Pitch Selection; the deck,
+ * memo and supporting documents from the post-pitch vote (Pitch Outcome); all
+ * applicable documents from Investment Commitments on. Earlier stages and declined
+ * deals: nothing, even if shared.
+ */
+export type AngelDealPhase = "pitch-selection" | "post-pitch" | "commitments";
+
+export function angelDealPhase(stage: Stage): AngelDealPhase | null {
+  switch (stage) {
+    case "PITCH_SELECTION":
+      return "pitch-selection";
+    case "PITCH_OUTCOME":
+      return "post-pitch";
+    case "INVESTMENT_COMMITMENTS":
+    case "DUE_DILIGENCE":
+    case "INVESTMENT_COMPLETE":
+    case "SEIS_CERTIFICATE":
+      return "commitments";
+    default:
+      return null;
+  }
+}
+
+export const ANGEL_PHASE_LABELS: Record<AngelDealPhase, string> = {
+  "pitch-selection": "Pitch selection",
+  "post-pitch": "After the pitch",
+  commitments: "Investment",
+};
+
+/** The phase an angel sees a deal in, or null if they can't see it at all (not shared, too early, declined). */
+export function angelDealVisibility(v: { sharedWithAngelsAt: Date | null; currentStage: Stage }): AngelDealPhase | null {
+  return v.sharedWithAngelsAt ? angelDealPhase(v.currentStage) : null;
+}
+
+const PHASE_ORDER: AngelDealPhase[] = ["pitch-selection", "post-pitch", "commitments"];
+const atLeast = (phase: AngelDealPhase, min: AngelDealPhase) => PHASE_ORDER.indexOf(phase) >= PHASE_ORDER.indexOf(min);
+
+/** The locked memo (DXV Review Issue) is shown from the post-pitch vote. */
+export const angelSeesMemo = (phase: AngelDealPhase) => atLeast(phase, "post-pitch");
+
+/**
+ * Whether a (non-deck) document is shown in this phase: only if the team chose a phase
+ * for it and that phase has been reached. Archived or unfinished uploads never.
+ */
+export function angelSeesDocument(phase: AngelDealPhase, doc: { angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | null; archivedAt: Date | null; uploadedAt: Date | null }): boolean {
+  if (doc.archivedAt || !doc.uploadedAt || !doc.angelVisibleFrom) return false;
+  return atLeast(phase, doc.angelVisibleFrom === "POST_PITCH" ? "post-pitch" : "commitments");
+}
+
+/** What an angel can record at this stage: interest in hearing the pitch, then their EOI. */
+export function angelVoteKind(stage: Stage): "pre-selection" | "eoi" | null {
+  if (stage === "PITCH_SELECTION") return "pre-selection";
+  if (stage === "PITCH_OUTCOME" || stage === "INVESTMENT_COMMITMENTS") return "eoi";
+  return null;
+}
+
+export const ANGEL_DOC_PHASE_LABELS = { POST_PITCH: "From the post-pitch vote", COMMITMENTS: "From Investment Commitments" } as const;

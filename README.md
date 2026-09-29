@@ -222,6 +222,24 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
 - **Security**: `requireAngel()` on every portal page and action (own data only); `requireAdmin()` redirects angels
   to `/portal`; team APIs return 401; revoked logins and archived angels are treated as signed out.
 
+### Members' deal room
+
+Members see **no deals** unless the team shares one, and then only while they hold a current investor
+statement (and have finished onboarding):
+- **Share**: the deal page's **Members' deal room** card (sidebar) has *Share with members* / *Stop sharing*,
+  a short summary written for members, and a *Members see* setting per document (Hidden / From the post-pitch
+  vote / From Investment Commitments). It lists exactly what members see now, how many can see it, and links to
+  **Preview as a member**. Every change is logged (`DealShareLog`).
+- **By stage** (`angelDealPhase()` etc. in `pipeline.ts`): Member Pitch Selection → the latest pitch deck and a
+  pitch selection vote; Pitch Outcome → plus the memo (latest DXV Review Issue, in full) and documents set "from
+  the post-pitch vote", and an EOI (interest + maximum ticket); Investment Commitments onwards → plus documents
+  set "from Investment Commitments" (EOIs close after Investment Commitments). Earlier stages and declined deals:
+  nothing, even if shared.
+- **Votes** from the portal land in the deal's Pre-Selection votes and Commitments as the angel (linked by
+  `angelId`); the latest per angel counts, as before.
+- **Never shown**: eligibility screens, AI drafts and working drafts, AI-generated DD reports, notes, other
+  members' votes. Files are served by `/api/portal/documents/[id]`, which re-checks access on every request.
+
 ## DXV Brain (floating AI assistant, every page)
 
 The **DXV Brain** button (bottom right, or Ctrl+J) opens a chat with Claude Opus 5.5 that is DXV-first:
