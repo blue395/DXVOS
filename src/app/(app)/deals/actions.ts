@@ -21,6 +21,7 @@ import type { ActionResult } from "@/lib/action-result";
 import type { EntrySnapshot } from "@/lib/audit";
 import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
+import { angelIdForName } from "@/lib/angels";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export async function addPreSelectionVote(ventureId: string, _prev: ActionResult
   const parsed = PreSelectionSchema.safeParse(form(formData));
   if (!parsed.success) return { error: firstError(parsed.error) };
 
-  await db.preSelectionVote.create({ data: { ventureId, recordedById: user.id, ...parsed.data } });
+  await db.preSelectionVote.create({ data: { ventureId, recordedById: user.id, ...parsed.data, angelId: await angelIdForName(parsed.data.angelName) } });
   revalidateDeal(ventureId);
   return { ok: true };
 }
@@ -244,7 +245,7 @@ export async function addInvestmentVote(ventureId: string, _prev: ActionResult, 
 
   const { maxTicketGbp, ...rest } = parsed.data;
   await db.investmentVote.create({
-    data: { ventureId, recordedById: user.id, maxTicketGbp: rest.interested ? (maxTicketGbp ?? 0) : 0, ...rest },
+    data: { ventureId, recordedById: user.id, maxTicketGbp: rest.interested ? (maxTicketGbp ?? 0) : 0, ...rest, angelId: await angelIdForName(rest.angelName) },
   });
   revalidateDeal(ventureId);
   return { ok: true };
@@ -269,7 +270,7 @@ export async function updateInvestmentVote(voteId: string, _prev: ActionResult, 
   const { maxTicketGbp, ...rest } = parsed.data;
   const next = { ...rest, maxTicketGbp: rest.interested ? (maxTicketGbp ?? 0) : 0, note: rest.note ?? null };
   await db.$transaction([
-    db.investmentVote.update({ where: { id: voteId }, data: { ...next, editedAt: new Date() } }),
+    db.investmentVote.update({ where: { id: voteId }, data: { ...next, angelId: await angelIdForName(next.angelName), editedAt: new Date() } }),
     db.entryAudit.create({
       data: {
         ventureId: vote.ventureId,
@@ -330,6 +331,7 @@ export async function addFinalInvestment(ventureId: string, _prev: ActionResult,
     data: {
       ventureId,
       ...rest,
+      angelId: await angelIdForName(rest.angelName),
       ticketGbp: ticketGbp!,
       createdById: user.id,
       ...(paid ? { paidAt: new Date(), paidById: user.id } : {}),
@@ -349,7 +351,7 @@ export async function updateFinalInvestment(entryId: string, _prev: ActionResult
 
   const next = { angelName: parsed.data.angelName, ticketGbp: parsed.data.ticketGbp!, note: parsed.data.note ?? null };
   await db.$transaction([
-    db.finalInvestment.update({ where: { id: entryId }, data: { ...next, editedAt: new Date() } }),
+    db.finalInvestment.update({ where: { id: entryId }, data: { ...next, angelId: await angelIdForName(next.angelName), editedAt: new Date() } }),
     db.entryAudit.create({
       data: {
         ventureId: entry.ventureId,
@@ -417,7 +419,7 @@ export async function addFinalFromEois(ventureId: string): Promise<ActionResult>
   const toAdd = latestVotePerAngel(votes).filter((v) => v.interested && v.maxTicketGbp > 0 && !listed.has(normaliseAngelName(v.angelName)));
   if (toAdd.length === 0) return { error: "No interested angels from the EOIs left to add." };
   await db.finalInvestment.createMany({
-    data: toAdd.map((v) => ({ ventureId, angelName: v.angelName, ticketGbp: v.maxTicketGbp, note: "From EOI", createdById: user.id })),
+    data: toAdd.map((v) => ({ ventureId, angelName: v.angelName, angelId: v.angelId, ticketGbp: v.maxTicketGbp, note: "From EOI", createdById: user.id })),
   });
   revalidateDeal(ventureId);
   return { ok: true };

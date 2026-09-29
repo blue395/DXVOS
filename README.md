@@ -178,6 +178,29 @@ The feedback loop behind the AI, and what the DXV Brain knows DXV's criteria and
   decision differs from the AI's recommendation. Suggestions wait for a person to approve (menu badge).
   Approved eligibility/assessment/general lessons (newest 40) are given to those AI steps.
 
+## Angels (`/angels`)
+
+DXV's members and prospects (spec §8), admin-only for now.
+- **Directory**: stat cards led by **Certification needed** (members without a current statement: the
+  headline compliance number, yellow when non-zero, also on the Dashboard's Angels card), due in 30 days,
+  prospects, women members (self-declared tag); filters, search, copy emails, CSV export, duplicates review.
+- **Certification**: each signed FCA statement (high net worth or self-certified sophisticated: 12 months;
+  certified sophisticated from an FCA firm: 36 months, to be confirmed by Kevin) is an append-only
+  `AngelCertification`, optionally with the signed file (private storage, served via `/api/angels/certifications/[id]`).
+  The most recently signed one counts. `canSeeLiveDeals()` in `pipeline.ts` is the compliance gate for when
+  angels log in (spec §10): current, non-archived members only; enforce it server-side on angel-facing data.
+- **Angel page**: profile (sectors, self-declared tags, WhatsApp groups recorded, source), certification history,
+  notes (append-only), and investments across deals (EOIs, pre-selection votes, final tickets) with totals.
+- **Import**: `/angels/import` reads a CSV (e.g. the Squarespace export) in the browser; you match columns to
+  fields (remembered per header row), preview, and import in batches. Matches by email, fills blanks only.
+- **Linking votes**: votes recorded as typed names link to angels through confirmed aliases (`AngelAlias`,
+  reviewed at `/angels/link`, with suggestions like "Kevin W" = Kevin Walker), so append-only votes are never
+  edited. New votes and investments pick from an autocomplete of angel names and link on save.
+- Not yet: angel logins and self-service (spec: after the certification gate is proven), automated
+  self-certification links, WhatsApp integration (needs Meta's WhatsApp Business API and a compliance view on
+  promotions), membership fees (`membershipTier` reserved). Ethnicity isn't recorded (special-category data)
+  until Kevin confirms the lawful basis.
+
 ## DXV Brain (floating AI assistant, every page)
 
 The **DXV Brain** button (bottom right, or Ctrl+J) opens a chat with Claude Opus 5.5 that is DXV-first:

@@ -2,7 +2,7 @@
 // Everything the board, the deal page and the dashboard need to agree on lives here,
 // so there's exactly one definition of "what's a gate", "what counts towards momentum", etc.
 
-import type { Gate, PassReason, Stage } from "@/generated/prisma/enums";
+import type { AngelStatus, CertificationType, Gate, PassReason, Stage } from "@/generated/prisma/enums";
 
 // ── Stages ──────────────────────────────────────────────────────────────────
 
@@ -487,4 +487,176 @@ export function deckCardState(
   const running = latest.status === "PENDING" || latest.status === "PROCESSING";
   if (running) return latest.intakeOnly ? "reading" : null; // a screen in progress needs no pill
   return !screened && stage === "SUBMITTED" ? "not-screened" : null;
+}
+
+// ── Angels (spec §8, §10) ───────────────────────────────────────────────────
+
+export const ANGEL_STATUS_LABELS: Record<AngelStatus, string> = { PROSPECT: "Prospect", MEMBER: "Member", LAPSED: "Lapsed" };
+
+export const CERTIFICATION_LABELS: Record<CertificationType, string> = {
+  HIGH_NET_WORTH: "High net worth",
+  SELF_CERTIFIED_SOPHISTICATED: "Self-certified sophisticated",
+  CERTIFIED_SOPHISTICATED: "Certified sophisticated (FCA firm)",
+};
+
+/**
+ * How long each FCA investor statement lets DXV send an angel financial promotions
+ * (COBS 4.12): HNW and self-certified sophisticated statements must be signed in the
+ * last 12 months; a certified sophisticated investor certificate lasts 36 months.
+ * To be confirmed by Kevin.
+ */
+export const CERTIFICATION_VALID_MONTHS: Record<CertificationType, number> = {
+  HIGH_NET_WORTH: 12,
+  SELF_CERTIFIED_SOPHISTICATED: 12,
+  CERTIFIED_SOPHISTICATED: 36,
+};
+
+/** "Due soon" warning window before a statement expires. */
+export const CERT_DUE_SOON_DAYS = 30;
+
+export function certificationExpiry(type: CertificationType, signedOn: Date): Date {
+  const d = new Date(signedOn);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + CERTIFICATION_VALID_MONTHS[type]);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay)); // 29 Feb + 12 months = 28 Feb
+  return d;
+}
+
+export type CertLike = { signedOn: Date; expiresOn: Date };
+
+/** The statement that counts: the most recently signed. */
+export function latestCertification<T extends CertLike>(certs: T[]): T | null {
+  return certs.reduce<T | null>((best, c) => (!best || c.signedOn > best.signedOn ? c : best), null);
+}
+
+export type CertState = "current" | "due-soon" | "overdue" | "none";
+
+export function certState(latest: CertLike | null | undefined, now: Date = new Date()): CertState {
+  if (!latest) return "none";
+  const msLeft = latest.expiresOn.getTime() - now.getTime();
+  if (msLeft <= 0) return "overdue";
+  return msLeft <= CERT_DUE_SOON_DAYS * 86_400_000 ? "due-soon" : "current";
+}
+
+export const CERT_STATE_LABELS: Record<CertState, string> = { current: "Current", "due-soon": "Due soon", overdue: "Overdue", none: "Not certified" };
+
+/** Members must hold a current statement; for them "none" is overdue too (the headline compliance number). */
+export function certNeedsAction(status: AngelStatus, state: CertState): boolean {
+  return status === "MEMBER" && (state === "overdue" || state === "none");
+}
+
+/**
+ * The compliance gate (spec §10): who may see live deal terms and vote, once angels log
+ * in. Enforce it on the server wherever angel-facing deal data is served.
+ */
+export function canSeeLiveDeals(angel: { status: AngelStatus; archivedAt: Date | null }, latest: CertLike | null, now: Date = new Date()): boolean {
+  if (angel.status !== "MEMBER" || angel.archivedAt) return false;
+  const s = certState(latest, now);
+  return s === "current" || s === "due-soon";
+}
+
+/** Tags the team can pick from (free text allowed). Only record what the angel has shared. */
+export const ANGEL_TAG_SUGGESTIONS = ["Woman angel", "First-time angel", "Founder", "Operator", "Lead angel experience"] as const;
+
+/** A comma-separated list as typed: trimmed, blanks dropped, duplicates (any case) removed. */
+export function parseList(raw: string | null | undefined): string[] {
+  const out: string[] = [];
+  for (const part of (raw ?? "").split(/[,;\n]/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
+}
+
+export type AngelFilter = "all" | "members" | "prospects" | "action" | "due-soon" | "lapsed";
+
+export function parseAngelFilter(value: string | string[] | undefined): AngelFilter {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v === "members" || v === "prospects" || v === "action" || v === "due-soon" || v === "lapsed" ? v : "all";
+}
+
+export function matchesAngelFilter(filter: AngelFilter, status: AngelStatus, state: CertState): boolean {
+  switch (filter) {
+    case "members":
+      return status === "MEMBER";
+    case "prospects":
+      return status === "PROSPECT";
+    case "action":
+      return certNeedsAction(status, state);
+    case "due-soon":
+      return status === "MEMBER" && state === "due-soon";
+    case "lapsed":
+      return status === "LAPSED";
+    default:
+      return true;
+  }
+}
+
+/**
+ * Suggest which angel a name typed on a vote means: the exact name, else a unique
+ * "First L" / first-name-only match (e.g. "Kevin W" = Kevin Walker). Null when unsure.
+ */
+export function suggestAngelMatch(typed: string, angels: { id: string; name: string }[]): string | null {
+  const t = normaliseAngelName(typed).replace(/\./g, "");
+  if (!t) return null;
+  const exact = angels.filter((a) => normaliseAngelName(a.name) === t);
+  if (exact.length === 1) return exact[0].id;
+  const [first, second] = t.split(" ");
+  const candidates = angels.filter((a) => {
+    const [f, ...rest] = normaliseAngelName(a.name).split(" ");
+    const last = rest.at(-1) ?? "";
+    if (f !== first) return false;
+    if (!second) return true;
+    return second.length <= 2 ? last.startsWith(second[0]) : last === second;
+  });
+  return candidates.length === 1 ? candidates[0].id : null;
+}
+
+/** Groups of possible duplicate angels: same email, or same name. */
+export function findDuplicateAngels<T extends { id: string; name: string; email: string | null }>(angels: T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const a of angels) {
+    for (const key of [a.email ? `e:${a.email.trim().toLowerCase()}` : null, `n:${normaliseAngelName(a.name)}`]) {
+      if (key) groups.set(key, [...(groups.get(key) ?? []), a]);
+    }
+  }
+  const seen = new Set<string>();
+  const out: T[][] = [];
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const sig = g.map((a) => a.id).sort().join(",");
+    if (!seen.has(sig)) {
+      seen.add(sig);
+      out.push(g);
+    }
+  }
+  return out;
+}
+
+/** Which angel a vote or investment belongs to: picked from the list, else a confirmed alias of the typed name. */
+export function resolveAngelId(row: { angelId: string | null; angelName: string }, aliases: Map<string, string>): string | null {
+  return row.angelId ?? aliases.get(normaliseAngelName(row.angelName)) ?? null;
+}
+
+/**
+ * An angel's totals: committed = their latest EOI per deal (if interested), summed;
+ * invested = paid final investment tickets. Removed entries are excluded by the caller.
+ */
+export function angelTotals(
+  eois: { ventureId: string; interested: boolean; maxTicketGbp: number; createdAt: Date }[],
+  finals: { ticketGbp: number; paidAt: Date | null }[],
+): { committedGbp: number; investedGbp: number; deals: number } {
+  const latest = new Map<string, (typeof eois)[number]>();
+  for (const e of eois) {
+    const cur = latest.get(e.ventureId);
+    if (!cur || e.createdAt >= cur.createdAt) latest.set(e.ventureId, e);
+  }
+  const committed = [...latest.values()].filter((e) => e.interested);
+  return {
+    committedGbp: committed.reduce((a, e) => a + e.maxTicketGbp, 0),
+    investedGbp: finals.filter((f) => f.paidAt).reduce((a, f) => a + f.ticketGbp, 0),
+    deals: committed.length,
+  };
 }

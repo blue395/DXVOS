@@ -13,9 +13,13 @@ export function deckFileProblem(file: File): string | null {
 }
 
 export async function uploadDeckFile(target: UploadTarget, file: File): Promise<void> {
+  return uploadFile(target, file, "application/pdf");
+}
+
+export async function uploadFile(target: UploadTarget, file: File, contentType: string): Promise<void> {
   if (target.kind === "supabase") {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
-    const { error } = await sb.storage.from(target.bucket).uploadToSignedUrl(target.path, target.token, file, { contentType: "application/pdf" });
+    const { error } = await sb.storage.from(target.bucket).uploadToSignedUrl(target.path, target.token, file, { contentType });
     if (error) throw new Error(`Upload failed: ${error.message}`);
   } else {
     const res = await fetch(target.url, { method: "PUT", body: file });

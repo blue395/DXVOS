@@ -3,13 +3,14 @@ import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dealsByStage, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
+import { loadAngelRows } from "@/lib/angels";
 
 // Admin-only (spec: angels must never see the Dashboard or Activity, even once they
 // can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function DashboardPage() {
   const now = new Date();
 
-  const [ventures, awaiting] = await requireAdminWith(() =>
+  const [ventures, awaiting, angels] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findMany({
         select: {
@@ -24,8 +25,11 @@ export default async function DashboardPage() {
         orderBy: { createdAt: "asc" },
         include: { venture: { select: { id: true, name: true } } },
       }),
+      loadAngelRows(),
     ]),
   );
+  const members = angels.filter((a) => a.status === "MEMBER").length;
+  const certNeeded = angels.filter((a) => a.needsAction).length;
 
   const byStage = dealsByStage(ventures.map((v) => v.currentStage));
   const maxCount = Math.max(1, ...byStage.map((s) => s.count));
@@ -43,7 +47,13 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-semibold text-dxv-green">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <Metric label="Angels" value="–" note="Coming with the Angels module" />
+        <Metric
+          label="Angels"
+          value={members}
+          href={certNeeded ? "/angels?filter=action" : "/angels"}
+          note={certNeeded ? `${certNeeded} need certification` : "Members, all certified"}
+          alarm={certNeeded > 0}
+        />
         <Metric label="Live Deals" value={metrics.liveDeals} href="/deals" />
         <Metric label="In DD" value={metrics.inDueDiligence} href="/deals" />
         <Metric label="Investments" value={metrics.investments} />
@@ -121,6 +131,7 @@ function Metric({
   href,
   title,
   wide,
+  alarm,
 }: {
   label: string;
   value: number | string;
@@ -129,6 +140,8 @@ function Metric({
   title?: string;
   /** Full width on phones (the fifth tile would otherwise sit alone at half width). */
   wide?: boolean;
+  /** Needs attention (the note becomes a yellow flag). */
+  alarm?: boolean;
 }) {
   const body = (
     <>
@@ -137,7 +150,9 @@ function Metric({
         {value}
       </p>
       {/* Same height on every tile, so the numbers line up across the row. */}
-      <p className="mt-2 h-4 text-xs text-black/45">{note}</p>
+      <p className={`mt-2 h-4 text-xs ${alarm ? "" : "text-black/45"}`}>
+        {alarm ? <span className="rounded-full bg-dxv-yellow px-2 py-0.5 font-semibold text-black ring-1 ring-black/20">! {note}</span> : note}
+      </p>
     </>
   );
   const cls = `flex flex-col items-center justify-center rounded-lg border border-black/10 bg-white px-4 py-7 text-center ${

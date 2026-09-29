@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminWith } from "@/lib/auth";
+import { angelNameOptions } from "@/lib/angels";
 import { db } from "@/lib/db";
 import {
   GATE_LABELS,
@@ -51,7 +52,7 @@ import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../invest
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
 
-  const [v, { _max }] = await requireAdminWith(() =>
+  const [v, { _max }, angelNames] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -98,6 +99,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
         },
       }),
       db.venture.aggregate({ _max: { round: true } }),
+      angelNameOptions(),
     ]),
   );
   if (!v) notFound();
@@ -148,6 +150,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
   return (
     <div className="space-y-6">
+      {/* Autocomplete for every angel-name field on this page: picking a name links the entry to that angel. */}
+      <datalist id="dxv-angel-names">
+        {angelNames.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
       {/* ── Header ── */}
       <div>
         <Link href="/deals" className="text-sm text-dxv-green hover:underline">
@@ -318,7 +326,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 <ActionForm action={addPreSelectionVote.bind(null, v.id)} className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <Field label="Angel *">
-                      <input name="angelName" required className={inputClass} />
+                      <input name="angelName" required list="dxv-angel-names" autoComplete="off" className={inputClass} />
                     </Field>
                     <Field label="Interested? *">
                       <InterestSelect />

@@ -91,7 +91,7 @@ function EoiFields({ v }: { v?: EoiEntry }) {
   return (
     <div className="grid gap-3 sm:grid-cols-4">
       <Field label="Angel *">
-        <input name="angelName" required defaultValue={v?.angelName} className={inputClass} />
+        <input name="angelName" required list="dxv-angel-names" autoComplete="off" defaultValue={v?.angelName} className={inputClass} />
       </Field>
       <Field label="Interested? *">
         <InterestSelect defaultValue={v ? (v.interested ? "yes" : "no") : ""} />
@@ -176,7 +176,7 @@ function FinalFields({ v, withPaid }: { v?: FinalEntry; withPaid?: boolean }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <Field label="Angel *">
-        <input name="angelName" required defaultValue={v?.angelName} className={inputClass} />
+        <input name="angelName" required list="dxv-angel-names" autoComplete="off" defaultValue={v?.angelName} className={inputClass} />
       </Field>
       <Field label="Ticket (£) *">
         <input name="ticketGbp" required inputMode="numeric" defaultValue={v?.ticketGbp ?? ""} className={inputClass} />
