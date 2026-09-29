@@ -4,8 +4,8 @@ import { dehydrateDecks, rehydrateDecks } from "../brain-worker";
 import { DEFAULT_ASSESSMENT, DEFAULT_ELIGIBILITY } from "../playbook/defaults";
 import { fakeBrainCall } from "./mock";
 import { chatTitle, dealIdFromPath } from "./page";
-import { BRAIN_MODEL, buildBrainSystem, questionNote, type BrainContext } from "./prompt";
-import { BrainError, runBrainTurn, type BrainModelCall } from "./run";
+import { BRAIN_MODEL, BRAIN_SETUP_VERSION, brainSearchLimit, buildBrainSystem, questionNote, type BrainContext } from "./prompt";
+import { brainParams, BrainError, runBrainTurn, type BrainModelCall } from "./run";
 import { BRAIN_TOOLS, DECK_MARKER } from "./tools";
 
 type Msg = Anthropic.Beta.BetaMessage;
@@ -28,6 +28,20 @@ describe("Brain instructions", () => {
     expect(s).toContain("[due diligence] Check the cap table early");
     expect(s).toContain("never change it");
     expect(buildBrainSystem(ctx)).toBe(s); // stable, so Claude can cache it
+  });
+
+  it("keep each chat's setup fixed: older chats keep 5 searches and their exact instructions", () => {
+    const v1 = buildBrainSystem(ctx); // chats from before setup versions have no `setup`
+    const v2 = buildBrainSystem({ ...ctx, setup: 2 });
+    expect(v1).not.toContain("web searches per question");
+    expect(v2).toContain("You have up to 12 web searches per question");
+    expect(v2).toContain("a follow-up question in this same chat gets a fresh allowance");
+    expect(v2.replace(/\n- You have up to 12 web searches[^\n]*/, "")).toBe(v1); // the only difference
+    const search = (setup?: number) => (brainParams("s", ask("q"), setup).tools ?? []).find((t) => "name" in t && t.name === "web_search") as { max_uses: number };
+    expect(search().max_uses).toBe(5);
+    expect(search(2).max_uses).toBe(12);
+    expect(BRAIN_SETUP_VERSION).toBe(2);
+    expect(brainSearchLimit(BRAIN_SETUP_VERSION)).toBe(12);
   });
 
   it("note which deal page a question came from", () => {
