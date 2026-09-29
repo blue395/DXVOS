@@ -194,3 +194,20 @@ export function Spinner({ className = "h-3.5 w-3.5" }: { className?: string }) {
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div aria-hidden className={`animate-pulse rounded-md bg-black/[0.06] ${className}`} />;
 }
+
+const exportLinkClass =
+  "inline-flex items-center rounded-md border border-dxv-green/30 bg-white px-2 py-1 text-xs font-medium text-dxv-green transition hover:-translate-y-px hover:border-dxv-green hover:bg-dxv-green/10";
+
+/** "Export: PDF | Word" for a document DXV OS created (href = /api/export/<kind>/<id>). */
+export function ExportLinks({ href, formats = ["pdf", "docx"] }: { href: string; formats?: ("pdf" | "docx")[] }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs">
+      <span className="text-black/50">Export:</span>
+      {formats.map((f) => (
+        <a key={f} href={`${href}?format=${f}`} download className={exportLinkClass} title={f === "pdf" ? "Download as PDF" : "Download as a Word document"}>
+          {f === "pdf" ? "PDF" : "Word"}
+        </a>
+      ))}
+    </span>
+  );
+}

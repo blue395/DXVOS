@@ -150,6 +150,17 @@ it under Documents → Due diligence. Each run is recorded in `DDReportJob`; a n
 are kept). Prompt: `src/lib/dd-doc/prompt.ts`; layout: `src/lib/dd-doc/build.ts`. Runs in the Netlify background
 function `generate-dd-background`.
 
+## Exporting documents (PDF and Word)
+
+Every document DXV OS writes has **Export: PDF | Word** buttons: the eligibility screen, the investment memo
+(AI Draft, DXV Review Draft, DXV Review Issue) and the DD report (stored as Word; PDF on export).
+- Each document type is described once as a `DocSpec` (`src/lib/export/spec.ts`: cover + blocks) in
+  `src/lib/export/documents.ts` (screen, memo) and `src/lib/dd-doc/build.ts` (DD report).
+- Two renderers turn the same spec into a DXV-branded file: `export/docx.ts` (docx library) and
+  `export/pdf.ts` (pdf-lib, built-in Helvetica, so no browser or system fonts are needed on Netlify).
+- Route: `/api/export/<screen|ai-draft|draft|issue|dd>/<id>?format=pdf|docx` (admin only). Drafts carry
+  the app-rendered review banner; issues carry the "issued by" footer.
+
 ## Documents (DXV OS is the document store)
 
 Every deal has a **Documents** section: PDF, Word and Excel files up to 50 MB, tagged Deck, Memo, Due

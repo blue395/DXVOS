@@ -2,10 +2,11 @@
 import type { Stage } from "@/generated/prisma/enums";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
 import { canCreateDDDocument } from "@/lib/pipeline";
-import { AiTag, formatDateTime } from "@/components/ui";
+import { AiTag, ExportLinks, formatDateTime } from "@/components/ui";
 import { CreateDDDocumentButton } from "./dd-document-client";
 
 export type DDJobRow = {
+  id: string;
   status: DeckStatus;
   error: string | null;
   createdAt: Date;
@@ -51,6 +52,7 @@ export function DDDocumentPanel({ ventureId, stage, latest }: { ventureId: strin
             {latest.createdBy.name}, {formatDateTime(latest.completedAt ?? latest.createdAt)}
             {latest.document.archivedAt ? " · archived" : " · also under Documents"}
           </span>
+          <ExportLinks href={`/api/export/dd/${latest.id}`} formats={["pdf"]} />
         </p>
       )}
     </div>

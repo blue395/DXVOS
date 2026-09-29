@@ -250,6 +250,13 @@ export function canDecideEligibility(stage: Stage): boolean {
   return stage === "SUBMITTED" || stage === "ELIGIBILITY_SCREEN";
 }
 
+/** How each human eligibility decision reads (deal page and exports). */
+export const ELIGIBILITY_DECISION_LABELS = {
+  PROCEED: "Proceed to pipeline",
+  DECLINE: "Decline",
+  NEED_MORE_INFO: "Request more information",
+} as const;
+
 /** Where each decision moves the deal. "Need more info" doesn't move it. */
 export const ELIGIBILITY_DECISION_TARGET = {
   PROCEED: "PARTNER_REVIEW",

@@ -2,8 +2,8 @@ import type { EligibilityDecision, PassReason, Stage } from "@/generated/prisma/
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import { renderScreen } from "@/lib/deck-ai/render";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
-import { canDecideEligibility, PASS_REASON_LABELS } from "@/lib/pipeline";
-import { AiTag, Card, formatDateTime } from "@/components/ui";
+import { canDecideEligibility, ELIGIBILITY_DECISION_LABELS, PASS_REASON_LABELS } from "@/lib/pipeline";
+import { AiTag, Card, formatDateTime, ExportLinks } from "@/components/ui";
 import { decideEligibility } from "../deck-actions";
 import { CopyButton, DecisionForm, DeckUploadForVenture, RerunButton } from "./eligibility-client";
 
@@ -29,11 +29,7 @@ type Review = {
   decidedBy: { name: string };
 };
 
-const DECISION_TEXT: Record<EligibilityDecision, string> = {
-  PROCEED: "Proceed to pipeline",
-  DECLINE: "Decline",
-  NEED_MORE_INFO: "Request more information",
-};
+const DECISION_TEXT: Record<EligibilityDecision, string> = ELIGIBILITY_DECISION_LABELS;
 
 /**
  * The AI's eligibility screen next to the human decision. The screen is a first
@@ -198,6 +194,7 @@ function ScreenView({
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-black/50">
         <CopyButton text={renderScreen(screen)} />
+        <ExportLinks href={`/api/export/screen/${analysis.id}`} />
         <RerunButton ventureId={ventureId} />
         <span>
           {analysis.fileName} · {analysis.model} · run by {analysis.createdBy.name} ·{" "}

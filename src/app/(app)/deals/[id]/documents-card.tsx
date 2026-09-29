@@ -16,6 +16,8 @@ export type DocRow = {
   ddItemId: string | null;
   ddItem: { title: string } | null;
   isMemoVersion: boolean;
+  /** Set for DD reports DXV OS generated: offers a PDF export alongside the Word file. */
+  ddReportJobId?: string | null;
 };
 
 /** Every document on the deal, grouped by category. DXV OS is the document store. */
@@ -59,6 +61,11 @@ export function DocumentItem({ d, showArchive = true }: { d: DocRow; showArchive
       <a href={`/api/documents/${d.id}?download=1`} className="text-xs text-dxv-green hover:underline">
         Download
       </a>
+      {d.ddReportJobId && (
+        <a href={`/api/export/dd/${d.ddReportJobId}?format=pdf`} download className="text-xs text-dxv-green hover:underline" title="Download this DD report as a PDF">
+          PDF
+        </a>
+      )}
       {showArchive && !d.isMemoVersion && <ArchiveDocumentButton documentId={d.id} fileName={d.fileName} />}
       {d.note && <p className="w-full text-xs text-black/55">{d.note}</p>}
     </li>

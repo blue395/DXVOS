@@ -6,7 +6,7 @@ import { effectiveDeckStatus } from "@/lib/deck-status";
 import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { totalScore, MAX_TOTAL_SCORE, type MemoContent } from "@/lib/memo-ai/schema";
 import { canGenerateAssessment } from "@/lib/pipeline";
-import { AiTag, Card, formatDateTime, StageBadge } from "@/components/ui";
+import { AiTag, Card, ExportLinks, formatDateTime, StageBadge } from "@/components/ui";
 import { CopyButton } from "../eligibility-client";
 import { FinaliseForm, GenerateButton, MemoTextForm, ReviseIssueButton, ScoreRow, StartReviewButton } from "./assessment-client";
 import { MemoView, ReviewBanner, TotalScore } from "./memo-view";
@@ -160,6 +160,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
                 <MemoView m={m} />
                 <div className="flex flex-wrap items-center gap-2 border-t border-black/10 pt-3 text-xs text-black/50">
                   <CopyButton text={renderMemo(m, { banner: true })} label="Copy as text" />
+                  <ExportLinks href={`/api/export/ai-draft/${a.id}`} />
                   <AiTag>AI Draft</AiTag>
                   <span>
                     {a.model} · run by {a.createdBy.name} · {formatDateTime(a.completedAt ?? a.createdAt)}
@@ -227,6 +228,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
               <div className="flex flex-wrap items-end gap-3">
                 <FinaliseForm draftId={draft.id} issueName={reviewIssueName(draft.number)} />
                 <CopyButton text={renderMemo(m, { banner: true })} label="Copy as text" />
+                <ExportLinks href={`/api/export/draft/${draft.id}`} />
               </div>
             </Card>
           </div>
@@ -248,6 +250,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
                 <span className="flex flex-wrap items-center gap-2">
                   {isLatestIssue && !draft && <ReviseIssueButton memoVersionId={mv.id} draftName={reviewDraftName(nextIssue)} />}
                   <CopyButton text={renderMemo(m, { banner: false, footer })} label="Copy as text" />
+                  <ExportLinks href={`/api/export/issue/${mv.id}`} />
                 </span>
               }
             >
