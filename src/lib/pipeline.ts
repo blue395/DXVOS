@@ -660,3 +660,55 @@ export function angelTotals(
     deals: committed.length,
   };
 }
+
+// ── Angel portal onboarding ─────────────────────────────────────────────────
+
+/** Onboarding answers (what the angel tells us about themselves). */
+export const TICKET_RANGES = ["Under £1k", "£1k to £2k", "£2k to £5k", "£5k to £10k", "£10k to £25k", "£25k+"] as const;
+export const EXPERIENCE_LEVELS = ["I haven't made an angel investment yet", "1 to 5 angel investments", "6 or more angel investments", "I invest professionally"] as const;
+export const SECTOR_SUGGESTIONS = ["Fintech", "Healthtech", "Climate", "Edtech", "Consumer", "B2B SaaS", "Deeptech", "Impact", "Creative industries", "Food"] as const;
+
+export type OnboardingStep = "profile" | "certify" | "welcome" | "done";
+
+/**
+ * The next onboarding step for an angel who has signed in (terms were accepted when they
+ * set their password): confirm or fill in their profile, then certify (or say no exemption
+ * applies), then the welcome. Certify is done when their statement is current.
+ */
+export function nextOnboardingStep(
+  a: { profileConfirmedAt: Date | null; restrictedDeclaredAt: Date | null; onboardedAt: Date | null },
+  latest: CertLike | null,
+  now: Date = new Date(),
+): OnboardingStep {
+  if (!a.profileConfirmedAt) return "profile";
+  const s = certState(latest, now);
+  if (s !== "current" && s !== "due-soon" && !a.restrictedDeclaredAt) return "certify";
+  return a.onboardedAt ? "done" : "welcome";
+}
+
+/** Where an angel's portal access stands, for the admin view. */
+export type PortalState = "not-invited" | "invited" | "invite-expired" | "onboarding" | "active" | "revoked";
+
+export function portalState(
+  a: { onboardedAt: Date | null },
+  user: { disabledAt: Date | null } | null,
+  latestInvite: { expiresAt: Date; usedAt: Date | null; revokedAt: Date | null; kind: "INVITE" | "RESET" } | null,
+  now: Date = new Date(),
+): PortalState {
+  if (user?.disabledAt) return "revoked";
+  if (user) return a.onboardedAt ? "active" : "onboarding";
+  if (!latestInvite || latestInvite.kind !== "INVITE" || latestInvite.revokedAt) return "not-invited";
+  return latestInvite.expiresAt > now ? "invited" : "invite-expired";
+}
+
+export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
+  "not-invited": "Not invited",
+  invited: "Invited (link not used yet)",
+  "invite-expired": "Invite expired",
+  onboarding: "Signed up, onboarding",
+  active: "Active on the portal",
+  revoked: "Access revoked",
+};
+
+/** Minimum password length for angel logins. */
+export const MIN_PASSWORD_LENGTH = 10;

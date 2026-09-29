@@ -13,8 +13,12 @@ import {
   formatGbp,
   latestCertification,
   normaliseAngelName,
+  PORTAL_STATE_LABELS,
+  portalState,
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
+import { complianceReady } from "@/lib/compliance";
+import { AccessButton, PortalLinkButton } from "./portal-client";
 import { AngelFields } from "../angel-fields";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
 import { ArchiveAngelButton, CertificationForm, UnlinkAliasButton } from "./angel-client";
@@ -23,12 +27,18 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
   const { id } = await params;
   const venture = { select: { id: true, name: true, currentStage: true } } as const;
 
-  const [angel, eois, preVotes, finals] = await requireAdminWith(() =>
+  const [angel, eois, preVotes, finals, ready] = await requireAdminWith(() =>
     Promise.all([
       db.angel.findUnique({
         where: { id },
         include: {
-          certifications: { orderBy: { signedOn: "desc" }, include: { recordedBy: { select: { name: true } } } },
+          certifications: {
+            orderBy: { signedOn: "desc" },
+            include: { recordedBy: { select: { name: true } }, complianceText: { select: { version: true } } },
+          },
+          user: { select: { id: true, disabledAt: true, lastSignInAt: true } },
+          invites: { orderBy: { createdAt: "desc" }, take: 1 },
+          events: { orderBy: { createdAt: "desc" }, take: 30 },
           notes: { orderBy: { createdAt: "desc" }, include: { author: { select: { name: true } } } },
           aliases: { orderBy: { createdAt: "asc" }, include: { confirmedBy: { select: { name: true } } } },
           createdBy: { select: { name: true } },
@@ -38,6 +48,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
       db.investmentVote.findMany({ where: { removedAt: null, OR: [{ angelId: id }, { angelId: null }] }, orderBy: { createdAt: "desc" }, include: { venture } }),
       db.preSelectionVote.findMany({ where: { OR: [{ angelId: id }, { angelId: null }] }, orderBy: { createdAt: "desc" }, include: { venture } }),
       db.finalInvestment.findMany({ where: { removedAt: null, OR: [{ angelId: id }, { angelId: null }] }, orderBy: { createdAt: "desc" }, include: { venture } }),
+      complianceReady(),
     ]),
   );
   if (!angel) notFound();
@@ -53,6 +64,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
   const state = certState(latest);
   const member = angel.status === "MEMBER";
   const gateOpen = canSeeLiveDeals(angel, latest);
+  const portal = portalState(angel, angel.user, angel.invites[0] ?? null);
 
   return (
     <div className="space-y-5">
@@ -107,9 +119,13 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                         <strong>{CERTIFICATION_LABELS[c.type]}</strong>
                         {i === 0 && <span className="ml-1.5 rounded-full bg-dxv-green/10 px-1.5 text-[10px] font-semibold uppercase text-dxv-green">Counts</span>}
                         <span className="block text-xs text-black/55">
-                          Signed {formatDate(c.signedOn)} · valid to {formatDate(c.expiresOn)} · recorded by {c.recordedBy.name}
-                          {c.note && ` · ${c.note}`}
+                          Signed {formatDate(c.signedOn)} · valid to {formatDate(c.expiresOn)} ·{" "}
+                          {c.signedByAngel ? `signed by the angel in the portal ("${c.signatureName}", wording v${c.complianceText?.version ?? "?"})` : `recorded by ${c.recordedBy.name}`}
+                          {c.note && !c.signedByAngel && ` · ${c.note}`}
                         </span>
+                        {c.signedByAngel && c.criteria.length > 0 && (
+                          <span className="mt-0.5 block text-xs text-black/50">Criteria ticked: {c.criteria.map((x) => x.split(".")[0]).join("; ")}</span>
+                        )}
                       </span>
                       {c.fileName && (
                         <a href={`/api/angels/certifications/${c.id}`} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-dxv-green underline">
@@ -182,12 +198,54 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
         </div>
 
         <div className="space-y-5">
+          <Card title="Portal access">
+            <div className="space-y-3 text-sm">
+              <p>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${portal === "active" ? "bg-dxv-green text-white" : portal === "revoked" ? "bg-black text-white" : "bg-black/5 text-black/70"}`}>
+                  {PORTAL_STATE_LABELS[portal]}
+                </span>
+                {angel.user?.lastSignInAt && <span className="ml-2 text-xs text-black/50">last signed in {formatDate(angel.user.lastSignInAt)}</span>}
+              </p>
+              {!ready.ready && (
+                <p className="rounded bg-dxv-yellow/30 px-2 py-1 text-xs">
+                  Invites are paused until the investor statements and member terms are approved.{" "}
+                  <Link href="/angels/statements" className="font-medium underline">
+                    Review them
+                  </Link>
+                </p>
+              )}
+              {!angel.user && ready.ready && (
+                <PortalLinkButton angelId={angel.id} kind="INVITE" label={portal === "invited" ? "Make a new invite link" : "Create invite link"} />
+              )}
+              {angel.user && !angel.user.disabledAt && <PortalLinkButton angelId={angel.id} kind="RESET" label="Password reset link" />}
+              {angel.user && <AccessButton angelId={angel.id} enabled={!!angel.user.disabledAt} />}
+              <Link href={`/angels/${angel.id}/preview`} className="block text-xs font-medium text-dxv-green underline">
+                Preview their portal
+              </Link>
+              {angel.events.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-black/60">Portal activity ({angel.events.length})</summary>
+                  <ul className="mt-1 space-y-0.5 text-black/60">
+                    {angel.events.map((e) => (
+                      <li key={e.id}>
+                        {formatDateTime(e.createdAt)}: {e.kind.replace(/-/g, " ")}
+                        {e.detail && ` (${e.detail})`}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </Card>
+
           <Card title="Profile">
             <dl className="space-y-2.5 text-sm">
               <Item label="Sectors">{angel.sectors.length ? <Chips items={angel.sectors} /> : "–"}</Item>
               <Item label="WhatsApp groups">{angel.whatsappGroups.length ? <Chips items={angel.whatsappGroups} className="bg-black/5 text-black/75" /> : "–"}</Item>
               <Item label="Member since">{angel.joinedAt ? formatDate(angel.joinedAt) : "–"}</Item>
               <Item label="Came to DXV via">{angel.source ?? "–"}</Item>
+              <Item label="Typical cheque">{angel.ticketRange ?? "–"}</Item>
+              <Item label="Experience">{angel.experience ?? "–"}</Item>
               {angel.bio && <Item label="Bio">{angel.bio}</Item>}
               <Item label="Added">
                 {formatDate(angel.createdAt)} by {angel.createdBy.name}

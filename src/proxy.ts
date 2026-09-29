@@ -13,7 +13,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except the login page, Next internals, static files, and Netlify's
-  // own function endpoints (the deck worker authenticates its calls itself).
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|\\.netlify).*)"],
+  // Everything except the login page, invite links (/join: the one-time token is the
+  // check), Next internals, static files, and Netlify's own function endpoints (the
+  // workers authenticate their calls themselves).
+  matcher: ["/((?!login|join|_next/static|_next/image|favicon.ico|\\.netlify).*)"],
 };
