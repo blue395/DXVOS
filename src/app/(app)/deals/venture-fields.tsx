@@ -1,4 +1,5 @@
 import { Field, inputClass } from "@/components/ui";
+import { CompanyStageField } from "./company-stage-field";
 import { LeadAngelField } from "./lead-angel-field";
 
 type VentureValues = {
@@ -57,9 +58,7 @@ export function VentureFields({
       <Field aiSuggested={tag("sector")} label="Sector">
         <input name="sector" defaultValue={v.sector ?? ""} className={inputClass} />
       </Field>
-      <Field aiSuggested={tag("companyStage")} label="Company stage" hint="e.g. Pre-seed, Seed">
-        <input name="companyStage" defaultValue={v.companyStage ?? ""} className={inputClass} />
-      </Field>
+      <CompanyStageField value={v.companyStage} aiSuggested={tag("companyStage")} />
       <Field aiSuggested={tag("raiseAmountGbp")} label="Raise amount (£)">
         <input name="raiseAmountGbp" inputMode="numeric" defaultValue={v.raiseAmountGbp ?? ""} className={inputClass} />
       </Field>

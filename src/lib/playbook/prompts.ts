@@ -45,7 +45,7 @@ export function buildDeckUserInstructions(p: EligibilityPlaybook): string {
    - founderEmail: a contact email if one is shown
    - website: the company website as a full URL starting with https:// if one is shown
    - sector: short sector label, e.g. "Fintech", "Healthtech"
-   - companyStage: "Pre-seed", "Seed", "Series A" etc., only if the deck states it or states the round being raised
+   - companyStage: one of "Pre-Seed", "Seed", "Series A", "Bridge Round", or the stage as written if it is none of these; only if the deck states it or states the round being raised
    - raiseAmountGbp: amount being raised, in whole pounds, only if stated in GBP (null if another currency or not stated)
    - description: two or three plain sentences on what the company does and for whom
 

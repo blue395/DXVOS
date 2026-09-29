@@ -16,7 +16,7 @@ export async function GET() {
     // PENDING decks are still uploading (the uploader shows that itself).
     db.deckAnalysis.findMany({
       where: { createdAt: { gte: since }, status: { not: "PENDING" } },
-      select: { id: true, fileName: true, ventureId: true, venture: { select: { name: true } }, ...common },
+      select: { id: true, fileName: true, intakeOnly: true, ventureId: true, venture: { select: { name: true } }, ...common },
     }),
     db.memoAnalysis.findMany({
       where: { createdAt: { gte: since } },
@@ -31,12 +31,12 @@ export async function GET() {
   const jobs: Job[] = [
     ...decks.map((d) => ({
       id: d.id,
-      kind: "eligibility" as const,
+      kind: d.intakeOnly ? ("intake" as const) : ("eligibility" as const),
       ventureName: d.venture?.name ?? d.fileName,
       href: d.ventureId ? `/deals/${d.ventureId}` : "/deals/new",
       ...effectiveDeckStatus(d),
       startedAt: (d.startedAt ?? d.createdAt).toISOString(),
-      result: "Eligibility screen ready",
+      result: d.intakeOnly ? "Deck stored, ready to screen" : "Eligibility screen ready",
     })),
     ...memos.map((m) => ({
       id: m.id,

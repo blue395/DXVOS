@@ -5,6 +5,7 @@ import {
   boardHref,
   cardOneLiner,
   daysSince,
+  deckCardState,
   dealWarnings,
   PASS_REASON_LABELS,
   parseDeclinedFilter,
@@ -12,6 +13,7 @@ import {
   type RoundFilter,
 } from "@/lib/pipeline";
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
+import { effectiveDeckStatus } from "@/lib/deck-status";
 import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "../kanban-board";
 import { DeclinedPill } from "../declined-pill";
@@ -57,17 +59,25 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   // Per deal: when the deck was first uploaded (the "submitted" clock starts at the
   // upload for the eligibility check), and the latest AI one-line summary.
   const ids = ventures.map((v) => v.id);
-  const [firstUploads, screens] = await Promise.all([
+  // Also each deal's latest deck job, for the "Reading deck…" / "Not screened" pills.
+  const [firstUploads, screens, latestJobs] = await Promise.all([
     db.deckAnalysis.groupBy({ by: ["ventureId"], where: { ventureId: { in: ids } }, _min: { createdAt: true } }),
     db.deckAnalysis.findMany({
-      where: { ventureId: { in: ids }, status: "COMPLETE" },
+      where: { ventureId: { in: ids }, status: "COMPLETE", intakeOnly: false },
       orderBy: { completedAt: "desc" },
       distinct: ["ventureId"],
       select: { ventureId: true, screen: true },
     }),
+    db.deckAnalysis.findMany({
+      where: { ventureId: { in: ids } },
+      orderBy: { createdAt: "desc" },
+      distinct: ["ventureId"],
+      select: { ventureId: true, status: true, error: true, createdAt: true, startedAt: true, intakeOnly: true },
+    }),
   ]);
   const deckSince = new Map(firstUploads.map((u) => [u.ventureId, u._min.createdAt]));
   const aiSummary = new Map(screens.map((a) => [a.ventureId, (a.screen as EligibilityScreen | null)?.oneLineSummary]));
+  const latestJob = new Map(latestJobs.map((a) => [a.ventureId, { status: effectiveDeckStatus(a).status, intakeOnly: a.intakeOnly }]));
 
   const now = new Date();
   // Shape exactly what the client needs — nothing more crosses to the browser.
@@ -84,6 +94,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     daysInStage: daysSince(v.stageEnteredAt, now),
     warnings: dealWarnings(v, now),
     commsOwed: v._count.founderComms,
+    deckState: deckCardState(v.currentStage, latestJob.get(v.id), aiSummary.has(v.id)),
     leadAngel: v.leadAngel,
     declinedAt: v.passedFromStage,
     declineReason: v.passReason ? PASS_REASON_LABELS[v.passReason] : null,
@@ -108,6 +119,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       <KanbanBoard
         initialCards={cards}
         view={declined ? "declined" : "live"}
+        intakeRound={filter.kind === "round" ? filter.round : null}
         toolbar={
           <RoundFilterBar
             filter={filter}

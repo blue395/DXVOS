@@ -2,7 +2,6 @@
 
 import { announceJobStarted } from "@/lib/job-events";
 import { useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import {
   beginDeckAnalysis,
   getDeckAnalysisStatus,
@@ -10,9 +9,9 @@ import {
 } from "@/app/(app)/deals/deck-actions";
 import type { ExtractedFields } from "@/lib/deck-ai/schema";
 import { actionErrorMessage } from "@/lib/stale-version";
+import { deckFileProblem, uploadDeckFile } from "@/lib/deck-upload-client";
 
 const POLL_MS = 3000;
-const MAX_BYTES = 20 * 1024 * 1024;
 
 type Phase =
   | { kind: "idle" }
@@ -44,26 +43,15 @@ export function DeckUploader({
 
   async function handleFile(file: File) {
     if (busy) return;
-    if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== "application/pdf")) {
-      return setPhase({ kind: "failed", message: "Upload the deck as a PDF." });
-    }
-    if (file.size > MAX_BYTES) return setPhase({ kind: "failed", message: "Decks must be 20 MB or smaller." });
+    const problem = deckFileProblem(file);
+    if (problem) return setPhase({ kind: "failed", message: problem });
 
     try {
       setPhase({ kind: "uploading", fileName: file.name });
       const start = await startDeckUpload({ fileName: file.name, fileSize: file.size, ventureId });
       if ("error" in start) return setPhase({ kind: "failed", message: start.error });
 
-      if (start.target.kind === "supabase") {
-        const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
-        const { error } = await sb.storage
-          .from(start.target.bucket)
-          .uploadToSignedUrl(start.target.path, start.target.token, file, { contentType: "application/pdf" });
-        if (error) throw new Error(`Upload failed: ${error.message}`);
-      } else {
-        const res = await fetch(start.target.url, { method: "PUT", body: file });
-        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      }
+      await uploadDeckFile(start.target, file);
 
       setPhase({ kind: "reading", fileName: file.name });
       const begun = await beginDeckAnalysis(start.analysisId);

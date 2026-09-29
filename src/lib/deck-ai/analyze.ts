@@ -5,6 +5,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { DEFAULT_ELIGIBILITY } from "../playbook/defaults";
 import { buildDeckUserInstructions, buildScreeningPrompt } from "../playbook/prompts";
 import type { AiContextSnapshot, EligibilityPlaybook } from "../playbook/schema";
+import { normaliseCompanyStage } from "../pipeline";
 import { DECK_AI_MODEL } from "./prompt";
 import { DeckAnalysisOutputSchema, type DeckAnalysisOutput } from "./schema";
 import { cleanOutput } from "./render";
@@ -56,8 +57,10 @@ export async function analyzeDeck(
     throw new DeckAnalysisError("Claude's response didn't match the expected format. Try again.");
   }
 
+  const output = cleanOutput(response.parsed_output);
+  output.extracted.companyStage = normaliseCompanyStage(output.extracted.companyStage); // onto DXV's stage options
   return {
-    output: cleanOutput(response.parsed_output),
+    output,
     model: response.model,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,

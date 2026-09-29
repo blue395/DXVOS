@@ -66,12 +66,14 @@ export function JobTray() {
     newlySeen.forEach((j) => nextSeen.add(j.id));
     writeSet("dxv-jobs-seen", nextSeen);
 
-    // A job we watched just finished: refresh the page if it's showing that deal.
+    // A job we watched just finished: refresh the page if it's showing that deal, or the
+    // board (its cards show deck state, e.g. a dropped deck's name filled in).
     const finishedHrefs = [
       ...[...prevRunning.current].filter(([id]) => !running.some((j) => j.id === id)).map(([, href]) => href),
       ...newlySeen.filter((j) => !isRunning(j)).map((j) => j.href),
     ];
-    if (finishedHrefs.some((href) => window.location.pathname.startsWith(dealPath(href)))) router.refresh();
+    const here = window.location.pathname;
+    if (finishedHrefs.length > 0 && (here === "/deals" || finishedHrefs.some((href) => here.startsWith(dealPath(href))))) router.refresh();
     prevRunning.current = new Map(running.map((j) => [j.id, j.href]));
 
     setSeen(nextSeen);

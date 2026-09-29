@@ -15,7 +15,7 @@ async function dealFacts(ventureId: string) {
   const v = await db.venture.findUnique({
     where: { id: ventureId },
     include: {
-      deckAnalyses: { where: { status: "COMPLETE" }, orderBy: { completedAt: "desc" }, take: 1, select: { screen: true } },
+      deckAnalyses: { where: { status: "COMPLETE", intakeOnly: false }, orderBy: { completedAt: "desc" }, take: 1, select: { screen: true } },
       memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, take: 1, select: { content: true } },
       memoAnalyses: { where: { status: "COMPLETE" }, orderBy: { number: "desc" }, take: 1, select: { output: true } },
       stageChanges: { orderBy: { changedAt: "asc" }, select: { fromStage: true, toStage: true, note: true } },

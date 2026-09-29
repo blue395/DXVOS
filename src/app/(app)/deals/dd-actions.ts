@@ -47,7 +47,7 @@ export async function generateDDDocument(ventureId: string): Promise<ActionResul
         : null;
 
   const deck = v.deckAnalyses.find((a) => a.status !== "PENDING");
-  const screen = v.deckAnalyses.find((a) => a.status === "COMPLETE")?.screen as EligibilityScreen | undefined;
+  const screen = v.deckAnalyses.find((a) => a.status === "COMPLETE" && a.screen)?.screen as EligibilityScreen | undefined;
 
   const context: DDContext = {
     ventureName: v.name,

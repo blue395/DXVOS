@@ -48,7 +48,7 @@ export async function generateAssessment(ventureId: string): Promise<ActionResul
   // The stored deck: any upload that finished (PENDING means the upload never completed).
   const deck = v.deckAnalyses.find((a) => a.status !== "PENDING");
   if (!deck) return { error: "No deck is stored for this venture. Upload one on the Eligibility screen card first." };
-  const screen = v.deckAnalyses.find((a) => a.status === "COMPLETE")?.screen as EligibilityScreen | undefined;
+  const screen = v.deckAnalyses.find((a) => a.status === "COMPLETE" && a.screen)?.screen as EligibilityScreen | undefined;
 
   const context: MemoContext = {
     ventureName: v.name,

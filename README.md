@@ -127,6 +127,16 @@ eligibility screen using DXV's prompt template (`src/lib/deck-ai/prompt.ts`).
 - House style (no em-dashes, arrows, emoji) is enforced mechanically after the model responds.
 - Setup: `docs/DEPLOY.md` §5.
 
+**Board intake.** Drop founder decks (PDFs, several at once) on the board's **Submitted** column, or
+click its drop box. Each becomes a Submitted deal with the deck under Documents; a quick read
+(`src/lib/deck-ai/intake.ts`, `DeckAnalysis.intakeOnly`) fills only the company name, primary founder
+and stage (never overwriting what a person typed). No screen runs: the card shows **Not screened**
+until someone clicks **Run eligibility screen** on the deal page, which screens the stored deck.
+Intake-only analyses have no `screen`, so anything reading "the latest screen" must skip them.
+
+Company Stage is a dropdown (`COMPANY_STAGES` in `pipeline.ts`: Pre-Seed, Seed, Series A, Bridge Round,
+or Other with free text); AI-read stages are normalised onto it with `normaliseCompanyStage()`.
+
 ## AI-assisted investment assessment (DXV Partner Review)
 
 From DXV Partner Review onwards, a partner can click **Generate AI assessment** on a deal. Claude (Sonnet 5)

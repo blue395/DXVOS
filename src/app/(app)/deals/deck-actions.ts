@@ -213,3 +213,53 @@ export async function decideEligibility(ventureId: string, _prev: ActionResult, 
   revalidatePath("/");
   return { ok: true };
 }
+
+// ── Board intake: drop founder decks on the Submitted column ────────────────
+// Flow: startDeckIntake → (browser uploads the PDF) → finishDeckIntake, which
+// creates the deal card and asks the worker for a quick read of name, founder and
+// stage. No eligibility screen: that runs later from the deal page.
+
+const IntakeSchema = StartSchema.omit({ ventureId: true }).extend({
+  round: z.number().int().positive().nullable().optional(),
+});
+
+export async function startDeckIntake(input: z.input<typeof IntakeSchema>): Promise<StartUploadResult> {
+  const user = await requireAdmin();
+  const parsed = IntakeSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid file" };
+  const { fileName, fileSize } = parsed.data;
+
+  const id = randomUUID();
+  const storagePath = deckPath(id, fileName);
+  await db.deckAnalysis.create({ data: { id, storagePath, fileName, fileSize, intakeOnly: true, createdById: user.id } });
+  try {
+    return { analysisId: id, target: await createUploadTarget(storagePath, id) };
+  } catch (e) {
+    await markFailed(id, e instanceof Error ? e.message : "Couldn't prepare the upload.");
+    return { error: e instanceof Error ? e.message : "Couldn't prepare the upload." };
+  }
+}
+
+/** Called once the browser has uploaded the PDF: create the Submitted card, store the deck, start the read. */
+export async function finishDeckIntake(analysisId: string, round?: number | null): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const analysis = await db.deckAnalysis.findUnique({ where: { id: analysisId } });
+  if (!analysis || !analysis.intakeOnly || analysis.status !== "PENDING" || analysis.ventureId) {
+    return { error: "This upload can't be filed." };
+  }
+  // The file name stands in as the company name until the read fills it in.
+  const venture = await db.venture.create({
+    data: {
+      name: analysis.fileName,
+      round: round && Number.isInteger(round) && round > 0 ? round : null,
+      createdById: user.id,
+      stageChanges: { create: { fromStage: null, toStage: "SUBMITTED", changedById: user.id, note: "Deck uploaded from the board" } },
+    },
+  });
+  await db.deckAnalysis.update({ where: { id: analysisId }, data: { ventureId: venture.id } });
+  await recordDeckDocument(analysisId); // the deck is listed under the deal's Documents
+  await triggerWorker(analysisId);
+  revalidatePath("/deals");
+  revalidatePath("/");
+  return { ok: true };
+}

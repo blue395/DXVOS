@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Pool } from "pg";
 import { analyzeDeck, DeckAnalysisError } from "./deck-ai/analyze";
 import type { AiContextSnapshot, EligibilityPlaybook } from "./playbook/schema";
+import { readDeckIntake } from "./deck-ai/intake";
 import { fakeAnthropicClient } from "./deck-ai/mock";
 import { sslOptions } from "./db-ssl";
 import { readDeck } from "./deck-storage";
@@ -32,10 +33,16 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
   try {
     // Claim atomically: only a PENDING job can start, so a double trigger can't
     // run (and bill) the same deck twice.
-    const claimed = await pool.query<{ storagePath: string; fileName: string; aiContext: AiContextSnapshot<EligibilityPlaybook> | null }>(
+    const claimed = await pool.query<{
+      storagePath: string;
+      fileName: string;
+      aiContext: AiContextSnapshot<EligibilityPlaybook> | null;
+      intakeOnly: boolean;
+      ventureId: string | null;
+    }>(
       `UPDATE "DeckAnalysis" SET status = 'PROCESSING', "startedAt" = now(), error = NULL
        WHERE id = $1 AND status = 'PENDING'
-       RETURNING "storagePath", "fileName", "aiContext"`,
+       RETURNING "storagePath", "fileName", "aiContext", "intakeOnly", "ventureId"`,
       [analysisId],
     );
     const job = claimed.rows[0];
@@ -43,6 +50,10 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
 
     try {
       const pdf = await (deps.readDeck ?? readDeck)(job.storagePath);
+      if (job.intakeOnly) {
+        await finishIntake(pool, analysisId, job.ventureId, await readDeckIntake(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName));
+        return;
+      }
       const result = await analyzeDeck(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName, job.aiContext);
       await pool.query(
         `UPDATE "DeckAnalysis"
@@ -75,5 +86,48 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
     }
   } finally {
     if (ownPool) await pool.end();
+  }
+}
+
+/**
+ * Board intake: save the quick read and fill the new card's name, founder and stage.
+ * Only fills what is still empty (the name only while it's the file-name placeholder),
+ * so anything a person typed in the meantime wins.
+ */
+async function finishIntake(
+  pool: Pool,
+  analysisId: string,
+  ventureId: string | null,
+  result: Awaited<ReturnType<typeof readDeckIntake>>,
+): Promise<void> {
+  const x = result.extracted;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE "DeckAnalysis"
+       SET status = 'COMPLETE', model = $2, extracted = $3::jsonb, screen = NULL,
+           "inputTokens" = $4, "outputTokens" = $5, "completedAt" = now()
+       WHERE id = $1`,
+      [analysisId, result.model, JSON.stringify(x), result.inputTokens, result.outputTokens],
+    );
+    if (ventureId) {
+      await client.query(
+        `UPDATE "Venture" v SET
+           name = CASE WHEN $2::text IS NOT NULL AND v.name = d."fileName" THEN $2 ELSE v.name END,
+           "founderNames" = COALESCE(NULLIF(v."founderNames", ''), $3),
+           "companyStage" = COALESCE(NULLIF(v."companyStage", ''), $4),
+           "updatedAt" = now()
+         FROM "DeckAnalysis" d
+         WHERE v.id = $1 AND d.id = $5`,
+        [ventureId, x.name, x.founderNames, x.companyStage, analysisId],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
   }
 }
