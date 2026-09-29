@@ -3,7 +3,7 @@
 // spec lives in dd-doc/build.ts. Pure: the export route loads data and renders.
 import type { EligibilityScreen } from "../deck-ai/schema";
 import { REVIEW_BANNER } from "../memo-ai/render";
-import { MAX_TOTAL_SCORE, totalScore, type MemoContent } from "../memo-ai/schema";
+import { maxScore, totalScore, type MemoContent } from "../memo-ai/schema";
 import { formatLongDate, type Block, type DocSpec } from "./spec";
 
 const list = (items: string[], none = "None") => (items.length ? items.join(", ") : none);
@@ -30,6 +30,9 @@ export function screenSpec(
     { kind: "bullets", items: s.redFlags, empty: "None identified." },
     { kind: "heading", text: "Next step" },
     { kind: "paragraph", text: s.nextStep },
+    ...((s.otherCriteria ?? []).length
+      ? ([{ kind: "heading", text: "Additional DXV criteria" }, { kind: "keyValue", rows: s.otherCriteria.map((c) => [c.criterion, c.assessment]) }] as Block[])
+      : []),
     ...(meta.decisions.length ? ([{ kind: "heading", text: "DXV decisions" }, { kind: "bullets", items: meta.decisions }] as Block[]) : []),
   ];
   return {
@@ -57,6 +60,7 @@ export function screenSpec(
 export function memoSpec(m: MemoContent, meta: { name: string; ventureName: string; banner: boolean; footer?: string; date: Date }): DocSpec {
   const h = m.header;
   const total = totalScore(m.scores);
+  const max = maxScore(m.scores);
   const blocks: Block[] = [
     { kind: "heading", text: "Executive summary" },
     { kind: "paragraph", text: m.executiveSummary },
@@ -64,11 +68,11 @@ export function memoSpec(m: MemoContent, meta: { name: string; ventureName: stri
     { kind: "bullets", items: m.investmentCase, empty: "None." },
     { kind: "heading", text: "Conclusion" },
     { kind: "paragraph", text: m.conclusion },
-    { kind: "heading", text: `Scoring (${total}/${MAX_TOTAL_SCORE})` },
+    { kind: "heading", text: `Scoring (${total}/${max})` },
     {
       kind: "table",
       headers: ["Criterion", "Score", "Justification"],
-      rows: [...m.scores.map((s) => [s.criterion, `${s.score}/5`, s.justification]), ["Total", `${total}/${MAX_TOTAL_SCORE}`, ""]],
+      rows: [...m.scores.map((s) => [s.criterion, `${s.score}/5`, s.justification]), ["Total", `${total}/${max}`, ""]],
       widths: [0.26, 0.1, 0.64],
     },
     { kind: "heading", text: "SWOT summary" },
@@ -98,7 +102,7 @@ export function memoSpec(m: MemoContent, meta: { name: string; ventureName: stri
       ["Impact thesis", h.impactThesis],
       ["Impact themes", list(h.impactThemes)],
       ["Diversity themes", list(h.diversityThemes, "Not stated")],
-      ["Total score", `${total}/${MAX_TOTAL_SCORE}`],
+      ["Total score", `${total}/${max}`],
       ["Version", `${meta.name}, ${formatLongDate(meta.date)}`],
     ],
     blocks,

@@ -1,5 +1,5 @@
 // Read-only memo in DXV's template order. Server-component safe.
-import { MAX_TOTAL_SCORE, totalScore, type MemoContent, type MemoScore } from "@/lib/memo-ai/schema";
+import { maxScore, totalScore, type MemoContent, type MemoScore } from "@/lib/memo-ai/schema";
 import { REVIEW_BANNER } from "@/lib/memo-ai/render";
 
 export function ReviewBanner() {
@@ -41,7 +41,7 @@ export function TotalScore({ scores }: { scores: MemoScore[] }) {
   return (
     <span className="rounded-full bg-dxv-green px-3 py-1 text-sm font-semibold text-white">
       {totalScore(scores)}
-      <span className="text-dxv-yellow">/{MAX_TOTAL_SCORE}</span>
+      <span className="text-dxv-yellow">/{maxScore(scores)}</span>
     </span>
   );
 }

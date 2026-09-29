@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
-import { MAX_TOTAL_SCORE, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
+import { maxScore, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
 import { aiDraftName, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { AiTag, buttonClass, Card, formatDateTime } from "@/components/ui";
 import { GenerateButton } from "./assessment/assessment-client";
@@ -32,6 +32,7 @@ export function AssessmentCard({
   const eff = latest ? effectiveDeckStatus(latest) : null;
   const running = eff && (eff.status === "PENDING" || eff.status === "PROCESSING");
   const scoreOf = (c: unknown) => totalScore((c as MemoContent).scores);
+  const maxOf = (c: unknown) => maxScore((c as MemoContent).scores);
   const href = `/deals/${ventureId}/assessment`;
 
   return (
@@ -42,11 +43,11 @@ export function AssessmentCard({
         collapse && {
           ...collapse,
           summary: reviewed
-            ? `${reviewIssueName(reviewed.issueNumber)} · ${scoreOf(reviewed.content)}/${MAX_TOTAL_SCORE}`
+            ? `${reviewIssueName(reviewed.issueNumber)} · ${scoreOf(reviewed.content)}/${maxOf(reviewed.content)}`
             : draft
               ? `${reviewDraftName(draft.number)} in progress`
               : latest && eff?.status === "COMPLETE"
-                ? `${aiDraftName(latest.number)} · ${scoreOf(latest.output)}/${MAX_TOTAL_SCORE}`
+                ? `${aiDraftName(latest.number)} · ${scoreOf(latest.output)}/${maxOf(latest.output)}`
                 : running
                   ? "Drafting…"
                   : (memoSummary ?? "Not started"),
@@ -76,10 +77,10 @@ export function AssessmentCard({
 
         <div className="flex flex-wrap gap-3">
           {latest?.status === "COMPLETE" && !!latest.output && (
-            <Summary label={aiDraftName(latest.number)} score={scoreOf(latest.output)} tag={<AiTag>AI</AiTag>} when={latest.completedAt ?? latest.createdAt} />
+            <Summary label={aiDraftName(latest.number)} score={scoreOf(latest.output)} max={maxOf(latest.output)} tag={<AiTag>AI</AiTag>} when={latest.completedAt ?? latest.createdAt} />
           )}
-          {draft && <Summary label={`${reviewDraftName(draft.number)} (in progress)`} score={scoreOf(draft.content)} when={draft.updatedAt} />}
-          {reviewed && <Summary label={reviewIssueName(reviewed.issueNumber)} score={scoreOf(reviewed.content)} when={reviewed.createdAt} by={reviewed.createdBy.name} />}
+          {draft && <Summary label={`${reviewDraftName(draft.number)} (in progress)`} score={scoreOf(draft.content)} max={maxOf(draft.content)} when={draft.updatedAt} />}
+          {reviewed && <Summary label={reviewIssueName(reviewed.issueNumber)} score={scoreOf(reviewed.content)} max={maxOf(reviewed.content)} when={reviewed.createdAt} by={reviewed.createdBy.name} />}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +104,7 @@ export function AssessmentCard({
   );
 }
 
-function Summary({ label, score, when, by, tag }: { label: string; score: number; when: Date; by?: string; tag?: React.ReactNode }) {
+function Summary({ label, score, max, when, by, tag }: { label: string; score: number; max: number; when: Date; by?: string; tag?: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-black/10 px-3 py-2">
       <p className="flex items-center gap-1.5 text-xs text-black/55">
@@ -111,7 +112,7 @@ function Summary({ label, score, when, by, tag }: { label: string; score: number
       </p>
       <p className="text-xl font-semibold text-dxv-green tabular-nums">
         {score}
-        <span className="text-sm text-black/40">/{MAX_TOTAL_SCORE}</span>
+        <span className="text-sm text-black/40">/{max}</span>
       </p>
       <p className="text-[11px] text-black/45">
         {by ? `${by} · ` : ""}

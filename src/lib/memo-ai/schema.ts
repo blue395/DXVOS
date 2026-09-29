@@ -2,7 +2,8 @@
 // Shared with the Netlify worker (no Next-only imports).
 import { z } from "zod";
 
-/** The eleven scoring criteria, in DXV's template order. Names are used as keys. */
+/** Playbook version 0's eleven scoring criteria (DXV's template order). The criteria in use
+ *  now come from the Playbook; each memo keeps the criteria it was scored against. */
 export const CRITERIA = [
   "Team",
   "Problem Solution fit",
@@ -16,11 +17,9 @@ export const CRITERIA = [
   "Impact",
   "Risks/Red Flags",
 ] as const;
-export type Criterion = (typeof CRITERIA)[number];
-export const MAX_TOTAL_SCORE = CRITERIA.length * 5;
 
 export const ScoreSchema = z.object({
-  criterion: z.enum(CRITERIA),
+  criterion: z.string(),
   score: z.number().int().min(1).max(5),
   justification: z.string(),
 });
@@ -49,6 +48,13 @@ export const MemoContentSchema = z.object({
   followUpQuestions: z.array(z.string()),
 });
 
+/** The shape Claude must return: scores limited to this run's criteria names. */
+export function memoContentSchema(criteria: readonly string[]) {
+  return MemoContentSchema.extend({
+    scores: z.array(ScoreSchema.extend({ criterion: z.enum(criteria as [string, ...string[]]) })),
+  });
+}
+
 export type MemoScore = z.infer<typeof ScoreSchema>;
 export type MemoContent = z.infer<typeof MemoContentSchema>;
 
@@ -58,17 +64,22 @@ export class MemoFormatError extends Error {}
  * Exactly one score per criterion, in template order. Throws if any are missing
  * or duplicated (the model is told to give all eleven; a gap means a bad draft).
  */
-export function normaliseScores(scores: MemoScore[]): MemoScore[] {
-  const byCriterion = new Map<Criterion, MemoScore>();
+export function normaliseScores(scores: MemoScore[], criteria: readonly string[] = CRITERIA): MemoScore[] {
+  const byCriterion = new Map<string, MemoScore>();
   for (const s of scores) {
     if (byCriterion.has(s.criterion)) throw new MemoFormatError(`The AI scored "${s.criterion}" twice. Try again.`);
     byCriterion.set(s.criterion, s);
   }
-  const missing = CRITERIA.filter((c) => !byCriterion.has(c));
+  const missing = criteria.filter((c) => !byCriterion.has(c));
   if (missing.length) throw new MemoFormatError(`The AI didn't score: ${missing.join(", ")}. Try again.`);
-  return CRITERIA.map((c) => byCriterion.get(c)!);
+  return criteria.map((c) => byCriterion.get(c)!);
 }
 
 export function totalScore(scores: MemoScore[]): number {
   return scores.reduce((a, s) => a + s.score, 0);
+}
+
+/** A memo's maximum score: 5 per criterion it was scored against (55 for version 0's eleven). */
+export function maxScore(scores: MemoScore[]): number {
+  return scores.length * 5;
 }

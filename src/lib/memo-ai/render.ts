@@ -1,6 +1,6 @@
 // The review banner and plain-text rendering of a memo (DXV template order).
 import type { MemoContent } from "./schema";
-import { MAX_TOTAL_SCORE, totalScore } from "./schema";
+import { maxScore, totalScore } from "./schema";
 
 /** §4 of DXV's memo assistant document, verbatim. Added by the app to every AI draft. */
 export const REVIEW_BANNER = [
@@ -32,7 +32,7 @@ export function renderMemo(m: MemoContent, opts: { banner: boolean; footer?: str
     `EXECUTIVE SUMMARY\n${m.executiveSummary}`,
     `INVESTMENT CASE\n${bullets(m.investmentCase)}`,
     `CONCLUSION\n${m.conclusion}`,
-    `SCORING (${totalScore(m.scores)}/${MAX_TOTAL_SCORE})\n` + m.scores.map((s) => `${s.criterion}: ${s.score}/5. ${s.justification}`).join("\n"),
+    `SCORING (${totalScore(m.scores)}/${maxScore(m.scores)})\n` + m.scores.map((s) => `${s.criterion}: ${s.score}/5. ${s.justification}`).join("\n"),
     `SWOT SUMMARY\nStrengths:\n${bullets(m.swot.strengths)}\nWeaknesses:\n${bullets(m.swot.weaknesses)}\nOpportunities:\n${bullets(m.swot.opportunities)}\nThreats:\n${bullets(m.swot.threats)}`,
     `KEY FOLLOW-UP QUESTIONS FOR FOUNDERS\n${bullets(m.followUpQuestions)}`,
     ...(opts.footer ? [opts.footer] : []),

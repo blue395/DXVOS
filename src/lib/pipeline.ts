@@ -250,6 +250,19 @@ export function canDecideEligibility(stage: Stage): boolean {
   return stage === "SUBMITTED" || stage === "ELIGIBILITY_SCREEN";
 }
 
+/** The AI screen's recommendation expressed as a decision, to spot when the team decided differently. */
+const AI_RECOMMENDATION_AS_DECISION: Record<string, keyof typeof ELIGIBILITY_DECISION_TARGET> = {
+  "Proceed to pipeline": "PROCEED",
+  Decline: "DECLINE",
+  "Need more information": "NEED_MORE_INFO",
+};
+
+/** True when the team's eligibility decision differs from what the AI recommended (a learning moment). */
+export function eligibilityDisagrees(aiRecommendation: string | null | undefined, decision: keyof typeof ELIGIBILITY_DECISION_TARGET): boolean {
+  const ai = aiRecommendation ? AI_RECOMMENDATION_AS_DECISION[aiRecommendation] : undefined;
+  return !!ai && ai !== decision;
+}
+
 /** How each human eligibility decision reads (deal page and exports). */
 export const ELIGIBILITY_DECISION_LABELS = {
   PROCEED: "Proceed to pipeline",

@@ -3,8 +3,10 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { applyHouseStyle } from "../deck-ai/render";
 import { renderContext, type MemoContext } from "./context";
-import { MEMO_AI_MODEL, MEMO_SYSTEM_PROMPT, MEMO_USER_INSTRUCTIONS } from "./prompt";
-import { MemoContentSchema, MemoFormatError, normaliseScores, type MemoContent } from "./schema";
+import { DEFAULT_ASSESSMENT } from "../playbook/defaults";
+import { buildMemoPrompt, buildMemoUserInstructions } from "../playbook/prompts";
+import { MEMO_AI_MODEL } from "./prompt";
+import { memoContentSchema, MemoFormatError, normaliseScores, type MemoContent } from "./schema";
 
 export type MemoAnalysisResult = { memo: MemoContent; model: string; inputTokens: number; outputTokens: number };
 
@@ -22,10 +24,13 @@ export function cleanMemo(m: MemoContent): MemoContent {
 }
 
 export async function analyzeMemo(client: Anthropic, pdf: Buffer, context: MemoContext): Promise<MemoAnalysisResult> {
+  // The Playbook version and lessons snapshotted when the job was created (older jobs: defaults).
+  const playbook = context.ai?.playbook ?? DEFAULT_ASSESSMENT;
+  const criteria = playbook.criteria.map((c) => c.name);
   const response = await client.messages.parse({
     model: MEMO_AI_MODEL,
     max_tokens: 16000,
-    system: MEMO_SYSTEM_PROMPT,
+    system: buildMemoPrompt(playbook, context.ai?.lessons ?? []),
     messages: [
       {
         role: "user",
@@ -36,11 +41,11 @@ export async function analyzeMemo(client: Anthropic, pdf: Buffer, context: MemoC
             source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") },
             title: context.deck?.fileName ?? "deck.pdf",
           },
-          { type: "text", text: MEMO_USER_INSTRUCTIONS },
+          { type: "text", text: buildMemoUserInstructions(playbook) },
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(MemoContentSchema) },
+    output_config: { format: zodOutputFormat(memoContentSchema(criteria)) },
   });
 
   if (response.stop_reason === "refusal") throw new MemoFormatError("Claude declined to assess this deck.");
@@ -48,7 +53,7 @@ export async function analyzeMemo(client: Anthropic, pdf: Buffer, context: MemoC
   if (!response.parsed_output) throw new MemoFormatError("The memo didn't match the expected format. Try again.");
 
   const memo = cleanMemo(response.parsed_output);
-  memo.scores = normaliseScores(memo.scores);
+  memo.scores = normaliseScores(memo.scores, criteria);
   memo.header.round = context.dxvRound; // app-owned field: never trust the model to copy it
   return { memo, model: response.model, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
 }

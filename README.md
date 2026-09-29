@@ -150,6 +150,21 @@ it under Documents → Due diligence. Each run is recorded in `DDReportJob`; a n
 are kept). Prompt: `src/lib/dd-doc/prompt.ts`; layout: `src/lib/dd-doc/build.ts`. Runs in the Netlify background
 function `generate-dd-background`.
 
+## Playbook: DXV's criteria and lessons (`/playbook`)
+
+The feedback loop behind the AI, and the foundation for the DXV Brain.
+- **Eligibility criteria** and **Investment assessment criteria** are editable by the team (add, remove, rename,
+  reorder; the four core eligibility criteria can be reworded but not removed). Every save is a new, noted
+  version (`PlaybookVersion`, append-only) with history and restore; version 0 is DXV's original documents,
+  verbatim. A preview shows the exact prompt the AI will get.
+- The AI eligibility screen and investment assessment are built from the **latest version plus approved
+  lessons** (`src/lib/playbook/prompts.ts`), snapshotted onto each job, so every screen and memo shows the
+  "criteria vN" it used. Memos keep the criteria they were scored against and total out of their own maximum.
+- **Lessons**: added by the team, or **suggested by the AI** (background job `suggest-lessons-background`) when
+  a deal is declined, when the team changes the AI's scores before issuing a memo, or when an eligibility
+  decision differs from the AI's recommendation. Suggestions wait for a person to approve (menu badge).
+  Approved eligibility/assessment/general lessons (newest 40) are given to those AI steps.
+
 ## Exporting documents (PDF and Word)
 
 Every document DXV OS writes has **Export: PDF | Word** buttons: the eligibility screen, the investment memo

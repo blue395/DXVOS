@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Pool } from "pg";
 import { analyzeDeck, DeckAnalysisError } from "./deck-ai/analyze";
+import type { AiContextSnapshot, EligibilityPlaybook } from "./playbook/schema";
 import { fakeAnthropicClient } from "./deck-ai/mock";
 import { sslOptions } from "./db-ssl";
 import { readDeck } from "./deck-storage";
@@ -31,10 +32,10 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
   try {
     // Claim atomically: only a PENDING job can start, so a double trigger can't
     // run (and bill) the same deck twice.
-    const claimed = await pool.query<{ storagePath: string; fileName: string }>(
+    const claimed = await pool.query<{ storagePath: string; fileName: string; aiContext: AiContextSnapshot<EligibilityPlaybook> | null }>(
       `UPDATE "DeckAnalysis" SET status = 'PROCESSING', "startedAt" = now(), error = NULL
        WHERE id = $1 AND status = 'PENDING'
-       RETURNING "storagePath", "fileName"`,
+       RETURNING "storagePath", "fileName", "aiContext"`,
       [analysisId],
     );
     const job = claimed.rows[0];
@@ -42,7 +43,7 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
 
     try {
       const pdf = await (deps.readDeck ?? readDeck)(job.storagePath);
-      const result = await analyzeDeck(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName);
+      const result = await analyzeDeck(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName, job.aiContext);
       await pool.query(
         `UPDATE "DeckAnalysis"
          SET status = 'COMPLETE', model = $2, extracted = $3::jsonb, screen = $4::jsonb,

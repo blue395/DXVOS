@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { logout } from "@/app/login/actions";
 import { Suspense } from "react";
 import { NavLink } from "@/components/nav-link";
@@ -11,7 +12,8 @@ import { StaleVersionBanner } from "@/components/stale-version-banner";
 // Shell for every signed-in page. requireAdmin() here protects page *rendering*;
 // server actions still check again themselves.
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const user = await requireAdmin();
+  // (the count only renders once requireAdmin has passed)
+  const [user, suggestedLessons] = await Promise.all([requireAdmin(), db.lesson.count({ where: { status: "SUGGESTED" } })]);
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -30,6 +32,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               Angels
             </NavLink>
             <NavLink href="/deals">Deals</NavLink>
+            <NavLink href="/playbook" badge={suggestedLessons}>
+              Playbook
+            </NavLink>
             <NavLink href="/portfolio" disabled>
               Portfolio
             </NavLink>

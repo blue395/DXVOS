@@ -25,7 +25,8 @@ export function sampleOutput(fileName: string): DeckAnalysisOutput {
       teamStrength: "Two co-founders with pharmacy operations and software backgrounds; no hires yet.",
       thesisFit: { rating: "Not stated", reasoning: "The deck does not state the founders' backgrounds." },
       redFlags: [],
-      nextStep: "Request from founder: confirmation of founder background against DXV's thesis",
+      otherCriteria: [],
+    nextStep: "Request from founder: confirmation of founder background against DXV's thesis",
     },
   };
 }

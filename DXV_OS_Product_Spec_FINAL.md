@@ -62,6 +62,11 @@ Dashboard · Angels · Deals · Portfolio · Activity, plus a **View as Angel** 
 > **Amended again 2026-09-28:** the £20k-in-one-week momentum threshold is removed;
 > Investment Commitments shows a running total of commitments instead. The list below is the original
 > wording, kept for context; `src/lib/pipeline.ts` is the source of truth.
+> **Amended 2026-09-30 (Blue): Playbook.** DXV's eligibility and investment assessment criteria are
+> edited by the team in DXV OS (versioned; the AI uses the latest version, and every screen and memo records
+> the version it used). A Lessons list captures what DXV learns; the AI suggests lessons at key moments for
+> the team to approve, and approved lessons feed the AI steps. Both are the knowledge base for the future
+> DXV Brain (an AI assistant for the team across deals, portfolio, declined deals and research).
 > **Amended 2026-09-29 (Blue): deal lifecycle.** Capital Transfer is retired (deals there moved
 > back to Due Diligence); payments are ticked off per angel in a new **Final Investment** section,
 > and paid tickets on deals at Investment Complete make the dashboard's Investment Total.

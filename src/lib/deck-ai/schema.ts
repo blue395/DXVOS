@@ -32,6 +32,9 @@ export const EligibilityScreenSchema = z.object({
   thesisFit: z.object({ rating: z.enum(THESIS_FIT_RATINGS), reasoning: z.string() }),
   redFlags: z.array(z.string()),
   nextStep: z.string(),
+  // DXV's additional eligibility criteria (beyond the four core ones), from the Playbook.
+  // Screens from before 2026-09-30 don't have this: read it as `otherCriteria ?? []`.
+  otherCriteria: z.array(z.object({ criterion: z.string(), assessment: z.string() })),
 });
 
 export const DeckAnalysisOutputSchema = z.object({
