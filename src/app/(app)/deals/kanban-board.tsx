@@ -312,20 +312,23 @@ function CardContent({ card, saving }: { card: BoardCard; saving: boolean }) {
         </div>
       )}
 
-      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-black/5 pt-2 text-[11px] text-black/50">
-        <span className="whitespace-nowrap" title="Days since the deck was first uploaded for the eligibility check">
-          {card.deckDaysAgo === null ? "No deck yet" : `Deck ${card.deckDaysAgo}d ago`}
+      {/* Wraps inside the card: whole chunks move to the next line, never past the edge. */}
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-black/5 pt-2 text-[11px] text-black/50">
+        <span className="min-w-0" title="Days since the deck was first uploaded for the eligibility check">
+          <span className="whitespace-nowrap">{card.deckDaysAgo === null ? "No deck yet" : `Deck ${card.deckDaysAgo}d ago`}</span>
           <span className="text-black/30"> · </span>
-          {card.daysInStage}d in stage
+          <span className="whitespace-nowrap">{card.daysInStage}d in stage</span>
           {card.leadAngel && (
             <>
               <span className="text-black/30"> · </span>
-              <span title="Lead angel">Lead {card.leadAngel}</span>
+              <span className="whitespace-nowrap" title="Lead angel">
+                Lead {card.leadAngel}
+              </span>
             </>
           )}
         </span>
         {card.commsOwed > 0 && (
-          <span className="whitespace-nowrap rounded-full bg-dxv-yellow px-1.5 py-0.5 font-medium text-dxv-green" title="Founder is owed a decision update">
+          <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-dxv-yellow px-1.5 py-0.5 font-medium text-dxv-green" title="Founder is owed a decision update">
             Update owed
           </span>
         )}
