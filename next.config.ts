@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Which deploy this build is (Netlify sets DEPLOY_ID at build time), so open pages can
+  // tell when DXV OS has been redeployed and offer a reload (stale-version-banner.tsx).
+  env: { NEXT_PUBLIC_DEPLOY_ID: process.env.DEPLOY_ID ?? process.env.COMMIT_REF ?? "local" },
   experimental: {
     // Turbopack's build cache (.next/cache/turbopack) snapshots environment
     // variables — including secrets like SESSION_SECRET — to detect changes.

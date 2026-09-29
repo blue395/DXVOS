@@ -79,7 +79,8 @@ scripts/                      seed.ts (dev), create-admin.ts
 - **Founder comms are created automatically.** Moving a deal out of a gate stage (or declining it)
   creates a `FounderComm` row as *Not yet sent*, so the dashboard's "founders awaiting a decision
   update" can't be forgotten. Skipping stages creates one per gate skipped; moving backwards creates none.
-- **Declined deals have their own board view** (stored as `PASSED`): the **Declined** pill next to the round pills (`/deals?declined=1`, combinable with a round) shows them read-only, grouped by the stage they were declined at. The live board has no Declined column; decline from the deal page.
+- **Declined deals have their own board view** (stored as `PASSED`): the **Declined** pill next to the round pills (`/deals?declined=1`, combinable with a round) shows them read-only, grouped by the stage they were declined at. On the live board, drag a card onto the Declined pill to decline it (a reason is asked for), or use the deal page's Decline pill.
+- **Redeploys and open pages.** A page open across a deploy can call server actions the new build doesn't know. `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (Netlify env) keeps action IDs stable across builds; `stale-version-banner.tsx` offers a Reload when a deploy is detected (`/api/version`) or an action fails that way.
 - **Investment commitments** show a running total of each angel's latest interested EOI (no threshold);
   a deal sitting in Investment Commitments for over 7 days gets a warning (`src/lib/pipeline.ts`).
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`

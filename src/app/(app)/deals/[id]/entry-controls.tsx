@@ -8,6 +8,7 @@ import { RevealContext } from "@/components/reveal";
 import { Spinner } from "@/components/ui";
 import type { ActionResult } from "@/lib/action-result";
 import { setFinalInvestmentPaid } from "../actions";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 const linkButton =
   "cursor-pointer rounded px-1.5 py-0.5 text-xs text-dxv-green transition hover:bg-dxv-green/10 disabled:cursor-wait disabled:opacity-60";
@@ -41,7 +42,13 @@ export function EntryRow({
               className={`${linkButton} text-black/50 hover:text-black`}
               onClick={() => {
                 if (!window.confirm(`Remove ${label}? It's hidden from the list and totals; the change is kept in History.`)) return;
-                start(async () => setError((await remove()).error ?? null));
+                start(async () => {
+                  try {
+                    setError((await remove()).error ?? null);
+                  } catch (e) {
+                    setError(actionErrorMessage(e));
+                  }
+                });
               }}
             >
               {pending ? <Spinner className="h-3 w-3" /> : "Remove"}
@@ -76,7 +83,11 @@ export function PaidToggle({ entryId, paid, angelName }: { entryId: string; paid
       onClick={() =>
         start(async () => {
           setOptimisticPaid(!optimisticPaid);
-          await setFinalInvestmentPaid(entryId, !optimisticPaid);
+          try {
+            await setFinalInvestmentPaid(entryId, !optimisticPaid);
+          } catch (e) {
+            actionErrorMessage(e); // out-of-date page: shows the reload banner
+          }
         })
       }
       className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded border transition hover:ring-2 hover:ring-dxv-green/30 ${

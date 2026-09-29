@@ -39,6 +39,7 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
    | `DATABASE_URL` | Transaction pooler string (port 6543) |
    | `DIRECT_URL` | Session pooler string (port 5432) |
    | `SESSION_SECRET` | 40+ random characters — e.g. generate a long password in your password manager. Never reuse it anywhere. |
+   | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | A fixed key so pages left open across a deploy keep working (otherwise every deploy changes the IDs of all buttons/forms and open pages fail with "Server Action … was not found"). Must be **exactly 32 random bytes, base64-encoded** (44 characters ending in `=`): generate with `openssl rand -base64 32`. Scope: Builds and Functions. Never change it casually. |
    
 3. **Turn off Deploy Previews for now.** Site configuration → Build & deploy →
    *Deploy Previews* → "Don't deploy pull requests". Previews would otherwise run
@@ -147,6 +148,7 @@ Stored files aren't included in Supabase's database backups.
 | Pages show "A server error occurred"; function log says `self-signed certificate in certificate chain` | `DATABASE_CA_CERT` is set — delete it and redeploy (see §1.4) |
 | Sign-in always says "Incorrect email or password" | Email in the `User` row isn't lowercase, or role isn't `ADMIN` |
 | Sign-in works then immediately logs out | `SESSION_SECRET` missing or shorter than 32 characters |
+| "Server Action … was not found on the server" after a deploy | A page opened before the deploy. Reload it. If it happens on every deploy, `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` isn't set (see above); the app also offers a Reload banner. |
 | Deck upload says "Deck storage isn't configured" | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` missing — add them and redeploy |
 | Upload fails with "Bucket not found" | The `decks` bucket wasn't created — see §5.4 |
 | Screen fails: "ANTHROPIC_API_KEY isn't set" | Add the key (§5.3) and redeploy |

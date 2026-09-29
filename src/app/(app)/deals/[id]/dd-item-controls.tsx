@@ -6,6 +6,7 @@
 import { useOptimistic, useTransition } from "react";
 import { Spinner } from "@/components/ui";
 import { deleteDDItem, toggleDDItem } from "../actions";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 export function DDItemToggle({ itemId, done }: { itemId: string; done: boolean }) {
   const [optimisticDone, setOptimisticDone] = useOptimistic(done);
@@ -18,7 +19,11 @@ export function DDItemToggle({ itemId, done }: { itemId: string; done: boolean }
       onClick={() =>
         start(async () => {
           setOptimisticDone(!optimisticDone);
-          await toggleDDItem(itemId);
+          try {
+            await toggleDDItem(itemId);
+          } catch (e) {
+            actionErrorMessage(e); // out-of-date page: shows the reload banner
+          }
         })
       }
       className={`flex h-5 w-5 cursor-pointer items-center justify-center rounded border transition hover:ring-2 hover:ring-dxv-green/30 ${
@@ -40,7 +45,13 @@ export function DDItemRemove({ itemId, title }: { itemId: string; title: string 
       disabled={pending}
       onClick={() => {
         if (!window.confirm(`Remove the DD item "${title}"? Attached files stay under Documents.`)) return;
-        start(() => deleteDDItem(itemId));
+        start(async () => {
+          try {
+            await deleteDDItem(itemId);
+          } catch (e) {
+            actionErrorMessage(e);
+          }
+        });
       }}
       className="cursor-pointer rounded px-1.5 text-black/35 transition hover:bg-black/5 hover:text-black disabled:cursor-wait"
     >

@@ -9,6 +9,7 @@ import {
   startDeckUpload,
 } from "@/app/(app)/deals/deck-actions";
 import type { ExtractedFields } from "@/lib/deck-ai/schema";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 const POLL_MS = 3000;
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -82,7 +83,7 @@ export function DeckUploader({
         }
       }
     } catch (e) {
-      setPhase({ kind: "failed", message: e instanceof Error ? e.message : "Something went wrong." });
+      setPhase({ kind: "failed", message: actionErrorMessage(e) });
     }
   }
 

@@ -4,6 +4,7 @@ import { createContext, startTransition, useActionState, useContext, useEffect, 
 import type { ActionResult } from "@/lib/action-result";
 import { RevealContext } from "./reveal";
 import { buttonClass, Spinner, type ButtonVariant } from "./ui";
+import { actionErrorMessage, isStaleActionError } from "@/lib/stale-version";
 
 type Props = {
   action: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
@@ -26,7 +27,16 @@ const FormStateContext = createContext({ pending: false, justSaved: false });
 // auto-reset, so we only clear the form on success. `action` stays set so the form
 // still works before JavaScript has loaded.
 export function ActionForm({ action, children, className, resetOnSuccess = true, onSuccess }: Props) {
-  const [state, formAction, pending] = useActionState(action, {});
+  // A page left open across a deploy can call an action the server no longer knows:
+  // turn that into a clear "reload" message instead of a crash.
+  const [state, formAction, pending] = useActionState(async (prev: ActionResult, formData: FormData): Promise<ActionResult> => {
+    try {
+      return await action(prev, formData);
+    } catch (e) {
+      if (isStaleActionError(e)) return { error: actionErrorMessage(e) };
+      throw e;
+    }
+  }, {});
   const ref = useRef<HTMLFormElement>(null);
   const [seen, setSeen] = useState(state);
   const [justSaved, setJustSaved] = useState(false);

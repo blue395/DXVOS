@@ -14,6 +14,7 @@ import {
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "../kanban-board";
+import { DeclinedPill } from "../declined-pill";
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const params = await searchParams;
@@ -96,20 +97,26 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           <p className="text-sm text-black/60">
             {declined
               ? "Declined deals, grouped by where in the dealflow they were declined. Kept for dealflow learning; open a deal to reopen it."
-              : "Drag a card to move it between stages. Every move is logged. Decline a deal from its page."}
+              : "Drag a card to move it between stages, or onto the Declined pill to decline it. Every move is logged."}
           </p>
         </div>
         <Link href="/deals/new" className={buttonClass("accent")}>
           + New venture
         </Link>
       </div>
-      <RoundFilterBar
-        filter={filter}
-        declined={declined}
-        declinedCount={declinedCount}
-        counts={roundCounts.map((r) => ({ round: r.round, count: r._count._all }))}
+      {/* The filter bar goes inside the board so its Declined pill can take dropped cards. */}
+      <KanbanBoard
+        initialCards={cards}
+        view={declined ? "declined" : "live"}
+        toolbar={
+          <RoundFilterBar
+            filter={filter}
+            declined={declined}
+            declinedCount={declinedCount}
+            counts={roundCounts.map((r) => ({ round: r.round, count: r._count._all }))}
+          />
+        }
       />
-      <KanbanBoard initialCards={cards} view={declined ? "declined" : "live"} />
     </div>
   );
 }
@@ -163,17 +170,9 @@ function RoundFilterBar({
         </Link>
       ))}
       <span aria-hidden className="mx-1 h-5 w-px bg-black/15" />
-      {/* Toggle: combines with the round filter to show that round's declined deals. */}
-      <Link
-        href={boardHref(filter, !declined)}
-        aria-pressed={declined}
-        title={declined ? "Back to the live pipeline" : "Show declined deals (in the selected round)"}
-        className={`rounded-full border px-3 py-1 text-sm transition ${
-          declined ? "border-black bg-black text-white" : "border-black/40 text-black hover:bg-black/5"
-        }`}
-      >
-        {declined && <span aria-hidden>✓ </span>}Declined <span className={declined ? "text-dxv-yellow" : "text-black/45"}>{declinedCount}</span>
-      </Link>
+      {/* Toggle: combines with the round filter to show that round's declined deals.
+          On the live board it's also where you drop a card to decline it. */}
+      <DeclinedPill href={boardHref(filter, !declined)} active={declined} count={declinedCount} droppable={!declined} />
     </nav>
   );
 }
