@@ -1,20 +1,37 @@
 import Link from "next/link";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cardOneLiner, daysSince, dealWarnings, parseRoundFilter, type RoundFilter } from "@/lib/pipeline";
+import {
+  boardHref,
+  cardOneLiner,
+  daysSince,
+  dealWarnings,
+  PASS_REASON_LABELS,
+  parseDeclinedFilter,
+  parseRoundFilter,
+  type RoundFilter,
+} from "@/lib/pipeline";
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import { buttonClass } from "@/components/ui";
 import { KanbanBoard, type BoardCard } from "../kanban-board";
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
-  const filter = parseRoundFilter((await searchParams).round);
+  const params = await searchParams;
+  const filter = parseRoundFilter(params.round);
+  const declined = parseDeclinedFilter(params.declined);
 
-  const [roundCounts, ventures] = await requireAdminWith(() =>
+  // The live pipeline and the declined deals are separate views; the round filter applies to both.
+  const stageWhere = declined ? { currentStage: "PASSED" as const } : { currentStage: { not: "PASSED" as const } };
+  const roundWhere = filter.kind === "round" ? { round: filter.round } : filter.kind === "none" ? { round: null } : {};
+
+  const [roundCounts, declinedCount, ventures] = await requireAdminWith(() =>
     Promise.all([
-      // Counts per round for the filter pills (null = no round assigned).
-      db.venture.groupBy({ by: ["round"], _count: { _all: true }, orderBy: { round: "asc" } }),
+      // Counts per round for the filter pills, in the current view (null = no round assigned).
+      db.venture.groupBy({ by: ["round"], where: stageWhere, _count: { _all: true }, orderBy: { round: "asc" } }),
+      // How many declined deals in the selected round (for the Declined pill).
+      db.venture.count({ where: { currentStage: "PASSED", ...roundWhere } }),
       db.venture.findMany({
-        where: filter.kind === "round" ? { round: filter.round } : filter.kind === "none" ? { round: null } : {},
+        where: { ...stageWhere, ...roundWhere },
         orderBy: { stageEnteredAt: "asc" }, // longest-waiting first within each column
         select: {
           id: true,
@@ -25,6 +42,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           raiseAmountGbp: true,
           description: true,
           leadAngel: true,
+          passReason: true,
+          passedFromStage: true,
           currentStage: true,
           stageEnteredAt: true,
           ddItems: { select: { dueDate: true, completedAt: true } },
@@ -65,6 +84,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     warnings: dealWarnings(v, now),
     commsOwed: v._count.founderComms,
     leadAngel: v.leadAngel,
+    declinedAt: v.passedFromStage,
+    declineReason: v.passReason ? PASS_REASON_LABELS[v.passReason] : null,
   }));
 
   return (
@@ -72,53 +93,87 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-dxv-green">Deals</h1>
-          <p className="text-sm text-black/60">Drag a card to move it between stages. Every move is logged.</p>
+          <p className="text-sm text-black/60">
+            {declined
+              ? "Declined deals, grouped by where in the dealflow they were declined. Kept for dealflow learning; open a deal to reopen it."
+              : "Drag a card to move it between stages. Every move is logged. Decline a deal from its page."}
+          </p>
         </div>
         <Link href="/deals/new" className={buttonClass("accent")}>
           + New venture
         </Link>
       </div>
-      <RoundFilterBar filter={filter} counts={roundCounts.map((r) => ({ round: r.round, count: r._count._all }))} />
-      <KanbanBoard initialCards={cards} />
+      <RoundFilterBar
+        filter={filter}
+        declined={declined}
+        declinedCount={declinedCount}
+        counts={roundCounts.map((r) => ({ round: r.round, count: r._count._all }))}
+      />
+      <KanbanBoard initialCards={cards} view={declined ? "declined" : "live"} />
     </div>
   );
 }
 
-/** Filter pills. Plain links, so a filtered board can be bookmarked or shared (/deals?round=3). */
-function RoundFilterBar({ filter, counts }: { filter: RoundFilter; counts: { round: number | null; count: number }[] }) {
+/**
+ * Filter pills. Plain links, so a filtered board can be bookmarked or shared
+ * (/deals?round=3&declined=1). Round pills keep the Declined toggle, and vice versa.
+ */
+function RoundFilterBar({
+  filter,
+  declined,
+  declinedCount,
+  counts,
+}: {
+  filter: RoundFilter;
+  declined: boolean;
+  declinedCount: number;
+  counts: { round: number | null; count: number }[];
+}) {
   const total = counts.reduce((a, c) => a + c.count, 0);
   const unassigned = counts.find((c) => c.round === null)?.count ?? 0;
   const pills = [
-    { href: "/deals", label: "All rounds", count: total, active: filter.kind === "all" },
+    { href: boardHref({ kind: "all" }, declined), label: "All rounds", count: total, active: filter.kind === "all" },
     ...counts
       .filter((c) => c.round !== null)
       .map((c) => ({
-        href: `/deals?round=${c.round}`,
+        href: boardHref({ kind: "round", round: c.round! }, declined),
         label: `Round ${c.round}`,
         count: c.count,
         active: filter.kind === "round" && filter.round === c.round,
       })),
-    ...(unassigned > 0 ? [{ href: "/deals?round=none", label: "No round", count: unassigned, active: filter.kind === "none" }] : []),
+    ...(unassigned > 0 ? [{ href: boardHref({ kind: "none" }, declined), label: "No round", count: unassigned, active: filter.kind === "none" }] : []),
   ];
   // A round asked for in the URL that has no deals still shows as selected.
   if (filter.kind === "round" && !counts.some((c) => c.round === filter.round)) {
-    pills.push({ href: `/deals?round=${filter.round}`, label: `Round ${filter.round}`, count: 0, active: true });
+    pills.push({ href: boardHref(filter, declined), label: `Round ${filter.round}`, count: 0, active: true });
   }
 
   return (
-    <nav aria-label="Filter by round" className="flex flex-wrap gap-2">
+    <nav aria-label="Filter deals" className="flex flex-wrap items-center gap-2">
       {pills.map((p) => (
         <Link
           key={p.href}
           href={p.href}
           aria-current={p.active ? "page" : undefined}
-          className={`rounded-full border px-3 py-1 text-sm ${
+          className={`rounded-full border px-3 py-1 text-sm transition ${
             p.active ? "border-dxv-green bg-dxv-green text-white" : "border-dxv-green/30 text-dxv-green hover:bg-dxv-green/5"
           }`}
         >
           {p.label} <span className={p.active ? "text-dxv-yellow" : "text-black/45"}>{p.count}</span>
         </Link>
       ))}
+      <span aria-hidden className="mx-1 h-5 w-px bg-black/15" />
+      {/* Toggle: combines with the round filter to show that round's declined deals. */}
+      <Link
+        href={boardHref(filter, !declined)}
+        aria-pressed={declined}
+        title={declined ? "Back to the live pipeline" : "Show declined deals (in the selected round)"}
+        className={`rounded-full border px-3 py-1 text-sm transition ${
+          declined ? "border-black bg-black text-white" : "border-black/40 text-black hover:bg-black/5"
+        }`}
+      >
+        {declined && <span aria-hidden>✓ </span>}Declined <span className={declined ? "text-dxv-yellow" : "text-black/45"}>{declinedCount}</span>
+      </Link>
     </nav>
   );
 }
