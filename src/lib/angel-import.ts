@@ -60,7 +60,7 @@ const GUESSES: [ImportField, RegExp][] = [
   ["email", /e-?mail/i],
   ["firstName", /^(first|given|fore)\s*name/i],
   ["lastName", /^(last|family|sur)\s*name|^surname/i],
-  ["name", /^(full\s*)?name$/i],
+  ["name", /^(full|billing|customer|contact|your)?\s*name$/i],
   ["phone", /phone|mobile|tel/i],
   ["linkedinUrl", /linked\s*in/i],
   ["location", /location|city|town|region|country/i],
