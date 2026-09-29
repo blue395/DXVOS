@@ -188,7 +188,10 @@ The **DXV Brain** button (bottom right, or Ctrl+J) opens a chat with Claude Opus
   write tools; asked to change something, it says where a partner does that.
 - **Knows the page**: each question carries a hidden note with the time and, on a deal page, which deal.
 - **Web search** (Anthropic's server tool) for market and public facts, with cited sources shown under the answer;
-  it's told never to search with confidential DXV information.
+  up to 12 searches per question (each follow-up gets a fresh allowance), spread across different sources.
+  It's told never to search with confidential DXV information.
+- **Setup versions**: the instructions and tools are fixed per chat (`BrainContext.setup`, `BRAIN_SETUP_VERSION`),
+  because Claude rejects a follow-up if they change mid-chat; changes reach new chats only.
 - **Chats are private** to the person who started them (`BrainConversation.userId`; every query is scoped to
   the signed-in user) and archived, never deleted. Each message stores exactly what went to and came back from
   Claude and is replayed unchanged, so follow-ups keep full context. A deck the Brain read is stored as a

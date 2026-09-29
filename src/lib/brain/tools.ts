@@ -19,8 +19,8 @@ const dealArg = {
   deal: { type: "string", description: "The deal's id (from the page note or list_deals) or its company name." },
 } as const;
 
-/** Anthropic's web search, run on Anthropic's servers; results come back with citations. */
-export const WEB_SEARCH_TOOL = { type: "web_search_20260209", name: "web_search", max_uses: 5 } as const;
+/** Anthropic's web search, run on Anthropic's servers; results come back with citations. `maxUses` is per question. */
+export const webSearchTool = (maxUses: number) => ({ type: "web_search_20260209", name: "web_search", max_uses: maxUses }) as const;
 
 export const BRAIN_TOOLS: Tool[] = [
   {

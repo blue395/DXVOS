@@ -3,7 +3,7 @@ import "server-only";
 // (all scopes). Snapshotted onto the chat, like every other AI job.
 import { db } from "@/lib/db";
 import { currentPlaybook } from "@/lib/playbook/current";
-import type { BrainContext } from "./prompt";
+import { BRAIN_SETUP_VERSION, type BrainContext } from "./prompt";
 
 /** Approved lessons given to the Brain (newest first), to keep its instructions a sensible size. */
 export const MAX_BRAIN_LESSONS = 80;
@@ -23,5 +23,6 @@ export async function brainContext(): Promise<BrainContext> {
     eligibility: { version: eligibility.version, playbook: eligibility.content },
     assessment: { version: assessment.version, playbook: assessment.content },
     lessons,
+    setup: BRAIN_SETUP_VERSION,
   };
 }

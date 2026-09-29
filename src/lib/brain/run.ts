@@ -4,8 +4,8 @@
 //
 // Shared with the Netlify worker: relative imports only.
 import type Anthropic from "@anthropic-ai/sdk";
-import { BRAIN_MODEL } from "./prompt";
-import { BRAIN_TOOLS, BrainToolError, toolActivity, WEB_SEARCH_TOOL } from "./tools";
+import { BRAIN_MODEL, brainSearchLimit } from "./prompt";
+import { BRAIN_TOOLS, BrainToolError, toolActivity, webSearchTool } from "./tools";
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
 type Message = Anthropic.Beta.BetaMessage;
@@ -32,14 +32,15 @@ export type BrainReply = {
 /** Tool rounds per reply before the Brain must answer with what it has. */
 export const MAX_STEPS = 10;
 
-export function brainParams(system: string, messages: MessageParam[]): BrainParams {
+/** `setup`: the chat's BRAIN_SETUP_VERSION (tools must stay identical for the whole chat). */
+export function brainParams(system: string, messages: MessageParam[], setup = 1): BrainParams {
   return {
     model: BRAIN_MODEL,
     max_tokens: 32000,
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }], // same all chat: cached
     cache_control: { type: "ephemeral" }, // and the conversation so far
     messages,
-    tools: [...BRAIN_TOOLS, WEB_SEARCH_TOOL],
+    tools: [...BRAIN_TOOLS, webSearchTool(brainSearchLimit(setup))],
     output_config: { effort: "medium" },
     // If Claude's safety filters decline (e.g. a false positive on a biotech deck), the API
     // retries on the model Anthropic designates, within the same call.
@@ -67,6 +68,7 @@ function sourcesOf(m: Message): BrainSource[] {
 export async function runBrainTurn(opts: {
   call: BrainModelCall;
   system: string;
+  setup?: number; // the chat's setup version (BrainContext.setup)
   history: MessageParam[]; // the conversation so far, ending with the new question
   runTool: (name: string, input: Record<string, unknown>) => Promise<ToolResult["content"]>;
   onProgress: (p: { text: string; activity: string | null }) => void;
@@ -82,7 +84,7 @@ export async function runBrainTurn(opts: {
 
   for (let step = 0; step < MAX_STEPS; step++) {
     let live = "";
-    const message = await opts.call(brainParams(opts.system, [...opts.history, ...appended]), {
+    const message = await opts.call(brainParams(opts.system, [...opts.history, ...appended], opts.setup), {
       onText: (delta) => {
         live += delta;
         opts.onProgress({ text: shown(live), activity: null });

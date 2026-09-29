@@ -119,6 +119,7 @@ export async function runBrainReply(messageId: string, deps: BrainWorkerDeps = {
       const reply = await runBrainTurn({
         call: deps.call ?? defaultCall(),
         system: buildBrainSystem(context),
+        setup: context.setup ?? 1,
         history,
         runTool: (name, input) => runBrainTool(name, input, { pool, readDeck: read }),
         onProgress: ({ text, activity }) => save(text, activity ?? (text ? null : "Thinking"), !!activity),
