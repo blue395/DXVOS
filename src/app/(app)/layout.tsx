@@ -29,15 +29,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </Link>
           <nav className="flex flex-1 items-center gap-1 overflow-x-auto text-sm">
             <NavLink href="/">Dashboard</NavLink>
-            <NavLink href="/angels" disabled>
-              Angels
-            </NavLink>
             <NavLink href="/deals">Deals</NavLink>
-            <NavLink href="/playbook" badge={suggestedLessons}>
-              Playbook
-            </NavLink>
             <NavLink href="/portfolio" disabled>
               Portfolio
+            </NavLink>
+            <NavLink href="/playbook" badge={suggestedLessons}>
+              Playbook
             </NavLink>
             <NavLink href="/activity">Activity</NavLink>
           </nav>

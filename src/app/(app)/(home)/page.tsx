@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ALL_STAGES, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
+import { dealsByStage, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
 import { Card, formatDate } from "@/components/ui";
 
 // Admin-only (spec: angels must never see the Dashboard or Activity, even once they
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     ]),
   );
 
-  const byStage = ALL_STAGES.map((s) => ({ ...s, count: ventures.filter((v) => v.currentStage === s.key).length }));
+  const byStage = dealsByStage(ventures.map((v) => v.currentStage));
   const maxCount = Math.max(1, ...byStage.map((s) => s.count));
   const metrics = dashboardMetrics(ventures);
   // One row per founder/venture (that's what the headline counts), listing each gate owed.

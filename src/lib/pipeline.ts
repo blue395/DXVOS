@@ -84,6 +84,11 @@ export function boardColumn(stage: Stage): Stage {
   return stage === "SEIS_CERTIFICATE" ? "INVESTMENT_COMPLETE" : stage;
 }
 
+/** Dashboard "Deals by stage": the board's stages (S/EIS Certificate counts as Investment Complete) plus Declined. */
+export function dealsByStage(stages: Stage[]): (StageMeta & { count: number })[] {
+  return [...BOARD_STAGES, PASSED_STAGE].map((s) => ({ ...s, count: stages.filter((st) => boardColumn(st) === s.key).length }));
+}
+
 export function stageMeta(stage: Stage): StageMeta {
   const meta = ALL_STAGES.find((s) => s.key === stage) ?? RETIRED_STAGES.find((s) => s.key === stage);
   if (!meta) throw new Error(`Unknown stage ${stage}`);
