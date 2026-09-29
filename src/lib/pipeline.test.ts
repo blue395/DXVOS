@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  nextOnboardingStep,
+  portalState,
   angelTotals,
   canSeeLiveDeals,
   certificationExpiry,
@@ -510,5 +512,30 @@ describe("angel names and lists", () => {
         ],
       ),
     ).toEqual({ committedGbp: 8000, investedGbp: 7000, deals: 1 });
+  });
+});
+
+describe("angel onboarding", () => {
+  const d = (s: string) => new Date(`${s}T12:00:00Z`);
+  const now = d("2026-10-04");
+  const blank = { profileConfirmedAt: null, restrictedDeclaredAt: null, onboardedAt: null };
+  const current = { signedOn: d("2026-10-04"), expiresOn: d("2027-10-04") };
+  it("goes profile, then certify, then welcome, then done", () => {
+    expect(nextOnboardingStep(blank, null, now)).toBe("profile");
+    expect(nextOnboardingStep({ ...blank, profileConfirmedAt: now }, null, now)).toBe("certify");
+    expect(nextOnboardingStep({ ...blank, profileConfirmedAt: now }, { signedOn: d("2025-01-01"), expiresOn: d("2026-01-01") }, now)).toBe("certify");
+    expect(nextOnboardingStep({ ...blank, profileConfirmedAt: now }, current, now)).toBe("welcome");
+    expect(nextOnboardingStep({ ...blank, profileConfirmedAt: now, restrictedDeclaredAt: now }, null, now)).toBe("welcome");
+    expect(nextOnboardingStep({ profileConfirmedAt: now, restrictedDeclaredAt: null, onboardedAt: now }, current, now)).toBe("done");
+  });
+  it("reports portal access for the admin view", () => {
+    const invite = (o: object = {}) => ({ expiresAt: d("2026-10-10"), usedAt: null, revokedAt: null, kind: "INVITE" as const, ...o });
+    expect(portalState({ onboardedAt: null }, null, null, now)).toBe("not-invited");
+    expect(portalState({ onboardedAt: null }, null, invite(), now)).toBe("invited");
+    expect(portalState({ onboardedAt: null }, null, invite({ expiresAt: d("2026-10-01") }), now)).toBe("invite-expired");
+    expect(portalState({ onboardedAt: null }, null, invite({ revokedAt: now }), now)).toBe("not-invited");
+    expect(portalState({ onboardedAt: null }, { disabledAt: null }, invite({ usedAt: now }), now)).toBe("onboarding");
+    expect(portalState({ onboardedAt: now }, { disabledAt: null }, null, now)).toBe("active");
+    expect(portalState({ onboardedAt: now }, { disabledAt: now }, null, now)).toBe("revoked");
   });
 });

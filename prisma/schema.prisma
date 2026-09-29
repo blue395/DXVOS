@@ -24,16 +24,20 @@ datasource db {
 
 enum Role {
   ADMIN
-  // ANGEL — added when angel self-service login lands (deferred, spec §9)
+  ANGEL // a syndicate member's portal login (linked to one Angel record); sees only /portal
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   name         String
   passwordHash String
-  role         Role     @default(ADMIN)
-  createdAt    DateTime @default(now())
+  role         Role      @default(ADMIN)
+  createdAt    DateTime  @default(now())
+  angelId      String?   @unique // ANGEL users: their Angel record
+  angel        Angel?    @relation("AngelUser", fields: [angelId], references: [id])
+  disabledAt   DateTime? // access revoked: treated as signed out everywhere
+  lastSignInAt DateTime?
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -66,6 +70,9 @@ model User {
   angelCertifications     AngelCertification[]
   angelNotes              AngelNote[]
   angelAliases            AngelAlias[]
+  angelInvitesCreated     AngelInvite[]
+  complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
+  complianceTextsApproved ComplianceText[]     @relation("ComplianceTextApprovedBy")
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -728,12 +735,21 @@ model Angel {
   membershipTier String? // reserved for the membership fee decision (spec §8); unused
   joinedAt       DateTime? // became a member
   archivedAt     DateTime? // hidden (duplicates, mistakes); never deleted
-  createdById    String
-  createdBy      User        @relation("AngelCreatedBy", fields: [createdById], references: [id])
-  updatedById    String?
-  updatedBy      User?       @relation("AngelUpdatedBy", fields: [updatedById], references: [id])
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  ticketRange    String? // typical cheque size, as they told us (onboarding)
+  experience     String? // angel investing experience, as they told us (onboarding)
+
+  // Portal onboarding (each step stamped when done)
+  termsAcceptedAt      DateTime?
+  termsVersionId       String? // the ComplianceText (MEMBER_TERMS) they accepted
+  profileConfirmedAt   DateTime?
+  restrictedDeclaredAt DateTime? // said no FCA exemption applies: portal without deal content
+  onboardedAt          DateTime? // finished onboarding (saw the welcome)
+  createdById          String
+  createdBy            User      @relation("AngelCreatedBy", fields: [createdById], references: [id])
+  updatedById          String?
+  updatedBy            User?     @relation("AngelUpdatedBy", fields: [updatedById], references: [id])
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   certifications    AngelCertification[]
   notes             AngelNote[]
@@ -741,27 +757,37 @@ model Angel {
   preSelectionVotes PreSelectionVote[]
   investmentVotes   InvestmentVote[]
   finalInvestments  FinalInvestment[]
+  user              User?                @relation("AngelUser")
+  invites           AngelInvite[]
+  events            AngelEvent[]
 
   @@index([status])
 }
 
 // Append-only: each signed investor statement, with the file if there is one.
 model AngelCertification {
-  id           String            @id @default(cuid())
-  angelId      String
-  angel        Angel             @relation(fields: [angelId], references: [id], onDelete: Cascade)
-  type         CertificationType
-  signedOn     DateTime
-  expiresOn    DateTime
-  note         String?
-  bucket       String? // the signed statement, in Supabase Storage ("documents")
-  storagePath  String?
-  fileName     String?
-  mimeType     String?
-  sizeBytes    Int?
-  recordedById String
-  recordedBy   User              @relation(fields: [recordedById], references: [id])
-  recordedAt   DateTime          @default(now())
+  id               String            @id @default(cuid())
+  angelId          String
+  angel            Angel             @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  type             CertificationType
+  signedOn         DateTime
+  expiresOn        DateTime
+  note             String?
+  bucket           String? // the signed statement, in Supabase Storage ("documents")
+  storagePath      String?
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  recordedById     String
+  recordedBy       User              @relation(fields: [recordedById], references: [id])
+  recordedAt       DateTime          @default(now())
+  // Signed by the angel in the portal: the exact wording version, what they ticked, their typed name.
+  signedByAngel    Boolean           @default(false)
+  complianceTextId String?
+  complianceText   ComplianceText?   @relation(fields: [complianceTextId], references: [id])
+  criteria         String[]
+  signatureName    String?
+  ipAddress        String?
 
   @@index([angelId, signedOn])
 }
@@ -789,4 +815,76 @@ model AngelAlias {
   confirmedById String
   confirmedBy   User     @relation(fields: [confirmedById], references: [id])
   createdAt     DateTime @default(now())
+}
+
+// ── Angel portal ────────────────────────────────────────────────────────────
+
+enum InviteKind {
+  INVITE // first sign-up: create the angel's login
+  RESET // set a new password (no email service yet, so admins hand these out)
+}
+
+// A one-time link to /join/<token>. Only a SHA-256 hash of the token is stored.
+model AngelInvite {
+  id          String     @id @default(cuid())
+  angelId     String
+  angel       Angel      @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  kind        InviteKind @default(INVITE)
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+
+  @@index([angelId, createdAt])
+}
+
+enum ComplianceTextKind {
+  HNW_STATEMENT // certified high net worth individual statement (FPO art. 48)
+  SOPHISTICATED_STATEMENT // self-certified sophisticated investor statement (FPO art. 50A)
+  MEMBER_TERMS // DXV member terms and privacy notice, accepted at sign-up
+}
+
+enum ComplianceTextStatus {
+  DRAFT
+  APPROVED // the one in use (one per kind)
+  RETIRED // replaced by a newer approved version; kept, as signatures refer to it
+}
+
+// Versioned legal wording shown to angels. The body never changes once saved: an edit
+// is a new version, and a version must be approved by an admin before angels see it.
+model ComplianceText {
+  id           String               @id @default(cuid())
+  kind         ComplianceTextKind
+  version      Int
+  title        String
+  body         String
+  criteria     String[] // statements: the qualifying criteria the angel ticks (at least one)
+  status       ComplianceTextStatus @default(DRAFT)
+  note         String? // what changed and why
+  createdById  String
+  createdBy    User                 @relation("ComplianceTextCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime             @default(now())
+  approvedById String?
+  approvedBy   User?                @relation("ComplianceTextApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  certifications AngelCertification[]
+
+  @@unique([kind, version])
+}
+
+// Append-only log of an angel's portal journey (invited, joined, signed, access revoked...).
+model AngelEvent {
+  id        String   @id @default(cuid())
+  angelId   String
+  angel     Angel    @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  kind      String
+  detail    String?
+  actorId   String? // who did it (an admin, or the angel's own login)
+  createdAt DateTime @default(now())
+
+  @@index([angelId, createdAt])
 }

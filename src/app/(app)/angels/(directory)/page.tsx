@@ -58,6 +58,9 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/angels/statements" className={buttonClass("secondary")}>
+            Statements &amp; terms
+          </Link>
           <Link href="/angels/import" className={buttonClass("secondary")}>
             Import CSV
           </Link>

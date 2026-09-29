@@ -201,6 +201,27 @@ DXV's members and prospects (spec §8), admin-only for now.
   promotions), membership fees (`membershipTier` reserved). Ethnicity isn't recorded (special-category data)
   until Kevin confirms the lawful basis.
 
+## Angel portal (`/portal`) and onboarding
+
+Syndicate members get their own login and a separate, minimal portal. Nothing from the team's app is visible to
+them; deals appear only when DXV shares one (next build: the deal room, with stage-based documents).
+- **Invite**: on an angel's page, **Portal access → Create invite link** makes a one-time link (14 days) to send by
+  WhatsApp or email. Only its hash is stored. The same card makes **password reset links**, revokes or restores
+  access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
+  also angels keep their team login (one email, one login).
+- **Onboarding** (`/join/<token>` then `/portal/...`): set a password and accept the member terms → **Your details**
+  ("Is this you?" for members DXV already knows, questions for new ones: sectors, cheque size, experience, how they
+  heard, optional self-declared tags) → **Investor statement** (HNW or self-certified sophisticated, the approved
+  wording, criteria ticked, signed by typing their name; or "neither applies", which keeps deals hidden) →
+  **Welcome** (how DXV works; a slot for the how-to video) → home. Members DXV already holds a current statement for
+  skip the signing step. Accepting an invite makes a prospect a member.
+- **Home**: statement status with renewal, deals (empty until the deal room), profile, how-to video slot.
+- **Statements & terms** (`/angels/statements`): the legal wording angels read, versioned and approved by an admin;
+  invites are paused until all three are approved. The starting drafts follow the FCA Financial Promotion Order
+  2005 (Schedule 5, as amended in 2024) and must be checked word for word (Kevin) before approval.
+- **Security**: `requireAngel()` on every portal page and action (own data only); `requireAdmin()` redirects angels
+  to `/portal`; team APIs return 401; revoked logins and archived angels are treated as signed out.
+
 ## DXV Brain (floating AI assistant, every page)
 
 The **DXV Brain** button (bottom right, or Ctrl+J) opens a chat with Claude Opus 5.5 that is DXV-first:

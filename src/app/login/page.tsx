@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, homeFor } from "@/lib/auth";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, inputClass } from "@/components/ui";
 import { login } from "./actions";
 
 export default async function LoginPage() {
-  if (await getCurrentUser()) redirect("/");
+  const user = await getCurrentUser();
+  if (user) redirect(homeFor(user.role));
 
   return (
     <main className="flex flex-1 items-center justify-center bg-dxv-green px-4">
@@ -13,7 +14,7 @@ export default async function LoginPage() {
         <div className="mb-6">
           <p className="inline-block rounded bg-dxv-yellow px-2 py-0.5 text-xs font-bold tracking-widest text-dxv-green">DXV</p>
           <h1 className="mt-3 text-2xl font-semibold text-dxv-green">DXV OS</h1>
-          <p className="text-sm text-black/60">Admin sign in</p>
+          <p className="text-sm text-black/60">Sign in (DXV team and members)</p>
         </div>
         <ActionForm action={login} className="space-y-4" resetOnSuccess={false}>
           <Field label="Email">

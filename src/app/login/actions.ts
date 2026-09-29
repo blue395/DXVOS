@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession, deleteSession } from "@/lib/session";
+import { homeFor } from "@/lib/auth";
 import type { ActionResult } from "@/lib/action-result";
 
 // Pre-computed hash of a random string. Comparing against it when the email is
@@ -22,10 +23,11 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
 
   const user = await db.user.findUnique({ where: { email: parsed.data.email } });
   const valid = await bcrypt.compare(parsed.data.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !valid || user.role !== "ADMIN") return { error: "Incorrect email or password." };
+  if (!user || !valid || user.disabledAt) return { error: "Incorrect email or password." };
 
   await createSession(user.id);
-  redirect("/");
+  await db.user.update({ where: { id: user.id }, data: { lastSignInAt: new Date() } });
+  redirect(homeFor(user.role));
 }
 
 export async function logout() {

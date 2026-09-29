@@ -107,18 +107,33 @@ export async function updateAngel(angelId: string, _prev: ActionResult, formData
   if (await emailTaken(r.data.email, angelId)) return { error: "Another angel already has that email." };
   const current = await db.angel.findUnique({
     where: { id: angelId },
-    select: { joinedAt: true },
+    select: { joinedAt: true, email: true, user: { select: { id: true } } },
   });
   if (!current) return { error: "Angel not found." };
-  await db.angel.update({
-    where: { id: angelId },
-    data: {
-      ...r.data,
-      // Becoming a member for the first time stamps the join date (unless one was given).
-      joinedAt: r.data.joinedAt ?? current.joinedAt ?? (r.data.status === "MEMBER" ? new Date() : null),
-      updatedById: user.id,
-    },
-  });
+  // Their email is also their portal login: keep the two in step.
+  const loginEmailChange = current.user && r.data.email !== current.email;
+  if (loginEmailChange) {
+    if (!r.data.email) return { error: "They have a portal login, so they need an email." };
+    const other = await db.user.findUnique({ where: { email: r.data.email }, select: { id: true } });
+    if (other && other.id !== current.user!.id) return { error: "That email is already someone else's login." };
+  }
+  await db.$transaction([
+    db.angel.update({
+      where: { id: angelId },
+      data: {
+        ...r.data,
+        // Becoming a member for the first time stamps the join date (unless one was given).
+        joinedAt: r.data.joinedAt ?? current.joinedAt ?? (r.data.status === "MEMBER" ? new Date() : null),
+        updatedById: user.id,
+      },
+    }),
+    ...(loginEmailChange
+      ? [
+          db.user.update({ where: { id: current.user!.id }, data: { email: r.data.email! } }),
+          db.angelEvent.create({ data: { angelId, kind: "login-email-changed", detail: `${current.email} to ${r.data.email}`, actorId: user.id } }),
+        ]
+      : []),
+  ]);
   revalidateAngels(angelId);
   return { ok: true };
 }
