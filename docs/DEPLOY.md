@@ -39,7 +39,7 @@ Roughly 30 minutes, once. After that, every merge to `main` deploys automaticall
    | `DATABASE_URL` | Transaction pooler string (port 6543) |
    | `DIRECT_URL` | Session pooler string (port 5432) |
    | `SESSION_SECRET` | 40+ random characters — e.g. generate a long password in your password manager. Never reuse it anywhere. |
-   | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | A fixed key so pages left open across a deploy keep working (otherwise every deploy changes the IDs of all buttons/forms and open pages fail with "Server Action … was not found"). Must be **exactly 32 random bytes, base64-encoded** (44 characters ending in `=`): generate with `openssl rand -base64 32`. Scope: Builds and Functions. Never change it casually. |
+   | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | A fixed key so pages left open across a deploy keep working (otherwise every deploy changes the IDs of all buttons/forms and open pages fail with "Server Action … was not found"). Must be **exactly 32 random bytes, base64-encoded** (44 characters ending in `=`): generate with `openssl rand -base64 32`. Scope: Builds and Functions. Never change it casually. On Windows, generate in PowerShell: `$b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)`. (`netlify.toml` tells the secrets scan to skip this key: Next.js keeps it in a server-only file.) |
    
 3. **Turn off Deploy Previews for now.** Site configuration → Build & deploy →
    *Deploy Previews* → "Don't deploy pull requests". Previews would otherwise run

@@ -6,6 +6,10 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Next.js stores NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in its server-side
+  # server-reference-manifest (never in browser assets: verified), which Netlify's
+  # secrets scan flags. Skip only this key; every other secret is still scanned.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"
 
 # Only PRODUCTION deploys (merges to main) apply database migrations.
 # Deploy previews must never change the production database schema.
