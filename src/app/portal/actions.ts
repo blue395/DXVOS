@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
 import { certificationExpiry, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, TICKET_RANGES } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
+import { angelHasDealAccess, loadDealRoom } from "@/lib/portal-deals";
 
 const text = (max: number) =>
   z
@@ -134,4 +135,79 @@ export async function finishOnboarding(): Promise<ActionResult> {
     ]);
   }
   redirect("/portal");
+}
+
+// ── Deal room votes ─────────────────────────────────────────────────────────
+// Recorded straight into the deal's Pre-Selection votes and Commitments (EOIs), as the
+// signed-in angel. Checked on every call: deal access, the deal shared and at a stage
+// that takes this vote.
+
+async function votableDeal(ventureId: string, kind: "pre-selection" | "eoi") {
+  const { user, angel } = await requireAngel();
+  if (!(await angelHasDealAccess(angel))) return { error: "Deals are open to members with a current investor statement." } as const;
+  const room = await loadDealRoom(ventureId, angel.id);
+  if (!room || room.voteKind !== kind) return { error: "This vote has closed. Reload the page to see where the deal is now." } as const;
+  return { user, angel, room } as const;
+}
+
+function revalidateVote(ventureId: string) {
+  revalidatePath(`/portal/deals/${ventureId}`);
+  revalidatePath(`/deals/${ventureId}`);
+}
+
+const VoteNote = z.string().trim().max(1000).optional().transform((s) => s || null);
+
+export async function castPreSelectionVote(ventureId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const parsed = z.object({ interested: z.enum(["yes", "no"], { message: "Choose yes or no" }), note: VoteNote }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const ctx = await votableDeal(ventureId, "pre-selection");
+  if ("error" in ctx) return { error: ctx.error };
+  const interested = parsed.data.interested === "yes";
+  await db.$transaction([
+    db.preSelectionVote.create({
+      data: { ventureId, angelName: ctx.angel.name, angelId: ctx.angel.id, interested, note: parsed.data.note, recordedById: ctx.user.id },
+    }),
+    db.angelEvent.create({
+      data: { angelId: ctx.angel.id, kind: "pitch-selection-vote", detail: `${ctx.room.name}: ${interested ? "interested" : "not interested"}`, actorId: ctx.user.id },
+    }),
+  ]);
+  revalidateVote(ventureId);
+  return { ok: true };
+}
+
+const EoiSchema = z
+  .object({
+    interested: z.enum(["yes", "no"], { message: "Choose yes or no" }),
+    maxTicketGbp: z
+      .string()
+      .trim()
+      .optional()
+      .transform((s) => (s ? Number(s.replace(/[£,\s]/g, "")) : 0))
+      .refine((n) => Number.isInteger(n) && n >= 0 && n <= 10_000_000, "Enter a whole number of pounds"),
+    note: VoteNote,
+  })
+  .refine((v) => v.interested === "no" || v.maxTicketGbp > 0, { message: "Enter the most you'd invest" });
+
+export async function castEoi(ventureId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const parsed = EoiSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const ctx = await votableDeal(ventureId, "eoi");
+  if ("error" in ctx) return { error: ctx.error };
+  const interested = parsed.data.interested === "yes";
+  const maxTicketGbp = interested ? parsed.data.maxTicketGbp : 0;
+  await db.$transaction([
+    db.investmentVote.create({
+      data: { ventureId, angelName: ctx.angel.name, angelId: ctx.angel.id, interested, maxTicketGbp, note: parsed.data.note, recordedById: ctx.user.id },
+    }),
+    db.angelEvent.create({
+      data: {
+        angelId: ctx.angel.id,
+        kind: "expression-of-interest",
+        detail: `${ctx.room.name}: ${interested ? `up to £${maxTicketGbp.toLocaleString("en-GB")}` : "not investing"}`,
+        actorId: ctx.user.id,
+      },
+    }),
+  ]);
+  revalidateVote(ventureId);
+  return { ok: true };
 }

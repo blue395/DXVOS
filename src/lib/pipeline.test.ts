@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  angelDealPhase,
+  angelDealVisibility,
+  angelSeesDocument,
+  angelSeesMemo,
+  angelVoteKind,
   nextOnboardingStep,
   portalState,
   angelTotals,
@@ -537,5 +542,42 @@ describe("angel onboarding", () => {
     expect(portalState({ onboardedAt: null }, { disabledAt: null }, invite({ usedAt: now }), now)).toBe("onboarding");
     expect(portalState({ onboardedAt: now }, { disabledAt: null }, null, now)).toBe("active");
     expect(portalState({ onboardedAt: now }, { disabledAt: now }, null, now)).toBe("revoked");
+  });
+});
+
+describe("deal room", () => {
+  const now = new Date("2026-10-05T12:00:00Z");
+  it("maps stages to phases: nothing before pitch selection or once declined", () => {
+    expect(angelDealPhase("SUBMITTED")).toBeNull();
+    expect(angelDealPhase("PARTNER_REVIEW")).toBeNull();
+    expect(angelDealPhase("PITCH_SELECTION")).toBe("pitch-selection");
+    expect(angelDealPhase("PITCH_OUTCOME")).toBe("post-pitch");
+    expect(angelDealPhase("INVESTMENT_COMMITMENTS")).toBe("commitments");
+    expect(angelDealPhase("DUE_DILIGENCE")).toBe("commitments");
+    expect(angelDealPhase("PASSED")).toBeNull();
+  });
+  it("shows a deal only when shared and at a visible stage", () => {
+    expect(angelDealVisibility({ sharedWithAngelsAt: null, currentStage: "PITCH_OUTCOME" })).toBeNull();
+    expect(angelDealVisibility({ sharedWithAngelsAt: now, currentStage: "PARTNER_REVIEW" })).toBeNull();
+    expect(angelDealVisibility({ sharedWithAngelsAt: now, currentStage: "PASSED" })).toBeNull();
+    expect(angelDealVisibility({ sharedWithAngelsAt: now, currentStage: "PITCH_SELECTION" })).toBe("pitch-selection");
+  });
+  it("unlocks the memo after the pitch and documents by their chosen phase", () => {
+    expect(angelSeesMemo("pitch-selection")).toBe(false);
+    expect(angelSeesMemo("post-pitch")).toBe(true);
+    const doc = (angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | null, o: object = {}) => ({ angelVisibleFrom, archivedAt: null, uploadedAt: now, ...o });
+    expect(angelSeesDocument("commitments", doc(null))).toBe(false);
+    expect(angelSeesDocument("pitch-selection", doc("POST_PITCH"))).toBe(false);
+    expect(angelSeesDocument("post-pitch", doc("POST_PITCH"))).toBe(true);
+    expect(angelSeesDocument("post-pitch", doc("COMMITMENTS"))).toBe(false);
+    expect(angelSeesDocument("commitments", doc("COMMITMENTS"))).toBe(true);
+    expect(angelSeesDocument("commitments", doc("POST_PITCH", { archivedAt: now }))).toBe(false);
+    expect(angelSeesDocument("commitments", doc("POST_PITCH", { uploadedAt: null }))).toBe(false);
+  });
+  it("opens pre-selection voting, then EOIs until DD", () => {
+    expect(angelVoteKind("PITCH_SELECTION")).toBe("pre-selection");
+    expect(angelVoteKind("PITCH_OUTCOME")).toBe("eoi");
+    expect(angelVoteKind("INVESTMENT_COMMITMENTS")).toBe("eoi");
+    expect(angelVoteKind("DUE_DILIGENCE")).toBeNull();
   });
 });

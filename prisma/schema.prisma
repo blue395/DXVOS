@@ -71,6 +71,7 @@ model User {
   angelNotes              AngelNote[]
   angelAliases            AngelAlias[]
   angelInvitesCreated     AngelInvite[]
+  dealShareLogs           DealShareLog[]
   complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
   complianceTextsApproved ComplianceText[]     @relation("ComplianceTextApprovedBy")
 }
@@ -127,6 +128,10 @@ model Venture {
   passNote        String?
   passedFromStage Stage? // where in the dealflow it was declined (set while currentStage = PASSED)
 
+  // Deal room: angels see nothing unless DXV shares the deal (and then by stage).
+  sharedWithAngelsAt DateTime? // null = not shared
+  angelSummary       String? // what angels read about the company (written by DXV for members)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdById String
@@ -148,6 +153,7 @@ model Venture {
   entryAudits        EntryAudit[]
   lessons            Lesson[]
   lessonJobs         LessonJob[]
+  shareLog           DealShareLog[]
 
   @@index([currentStage])
 }
@@ -504,25 +510,26 @@ enum DocumentCategory {
 // material, including declined deals, to learn from its dealflow. Mistaken uploads
 // are archived (hidden), not deleted.
 model Document {
-  id           String           @id @default(cuid())
-  ventureId    String
-  venture      Venture          @relation(fields: [ventureId], references: [id], onDelete: Cascade)
-  category     DocumentCategory
-  bucket       String // Supabase Storage bucket ("documents", or "decks" for AI-screened decks)
-  storagePath  String
-  fileName     String
-  mimeType     String
-  sizeBytes    Int
-  ddItemId     String? // attached to a DD checklist item
-  ddItem       DDItem?          @relation(fields: [ddItemId], references: [id], onDelete: SetNull)
-  note         String?
-  uploadedById String
-  uploadedBy   User             @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
-  createdAt    DateTime         @default(now())
-  uploadedAt   DateTime? // set once the browser confirms the upload finished (null = incomplete)
-  archivedAt   DateTime?
-  archivedById String?
-  archivedBy   User?            @relation("DocumentArchivedBy", fields: [archivedById], references: [id])
+  id               String           @id @default(cuid())
+  ventureId        String
+  venture          Venture          @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  category         DocumentCategory
+  bucket           String // Supabase Storage bucket ("documents", or "decks" for AI-screened decks)
+  storagePath      String
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  angelVisibleFrom AngelDocPhase? // shared deals: when members see this file (null = never; the deck shows automatically)
+  ddItemId         String? // attached to a DD checklist item
+  ddItem           DDItem?          @relation(fields: [ddItemId], references: [id], onDelete: SetNull)
+  note             String?
+  uploadedById     String
+  uploadedBy       User             @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  createdAt        DateTime         @default(now())
+  uploadedAt       DateTime? // set once the browser confirms the upload finished (null = incomplete)
+  archivedAt       DateTime?
+  archivedById     String?
+  archivedBy       User?            @relation("DocumentArchivedBy", fields: [archivedById], references: [id])
 
   memoVersion MemoVersion?
   ddReportJob DDReportJob?
@@ -887,4 +894,26 @@ model AngelEvent {
   createdAt DateTime @default(now())
 
   @@index([angelId, createdAt])
+}
+
+// ── Deal room ───────────────────────────────────────────────────────────────
+
+// From which deal-room phase members see a document (the pitch deck needs no setting).
+enum AngelDocPhase {
+  POST_PITCH // from the post-pitch vote (Pitch Outcome): with the deck and memo
+  COMMITMENTS // from Investment Commitments: the rest of the applicable documents
+}
+
+// Append-only: sharing and unsharing a deal with angels, and document visibility changes.
+model DealShareLog {
+  id        String   @id @default(cuid())
+  ventureId String
+  venture   Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  action    String // "shared", "unshared", "document", "summary"
+  detail    String?
+  byId      String
+  by        User     @relation(fields: [byId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([ventureId, createdAt])
 }

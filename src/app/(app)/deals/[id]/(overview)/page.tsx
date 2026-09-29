@@ -48,11 +48,13 @@ import { DDDocumentPanel } from "../dd-document";
 import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
 import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../investment-sections";
+import { AngelsCard } from "../angels-card";
+import { countAngelsWithDealAccess } from "@/lib/portal-deals";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
 
-  const [v, { _max }, angelNames] = await requireAdminWith(() =>
+  const [v, { _max }, angelNames, membersWithAccess] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -96,10 +98,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
           deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
           eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
+          shareLog: { orderBy: { createdAt: "desc" }, include: { by: { select: { name: true } } } },
         },
       }),
       db.venture.aggregate({ _max: { round: true } }),
       angelNameOptions(),
+      countAngelsWithDealAccess(),
     ]),
   );
   if (!v) notFound();
@@ -446,6 +450,21 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               </p>
             )}
           </Card>
+
+          <AngelsCard
+            ventureId={v.id}
+            name={v.name}
+            stage={v.currentStage}
+            sharedAt={v.sharedWithAngelsAt}
+            summary={v.angelSummary}
+            docs={v.documents.filter((d) => !d.ddReportJob)} // AI-generated DD reports stay team-only
+            latestIssueName={(() => {
+              const issue = v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO");
+              return issue ? reviewIssueName(issueNo.get(issue.id)!) : null;
+            })()}
+            membersWithAccess={membersWithAccess}
+            log={v.shareLog}
+          />
 
           <Card title="Founder comms">
             {commsSplit.latest === null ? (
