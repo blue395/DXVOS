@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <NavLink href="/portfolio" disabled>
               Portfolio
             </NavLink>
+            <NavLink href="/angels">Angels</NavLink>
             <NavLink href="/playbook" badge={suggestedLessons}>
               Playbook
             </NavLink>

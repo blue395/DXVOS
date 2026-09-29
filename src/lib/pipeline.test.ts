@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  angelTotals,
+  canSeeLiveDeals,
+  certificationExpiry,
+  certNeedsAction,
+  certState,
+  findDuplicateAngels,
+  latestCertification,
+  matchesAngelFilter,
+  parseList,
+  resolveAngelId,
+  suggestAngelMatch,
   dealsByStage,
   deckCardState,
   ALL_STAGES,
@@ -410,5 +421,94 @@ describe("dealsByStage", () => {
     expect(count("INVESTMENT_COMPLETE")).toBe(2);
     expect(count("SUBMITTED")).toBe(1);
     expect(rows.at(-1)).toMatchObject({ key: "PASSED", label: "Declined", count: 1 });
+  });
+});
+
+describe("angel certification", () => {
+  const d = (s: string) => new Date(`${s}T12:00:00Z`);
+  it("expires 12 months after signing (36 for an FCA-firm certificate), clamping month ends", () => {
+    expect(certificationExpiry("HIGH_NET_WORTH", d("2026-03-15")).toISOString().slice(0, 10)).toBe("2027-03-15");
+    expect(certificationExpiry("SELF_CERTIFIED_SOPHISTICATED", d("2028-02-29")).toISOString().slice(0, 10)).toBe("2029-02-28");
+    expect(certificationExpiry("CERTIFIED_SOPHISTICATED", d("2026-01-31")).toISOString().slice(0, 10)).toBe("2029-01-31");
+  });
+  it("uses the most recently signed statement, and flags due soon (30 days) and overdue", () => {
+    const now = d("2026-10-01");
+    const old = { signedOn: d("2025-01-01"), expiresOn: d("2026-01-01") };
+    const fresh = { signedOn: d("2025-10-20"), expiresOn: d("2026-10-20") };
+    expect(latestCertification([fresh, old])).toBe(fresh);
+    expect(certState(null, now)).toBe("none");
+    expect(certState(old, now)).toBe("overdue");
+    expect(certState(fresh, now)).toBe("due-soon");
+    expect(certState({ signedOn: now, expiresOn: d("2027-10-01") }, now)).toBe("current");
+  });
+  it("counts members without a current statement as needing action", () => {
+    expect(certNeedsAction("MEMBER", "overdue")).toBe(true);
+    expect(certNeedsAction("MEMBER", "none")).toBe(true);
+    expect(certNeedsAction("MEMBER", "due-soon")).toBe(false);
+    expect(certNeedsAction("PROSPECT", "none")).toBe(false);
+    expect(matchesAngelFilter("action", "MEMBER", "none")).toBe(true);
+    expect(matchesAngelFilter("due-soon", "MEMBER", "due-soon")).toBe(true);
+  });
+  it("gates live deals: only current, non-archived members", () => {
+    const now = d("2026-10-01");
+    const current = { signedOn: d("2026-06-01"), expiresOn: d("2027-06-01") };
+    expect(canSeeLiveDeals({ status: "MEMBER", archivedAt: null }, current, now)).toBe(true);
+    expect(canSeeLiveDeals({ status: "MEMBER", archivedAt: null }, { signedOn: d("2025-01-01"), expiresOn: d("2026-01-01") }, now)).toBe(false);
+    expect(canSeeLiveDeals({ status: "MEMBER", archivedAt: null }, null, now)).toBe(false);
+    expect(canSeeLiveDeals({ status: "PROSPECT", archivedAt: null }, current, now)).toBe(false);
+    expect(canSeeLiveDeals({ status: "MEMBER", archivedAt: now }, current, now)).toBe(false);
+  });
+});
+
+describe("angel names and lists", () => {
+  const angels = [
+    { id: "k", name: "Kevin Walker" },
+    { id: "a", name: "Anna Clarke" },
+    { id: "a2", name: "Anna Smith" },
+  ];
+  it("suggests a match only when it's unambiguous", () => {
+    expect(suggestAngelMatch("kevin walker", angels)).toBe("k");
+    expect(suggestAngelMatch("Kevin W", angels)).toBe("k");
+    expect(suggestAngelMatch("Kevin W.", angels)).toBe("k");
+    expect(suggestAngelMatch("Kevin", angels)).toBe("k");
+    expect(suggestAngelMatch("Anna C", angels)).toBe("a");
+    expect(suggestAngelMatch("Anna", angels)).toBeNull(); // two Annas
+    expect(suggestAngelMatch("Grace Hopper", angels)).toBeNull();
+  });
+  it("resolves a vote to an angel by pick, else a confirmed alias", () => {
+    const aliases = new Map([["kevin w", "k"]]);
+    expect(resolveAngelId({ angelId: "a", angelName: "Kevin W" }, aliases)).toBe("a");
+    expect(resolveAngelId({ angelId: null, angelName: " Kevin  W " }, aliases)).toBe("k");
+    expect(resolveAngelId({ angelId: null, angelName: "Someone" }, aliases)).toBeNull();
+  });
+  it("finds duplicates by email or name", () => {
+    const groups = findDuplicateAngels([
+      { id: "1", name: "Ada Lovelace", email: "ada@x.com" },
+      { id: "2", name: "A. Lovelace", email: "ADA@x.com " },
+      { id: "3", name: "Grace Hopper", email: null },
+      { id: "4", name: "grace  hopper", email: "g@x.com" },
+      { id: "5", name: "Alan Turing", email: null },
+    ]);
+    expect(groups.map((g) => g.map((a) => a.id).sort())).toEqual([["1", "2"], ["3", "4"]]);
+  });
+  it("parses comma lists", () => {
+    expect(parseList(" Fintech, health ;Fintech,, Climate tech ")).toEqual(["Fintech", "health", "Climate tech"]);
+    expect(parseList(null)).toEqual([]);
+  });
+  it("totals an angel's latest EOI per deal and paid tickets", () => {
+    const t = (s: string) => new Date(s);
+    expect(
+      angelTotals(
+        [
+          { ventureId: "v1", interested: true, maxTicketGbp: 5000, createdAt: t("2026-01-01") },
+          { ventureId: "v1", interested: true, maxTicketGbp: 8000, createdAt: t("2026-02-01") },
+          { ventureId: "v2", interested: false, maxTicketGbp: 0, createdAt: t("2026-01-01") },
+        ],
+        [
+          { ticketGbp: 7000, paidAt: t("2026-03-01") },
+          { ticketGbp: 3000, paidAt: null },
+        ],
+      ),
+    ).toEqual({ committedGbp: 8000, investedGbp: 7000, deals: 1 });
   });
 });

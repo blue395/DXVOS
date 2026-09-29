@@ -44,23 +44,28 @@ model User {
   deckAnalyses            DeckAnalysis[]
   eligibilityReviews      EligibilityReview[]
   memoAnalyses            MemoAnalysis[]
-  memoDraftsCreated       MemoDraft[]         @relation("MemoDraftCreatedBy")
-  memoDraftsUpdated       MemoDraft[]         @relation("MemoDraftUpdatedBy")
+  memoDraftsCreated       MemoDraft[]          @relation("MemoDraftCreatedBy")
+  memoDraftsUpdated       MemoDraft[]          @relation("MemoDraftUpdatedBy")
   memoScoreChanges        MemoScoreChange[]
-  documentsUploaded       Document[]          @relation("DocumentUploadedBy")
-  documentsArchived       Document[]          @relation("DocumentArchivedBy")
+  documentsUploaded       Document[]           @relation("DocumentUploadedBy")
+  documentsArchived       Document[]           @relation("DocumentArchivedBy")
   ddReportJobs            DDReportJob[]
-  investmentVotesRemoved  InvestmentVote[]    @relation("InvestmentVoteRemovedBy")
-  finalInvestmentsCreated FinalInvestment[]   @relation("FinalInvestmentCreatedBy")
-  finalInvestmentsPaid    FinalInvestment[]   @relation("FinalInvestmentPaidBy")
-  finalInvestmentsRemoved FinalInvestment[]   @relation("FinalInvestmentRemovedBy")
+  investmentVotesRemoved  InvestmentVote[]     @relation("InvestmentVoteRemovedBy")
+  finalInvestmentsCreated FinalInvestment[]    @relation("FinalInvestmentCreatedBy")
+  finalInvestmentsPaid    FinalInvestment[]    @relation("FinalInvestmentPaidBy")
+  finalInvestmentsRemoved FinalInvestment[]    @relation("FinalInvestmentRemovedBy")
   entryAudits             EntryAudit[]
   playbookVersions        PlaybookVersion[]
-  lessonsCreated          Lesson[]            @relation("LessonCreatedBy")
-  lessonsApproved         Lesson[]            @relation("LessonApprovedBy")
-  lessonsUpdated          Lesson[]            @relation("LessonUpdatedBy")
+  lessonsCreated          Lesson[]             @relation("LessonCreatedBy")
+  lessonsApproved         Lesson[]             @relation("LessonApprovedBy")
+  lessonsUpdated          Lesson[]             @relation("LessonUpdatedBy")
   lessonJobs              LessonJob[]
   brainConversations      BrainConversation[]
+  angelsCreated           Angel[]              @relation("AngelCreatedBy")
+  angelsUpdated           Angel[]              @relation("AngelUpdatedBy")
+  angelCertifications     AngelCertification[]
+  angelNotes              AngelNote[]
+  angelAliases            AngelAlias[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -281,8 +286,9 @@ model PreSelectionVote {
   id           String   @id @default(cuid())
   ventureId    String
   venture      Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
-  angelName    String // free text in Week 1
-  angelId      String? // reserved: linked to Angel record in Week 2
+  angelName    String // as typed (kept as recorded)
+  angelId      String? // set when picked from the angel list; older entries link through AngelAlias
+  angel        Angel?   @relation(fields: [angelId], references: [id], onDelete: SetNull)
   interested   Boolean
   note         String?
   recordedById String
@@ -299,7 +305,8 @@ model InvestmentVote {
   ventureId    String
   venture      Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
   angelName    String
-  angelId      String?
+  angelId      String? // set when picked from the angel list; older entries link through AngelAlias
+  angel        Angel?    @relation(fields: [angelId], references: [id], onDelete: SetNull)
   interested   Boolean
   maxTicketGbp Int       @default(0)
   note         String?
@@ -324,6 +331,8 @@ model FinalInvestment {
   ventureId   String
   venture     Venture   @relation(fields: [ventureId], references: [id], onDelete: Cascade)
   angelName   String
+  angelId     String? // set when picked from the angel list; older entries link through AngelAlias
+  angel       Angel?    @relation(fields: [angelId], references: [id], onDelete: SetNull)
   ticketGbp   Int
   note        String?
   paidAt      DateTime?
@@ -442,9 +451,9 @@ model DeckAnalysis {
   startedAt    DateTime?
   completedAt  DateTime?
 
-  reviews   EligibilityReview[]
-  aiContext Json? // the criteria version and lessons this screen was given (null: built-in defaults)
-  intakeOnly Boolean @default(false) // board upload: only name/founder/stage read, no eligibility screen
+  reviews    EligibilityReview[]
+  aiContext  Json? // the criteria version and lessons this screen was given (null: built-in defaults)
+  intakeOnly Boolean             @default(false) // board upload: only name/founder/stage read, no eligibility screen
 
   @@index([ventureId, createdAt])
 }
@@ -684,4 +693,100 @@ model BrainMessage {
   completedAt    DateTime?
 
   @@index([conversationId, createdAt])
+}
+
+// ── Angels (spec §8) ────────────────────────────────────────────────────────
+
+enum AngelStatus {
+  PROSPECT // interested / being recruited, not yet a member
+  MEMBER
+  LAPSED // was a member, no longer active
+}
+
+// FCA financial promotion exemptions (COBS 4.12) an angel can rely on.
+enum CertificationType {
+  HIGH_NET_WORTH // certified high net worth individual statement (12 months)
+  SELF_CERTIFIED_SOPHISTICATED // self-certified sophisticated investor statement (12 months)
+  CERTIFIED_SOPHISTICATED // certificate from an FCA-authorised firm (36 months)
+}
+
+// A syndicate member or prospect. Certification is kept as an append-only history
+// (AngelCertification); the latest one decides whether they're current.
+model Angel {
+  id             String      @id @default(cuid())
+  name           String
+  email          String?     @unique
+  phone          String?
+  linkedinUrl    String?
+  location       String?
+  bio            String?
+  status         AngelStatus @default(PROSPECT)
+  sectors        String[] // sectors of interest
+  tags           String[] // self-declared only (e.g. "Woman angel"); never guessed
+  whatsappGroups String[] // DXV WhatsApp groups they're in (recorded, not integrated)
+  source         String? // how they came to DXV (event, referral, website...)
+  membershipTier String? // reserved for the membership fee decision (spec §8); unused
+  joinedAt       DateTime? // became a member
+  archivedAt     DateTime? // hidden (duplicates, mistakes); never deleted
+  createdById    String
+  createdBy      User        @relation("AngelCreatedBy", fields: [createdById], references: [id])
+  updatedById    String?
+  updatedBy      User?       @relation("AngelUpdatedBy", fields: [updatedById], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  certifications    AngelCertification[]
+  notes             AngelNote[]
+  aliases           AngelAlias[]
+  preSelectionVotes PreSelectionVote[]
+  investmentVotes   InvestmentVote[]
+  finalInvestments  FinalInvestment[]
+
+  @@index([status])
+}
+
+// Append-only: each signed investor statement, with the file if there is one.
+model AngelCertification {
+  id           String            @id @default(cuid())
+  angelId      String
+  angel        Angel             @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  type         CertificationType
+  signedOn     DateTime
+  expiresOn    DateTime
+  note         String?
+  bucket       String? // the signed statement, in Supabase Storage ("documents")
+  storagePath  String?
+  fileName     String?
+  mimeType     String?
+  sizeBytes    Int?
+  recordedById String
+  recordedBy   User              @relation(fields: [recordedById], references: [id])
+  recordedAt   DateTime          @default(now())
+
+  @@index([angelId, signedOn])
+}
+
+// Append-only notes on an angel.
+model AngelNote {
+  id        String   @id @default(cuid())
+  angelId   String
+  angel     Angel    @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  body      String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([angelId, createdAt])
+}
+
+// A name as typed on votes and investments ("Kevin W"), confirmed as this angel. Links
+// older free-text entries without editing them (votes are append-only).
+model AngelAlias {
+  id            String   @id @default(cuid())
+  normalized    String   @unique // normaliseAngelName()
+  angelId       String
+  angel         Angel    @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  confirmedById String
+  confirmedBy   User     @relation(fields: [confirmedById], references: [id])
+  createdAt     DateTime @default(now())
 }
