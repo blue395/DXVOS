@@ -79,7 +79,7 @@ scripts/                      seed.ts (dev), create-admin.ts
 - **Founder comms are created automatically.** Moving a deal out of a gate stage (or declining it)
   creates a `FounderComm` row as *Not yet sent*, so the dashboard's "founders awaiting a decision
   update" can't be forgotten. Skipping stages creates one per gate skipped; moving backwards creates none.
-- **Declined is pinned** on the board's right edge (stored as `PASSED`) — reachable from every stage, so it's always a drop target.
+- **Declined deals have their own board view** (stored as `PASSED`): the **Declined** pill next to the round pills (`/deals?declined=1`, combinable with a round) shows them read-only, grouped by the stage they were declined at. The live board has no Declined column; decline from the deal page.
 - **Investment commitments** show a running total of each angel's latest interested EOI (no threshold);
   a deal sitting in Investment Commitments for over 7 days gets a warning (`src/lib/pipeline.ts`).
 - **Auth is checked server-side in every page and action**, not just in `proxy.ts`

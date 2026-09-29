@@ -10,6 +10,9 @@ import {
   canDecline,
   BOARD_STAGES,
   boardColumn,
+  boardHref,
+  parseDeclinedFilter,
+  declinedColumn,
   cardOneLiner,
   formatGbpCompact,
   stagePhase,
@@ -315,5 +318,24 @@ describe("focusSections", () => {
     expect(focusSections("INVESTMENT_COMMITMENTS")).toContain("commitments");
     expect(focusSections("DUE_DILIGENCE")[0]).toBe("dd");
     for (const s of ALL_STAGES) expect(focusSections(s.key)).toContain("documents");
+  });
+});
+
+describe("declined board filter", () => {
+  it("reads the toggle and builds combined URLs", () => {
+    expect(parseDeclinedFilter("1")).toBe(true);
+    expect(parseDeclinedFilter(undefined)).toBe(false);
+    expect(parseDeclinedFilter("yes")).toBe(false);
+    expect(boardHref({ kind: "all" }, false)).toBe("/deals");
+    expect(boardHref({ kind: "all" }, true)).toBe("/deals?declined=1");
+    expect(boardHref({ kind: "round", round: 3 }, true)).toBe("/deals?round=3&declined=1");
+    expect(boardHref({ kind: "none" }, false)).toBe("/deals?round=none");
+  });
+
+  it("groups declined deals by the stage they were declined at", () => {
+    expect(declinedColumn("PITCH_OUTCOME")).toBe("PITCH_OUTCOME");
+    expect(declinedColumn("SEIS_CERTIFICATE")).toBe("INVESTMENT_COMPLETE");
+    expect(declinedColumn("CAPITAL_TRANSFER")).toBeNull(); // retired stage
+    expect(declinedColumn(null)).toBeNull();
   });
 });

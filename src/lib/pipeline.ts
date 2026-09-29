@@ -260,6 +260,29 @@ export function parseRoundFilter(value: string | string[] | undefined): RoundFil
   return v && Number.isInteger(n) && n > 0 ? { kind: "round", round: n } : { kind: "all" };
 }
 
+/** The board's ?declined= toggle: "1" shows declined deals instead of the live pipeline. */
+export function parseDeclinedFilter(value: string | string[] | undefined): boolean {
+  return (Array.isArray(value) ? value[0] : value) === "1";
+}
+
+/** Board URL for a round filter + declined toggle (both combine: a round's declined deals). */
+export function boardHref(filter: RoundFilter, declined: boolean): string {
+  const q = new URLSearchParams();
+  if (filter.kind === "round") q.set("round", String(filter.round));
+  if (filter.kind === "none") q.set("round", "none");
+  if (declined) q.set("declined", "1");
+  const qs = q.toString();
+  return qs ? `/deals?${qs}` : "/deals";
+}
+
+/** In the declined view, which board column a deal sits in: the stage it was declined at
+ *  (null when not recorded, or declined at a retired stage). */
+export function declinedColumn(passedFromStage: Stage | null): Stage | null {
+  if (!passedFromStage) return null;
+  const col = boardColumn(passedFromStage);
+  return BOARD_STAGES.some((s) => s.key === col) ? col : null;
+}
+
 // ── Dashboard metrics ───────────────────────────────────────────────────────
 
 /** Invested: reached Investment Complete (S/EIS Certificate is after it). */

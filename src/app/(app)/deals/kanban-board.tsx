@@ -12,11 +12,10 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import type { PassReason, Stage } from "@/generated/prisma/enums";
-import { BOARD_STAGES, boardColumn, formatGbpCompact, PASSED_STAGE, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
+import type { Stage } from "@/generated/prisma/enums";
+import { BOARD_STAGES, boardColumn, declinedColumn, formatGbpCompact, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
 import { Spinner, WarningIcon } from "@/components/ui";
 import { moveVenture } from "./actions";
-import { PassDialog } from "./pass-dialog";
 
 export type BoardCard = {
   id: string;
@@ -33,11 +32,16 @@ export type BoardCard = {
   warnings: string[];
   commsOwed: number;
   leadAngel: string | null;
+  /** Declined deals only: the stage it was declined at, and why. */
+  declinedAt: Stage | null;
+  declineReason: string | null;
 };
 
-export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
+// "live": the pipeline, drag to move. "declined": read-only, grouped by where each deal was declined.
+export type BoardView = "live" | "declined";
+
+export function KanbanBoard({ initialCards, view = "live" }: { initialCards: BoardCard[]; view?: BoardView }) {
   const [cards, setCards] = useState(initialCards);
-  const [pendingPass, setPendingPass] = useState<BoardCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -55,13 +59,13 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
     useSensor(KeyboardSensor),
   );
 
-  function move(card: BoardCard, to: Stage, passReason?: PassReason, note?: string) {
+  function move(card: BoardCard, to: Stage) {
     const before = cards;
     setError(null);
     setCards((cs) => cs.map((c) => (c.id === card.id ? { ...c, currentStage: to, daysInStage: 0 } : c)));
     setSaving((s) => new Set(s).add(card.id));
     startTransition(async () => {
-      const res = await moveVenture(card.id, { to, passReason, note });
+      const res = await moveVenture(card.id, { to });
       setSaving((s) => {
         const next = new Set(s);
         next.delete(card.id);
@@ -77,9 +81,31 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
   function onDragEnd(e: DragEndEvent) {
     const card = cards.find((c) => c.id === e.active.id);
     const to = e.over?.id as Stage | undefined;
-    if (!card || !to || to === boardColumn(card.currentStage)) return; // (S/EIS deals sit in Investment Complete)
-    if (to === "PASSED") setPendingPass(card);
-    else move(card, to);
+    if (view !== "live" || !card || !to || to === boardColumn(card.currentStage)) return; // (S/EIS deals sit in Investment Complete)
+    move(card, to);
+  }
+
+  if (view === "declined") {
+    // Read-only: columns are the stages deals were declined at (only those with deals).
+    const other = cards.filter((c) => declinedColumn(c.declinedAt) === null);
+    const columns = BOARD_STAGES.map((stage) => ({ stage, cards: cards.filter((c) => declinedColumn(c.declinedAt) === stage.key) })).filter(
+      (col) => col.cards.length > 0,
+    );
+    if (cards.length === 0) {
+      return <p className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/55">No declined deals in this selection.</p>;
+    }
+    return (
+      <DndContext id="deals-board-declined">
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          {columns.map(({ stage, cards: cs }) => (
+            <Column key={stage.key} stage={stage} cards={cs} saving={saving} declined />
+          ))}
+          {other.length > 0 && (
+            <Column stage={{ key: "PASSED", label: "Stage not recorded" }} cards={other} saving={saving} declined />
+          )}
+        </div>
+      </DndContext>
+    );
   }
 
   return (
@@ -92,27 +118,14 @@ export function KanbanBoard({ initialCards }: { initialCards: BoardCard[] }) {
       {/* Fixed id: dnd-kit otherwise numbers its accessibility ids with a counter that
           differs between server and browser rendering (a hydration mismatch). */}
       <DndContext id="deals-board" sensors={sensors} onDragEnd={onDragEnd}>
-        {/* The linear stages scroll horizontally; Declined is pinned to the right edge
-            because it's reachable from every stage and must always be a visible drop target. */}
+        {/* The linear stages scroll horizontally. Declined deals have their own view (the
+            Declined filter pill); decline a deal from its page. */}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {BOARD_STAGES.map((stage) => (
             <Column key={stage.key} stage={stage} cards={cards.filter((c) => boardColumn(c.currentStage) === stage.key)} saving={saving} />
           ))}
-          <div className="sticky right-0 shrink-0 border-l border-dxv-green/15 bg-white pl-3 shadow-[-18px_0_18px_-14px_rgba(0,0,0,0.35)]">
-            <Column stage={PASSED_STAGE} cards={cards.filter((c) => c.currentStage === "PASSED")} saving={saving} />
-          </div>
         </div>
       </DndContext>
-      {pendingPass && (
-        <PassDialog
-          ventureName={pendingPass.name}
-          onCancel={() => setPendingPass(null)}
-          onConfirm={(reason, note) => {
-            move(pendingPass, "PASSED", reason, note);
-            setPendingPass(null);
-          }}
-        />
-      )}
     </>
   );
 }
@@ -127,9 +140,9 @@ const PHASE_STYLE: Record<StagePhase, { column: string; header: string; dot: str
   passed: { column: "bg-black/[0.03] border-black/15", header: "border-black/10", dot: "bg-black/60", label: "Kept for learning" },
 };
 
-function Column({ stage, cards, saving }: { stage: StageMeta; cards: BoardCard[]; saving: Set<string> }) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.key });
-  const phase = PHASE_STYLE[stagePhase(stage.key)];
+function Column({ stage, cards, saving, declined = false }: { stage: StageMeta; cards: BoardCard[]; saving: Set<string>; declined?: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage.key, disabled: declined });
+  const phase = PHASE_STYLE[declined ? "passed" : stagePhase(stage.key)];
   const totalRaise = cards.reduce((a, c) => a + (c.raiseAmountGbp ?? 0), 0);
 
   return (
@@ -141,7 +154,7 @@ function Column({ stage, cards, saving }: { stage: StageMeta; cards: BoardCard[]
         <div className="flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-semibold leading-tight text-dxv-green">
             <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${phase.dot}`} />
-            {stage.label}
+            {declined && stage.key !== "PASSED" ? `Declined at ${stage.label}` : stage.label}
             <span className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20">{cards.length}</span>
           </h3>
           {totalRaise > 0 && (
@@ -152,13 +165,13 @@ function Column({ stage, cards, saving }: { stage: StageMeta; cards: BoardCard[]
         </div>
         <p className="mt-1 pl-[18px] text-[10px] uppercase tracking-wide text-black/45">
           {phase.label}
-          {stage.gate && stage.key !== "PASSED" ? " · Decision gate" : ""}
-          {stage.optional ? " · If applicable" : ""}
+          {!declined && stage.gate && stage.key !== "PASSED" ? " · Decision gate" : ""}
+          {!declined && stage.optional ? " · If applicable" : ""}
         </p>
       </div>
       <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
         {cards.map((c) => (
-          <DealCard key={c.id} card={c} saving={saving.has(c.id)} />
+          <DealCard key={c.id} card={c} saving={saving.has(c.id)} draggable={!declined} />
         ))}
       </div>
     </div>
@@ -169,10 +182,10 @@ function Pill({ children, className }: { children: React.ReactNode; className: s
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{children}</span>;
 }
 
-function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
+function DealCard({ card, saving = false, draggable = true }: { card: BoardCard; saving?: boolean; draggable?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id, disabled: !draggable });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE";
+  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE" || card.declineReason;
 
   return (
     <div
@@ -180,7 +193,7 @@ function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean 
       style={style}
       {...listeners}
       {...attributes}
-      className={`relative cursor-grab rounded-lg border border-black/10 bg-white p-3 shadow-sm transition hover:-translate-y-px hover:border-dxv-green/40 hover:shadow-md active:cursor-grabbing ${
+      className={`relative ${draggable ? "cursor-grab active:cursor-grabbing" : ""} rounded-lg border border-black/10 bg-white p-3 shadow-sm transition hover:-translate-y-px hover:border-dxv-green/40 hover:shadow-md ${
         isDragging ? "z-10 shadow-lg ring-2 ring-dxv-green" : ""
       } ${saving ? "opacity-70" : ""}`}
     >
@@ -207,6 +220,7 @@ function DealCard({ card, saving = false }: { card: BoardCard; saving?: boolean 
           {card.sector && <Pill className="bg-dxv-green/10 text-dxv-green">{card.sector}</Pill>}
           {card.round && <Pill className="bg-dxv-yellow text-dxv-green">Round {card.round}</Pill>}
           {card.currentStage === "SEIS_CERTIFICATE" && <Pill className="bg-dxv-green text-white">S/EIS</Pill>}
+          {card.declineReason && <Pill className="bg-black text-white">{card.declineReason}</Pill>}
         </div>
       )}
 
