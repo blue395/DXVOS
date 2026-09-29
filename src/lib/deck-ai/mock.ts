@@ -1,6 +1,7 @@
 // A stand-in for the Anthropic client, returning a canned analysis. Used by unit
 // tests, and by local development when DECK_AI_MOCK=true (never in production).
 import type Anthropic from "@anthropic-ai/sdk";
+import { INTAKE_SYSTEM_PROMPT, type IntakeOutput } from "./intake";
 import type { DeckAnalysisOutput } from "./schema";
 
 export function sampleOutput(fileName: string): DeckAnalysisOutput {
@@ -31,20 +32,27 @@ export function sampleOutput(fileName: string): DeckAnalysisOutput {
   };
 }
 
+/** What the quick board-intake read returns for a deck (see intake.ts). */
+export function sampleIntake(fileName: string): IntakeOutput {
+  const x = sampleOutput(fileName).extracted;
+  return { name: x.name, primaryFounder: "Amara Okafor", companyStage: x.companyStage };
+}
+
 /** Minimal fake with the one method analyzeDeck uses. */
 export function fakeAnthropicClient(
-  opts: { output?: DeckAnalysisOutput | null; stopReason?: string; onRequest?: (params: unknown) => void } = {},
+  opts: { output?: DeckAnalysisOutput | IntakeOutput | null; stopReason?: string; onRequest?: (params: unknown) => void } = {},
 ): Anthropic {
   return {
     messages: {
-      parse: async (params: { messages: { content: { title?: string }[] }[] }) => {
+      parse: async (params: { system?: unknown; messages: { content: { title?: string }[] }[] }) => {
         await mockDelay();
         opts.onRequest?.(params);
         const title = params.messages[0]?.content[0]?.title ?? "deck.pdf";
         return {
           model: "mock-model",
           stop_reason: opts.stopReason ?? "end_turn",
-          parsed_output: opts.output === undefined ? sampleOutput(title) : opts.output,
+          parsed_output:
+            opts.output !== undefined ? opts.output : params.system === INTAKE_SYSTEM_PROMPT ? sampleIntake(title) : sampleOutput(title),
           usage: { input_tokens: 1234, output_tokens: 567 },
         };
       },

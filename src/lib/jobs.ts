@@ -1,9 +1,10 @@
 // Background AI jobs as the job tray sees them. Pure (shared by the API route and the tray).
 import type { DeckStatus } from "./deck-status";
 
-export type JobKind = "eligibility" | "assessment" | "dd";
+export type JobKind = "intake" | "eligibility" | "assessment" | "dd";
 
 export const JOB_KINDS: Record<JobKind, { label: string; expectedSeconds: number; usually: string }> = {
+  intake: { label: "Deck intake", expectedSeconds: 20, usually: "usually under 30 seconds" },
   eligibility: { label: "Eligibility screen", expectedSeconds: 45, usually: "usually under a minute" },
   assessment: { label: "Investment assessment", expectedSeconds: 120, usually: "usually 1 to 3 minutes" },
   dd: { label: "DD document", expectedSeconds: 120, usually: "usually 1 to 3 minutes" },

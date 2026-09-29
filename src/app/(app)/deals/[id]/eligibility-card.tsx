@@ -15,6 +15,7 @@ type Analysis = {
   model: string | null;
   screen: unknown;
   aiContext?: unknown; // the Playbook version and lessons it was given
+  intakeOnly: boolean; // dropped on the board: name, founder and stage read, no screen
   createdAt: Date;
   startedAt: Date | null;
   completedAt: Date | null;
@@ -51,11 +52,13 @@ export function EligibilityCard({
 }) {
   const latest = analyses[0];
   const effective = latest ? effectiveDeckStatus(latest) : null;
-  const lastComplete = analyses.find((a) => a.status === "COMPLETE");
+  const lastComplete = analyses.find((a) => a.status === "COMPLETE" && a.screen);
   const screen = (lastComplete?.screen ?? null) as EligibilityScreen | null;
   const hasStoredDeck = analyses.some((a) => a.status !== "PENDING");
   const running = effective && (effective.status === "PENDING" || effective.status === "PROCESSING");
   const decidable = canDecideEligibility(stage);
+  // A deck dropped on the board is stored but not screened until someone asks.
+  const unscreened = latest?.intakeOnly && effective?.status === "COMPLETE" && !screen;
 
   return (
     <Card
@@ -69,8 +72,12 @@ export function EligibilityCard({
             : screen
               ? `AI recommends: ${screen.recommendation}`
               : running
-                ? "Screening…"
-                : "No deck screened yet",
+                ? latest?.intakeOnly
+                  ? "Reading deck…"
+                  : "Screening…"
+                : latest
+                  ? "Deck stored, not screened yet"
+                  : "No deck screened yet",
         }
       }
       actions={latest ? <a href={`/api/decks/${latest.id}`} className="text-xs text-dxv-green hover:underline">Download stored deck</a> : undefined}
@@ -88,16 +95,29 @@ export function EligibilityCard({
         {running && (
           <p className="flex items-center gap-2 text-sm text-dxv-green" aria-live="polite">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-dxv-green border-t-transparent" />
-            Reading {latest.fileName}… progress is in the corner; this page updates when it&apos;s done.
+            {latest.intakeOnly
+              ? `Reading the company name, founder and stage from ${latest.fileName}…`
+              : `Reading ${latest.fileName}… progress is in the corner; this page updates when it's done.`}
           </p>
+        )}
+
+        {unscreened && (
+          <div className="space-y-2 rounded-lg bg-dxv-yellow/15 px-3 py-3">
+            <p className="text-sm">
+              <strong>{latest.fileName}</strong> is stored and ready. The eligibility screen hasn&apos;t been run yet.
+            </p>
+            <RerunButton ventureId={ventureId} label="Run eligibility screen" primary />
+          </div>
         )}
 
         {effective?.status === "FAILED" && (
           <div className="space-y-2">
             <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-2 text-sm">
-              The latest screen failed: {effective.error}
+              {latest.intakeOnly ? "Reading the deck for name, founder and stage failed" : "The latest screen failed"}: {effective.error}
             </p>
-            <div className="flex flex-wrap gap-2">{hasStoredDeck && <RerunButton ventureId={ventureId} />}</div>
+            <div className="flex flex-wrap gap-2">
+              {hasStoredDeck && <RerunButton ventureId={ventureId} label={screen ? "Re-run screen" : "Run eligibility screen"} />}
+            </div>
             <DeckUploadForVenture ventureId={ventureId} label="Or upload a deck (PDF)" />
           </div>
         )}

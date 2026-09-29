@@ -17,10 +17,10 @@ export function DeckUploadForVenture({ ventureId, label }: { ventureId: string; 
   return <DeckUploader ventureId={ventureId} label={label} onComplete={() => router.refresh()} />;
 }
 
-export function RerunButton({ ventureId }: { ventureId: string }) {
+export function RerunButton({ ventureId, label = "Re-run screen", primary = false }: { ventureId: string; label?: string; primary?: boolean }) {
   return (
-    <ActionButton run={() => rerunDeckAnalysis(ventureId)} variant="secondary" pendingLabel="Starting…" onDone={announceJobStarted}>
-      Re-run screen
+    <ActionButton run={() => rerunDeckAnalysis(ventureId)} variant={primary ? "primary" : "secondary"} pendingLabel="Starting…" onDone={announceJobStarted}>
+      {label}
     </ActionButton>
   );
 }

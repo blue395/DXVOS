@@ -36,10 +36,11 @@ const besidePointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }
   };
 };
 import type { PassReason, Stage } from "@/generated/prisma/enums";
-import { BOARD_STAGES, boardColumn, declinedColumn, formatGbpCompact, stageLabel, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
+import { BOARD_STAGES, boardColumn, declinedColumn, formatGbpCompact, stageLabel, stagePhase, type DeckCardState, type StageMeta, type StagePhase } from "@/lib/pipeline";
 import { Spinner, WarningIcon } from "@/components/ui";
 import { moveVenture } from "./actions";
 import { PassDialog } from "./pass-dialog";
+import { DeckIntake } from "./deck-intake";
 import { actionErrorMessage } from "@/lib/stale-version";
 
 export type BoardCard = {
@@ -56,6 +57,8 @@ export type BoardCard = {
   daysInStage: number;
   warnings: string[];
   commsOwed: number;
+  /** "Reading deck…" while a dropped deck is read; "Not screened" at Submitted until an eligibility screen runs. */
+  deckState: DeckCardState;
   leadAngel: string | null;
   /** Declined deals only: the stage it was declined at, and why. */
   declinedAt: Stage | null;
@@ -69,9 +72,12 @@ export function KanbanBoard({
   initialCards,
   view = "live",
   toolbar,
+  intakeRound = null,
 }: {
   initialCards: BoardCard[];
   view?: BoardView;
+  /** Round given to decks dropped on the Submitted column (the round the board is filtered to). */
+  intakeRound?: number | null;
   /** Filter bar, rendered inside the drag area so its Declined pill can take dropped cards. */
   toolbar?: React.ReactNode;
 }) {
@@ -181,7 +187,13 @@ export function KanbanBoard({
             Declined filter pill); drop a card on that pill, or use the deal page, to decline. */}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {BOARD_STAGES.map((stage) => (
-            <Column key={stage.key} stage={stage} cards={cards.filter((c) => boardColumn(c.currentStage) === stage.key)} saving={saving} />
+            <Column
+              key={stage.key}
+              stage={stage}
+              cards={cards.filter((c) => boardColumn(c.currentStage) === stage.key)}
+              saving={saving}
+              intake={stage.key === "SUBMITTED" ? { round: intakeRound } : undefined}
+            />
           ))}
         </div>
         <DragOverlay dropAnimation={null} modifiers={[besidePointer]}>{dragging ? <DragPreview card={dragging} /> : null}</DragOverlay>
@@ -211,40 +223,67 @@ const PHASE_STYLE: Record<StagePhase, { column: string; header: string; dot: str
   passed: { column: "bg-black/[0.03] border-black/15", header: "border-black/10", dot: "bg-black/60", label: "Kept for learning" },
 };
 
-function Column({ stage, cards, saving, declined = false }: { stage: StageMeta; cards: BoardCard[]; saving: Set<string>; declined?: boolean }) {
+function Column({
+  stage,
+  cards,
+  saving,
+  declined = false,
+  intake,
+}: {
+  stage: StageMeta;
+  cards: BoardCard[];
+  saving: Set<string>;
+  declined?: boolean;
+  /** Submitted column: founder decks can be dropped here to file new deals. */
+  intake?: { round: number | null };
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key, disabled: declined });
   const phase = PHASE_STYLE[declined ? "passed" : stagePhase(stage.key)];
   const totalRaise = cards.reduce((a, c) => a + (c.raiseAmountGbp ?? 0), 0);
+  const header = (
+    <div className={`border-b px-3 py-2.5 ${phase.header}`}>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-semibold leading-tight text-dxv-green">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${phase.dot}`} />
+          {declined && stage.key !== "PASSED" ? `Declined at ${stage.label}` : stage.label}
+          <span className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20">{cards.length}</span>
+        </h3>
+        {totalRaise > 0 && (
+          <span className="font-mono text-xs text-black/55" title="Total raise of deals in this column">
+            {formatGbpCompact(totalRaise)}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 pl-[18px] text-[10px] uppercase tracking-wide text-black/45">
+        {phase.label}
+        {!declined && stage.gate && stage.key !== "PASSED" ? " · Decision gate" : ""}
+        {!declined && stage.optional ? " · If applicable" : ""}
+      </p>
+    </div>
+  );
+  const list = (
+    <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
+      {cards.map((c) => (
+        <DealCard key={c.id} card={c} saving={saving.has(c.id)} draggable={!declined} />
+      ))}
+    </div>
+  );
 
   return (
     <div
       ref={setNodeRef}
       className={`flex h-full w-64 shrink-0 flex-col rounded-xl border ${isOver ? "border-dxv-green bg-dxv-yellow/30" : phase.column}`}
     >
-      <div className={`border-b px-3 py-2.5 ${phase.header}`}>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold leading-tight text-dxv-green">
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${phase.dot}`} />
-            {declined && stage.key !== "PASSED" ? `Declined at ${stage.label}` : stage.label}
-            <span className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20">{cards.length}</span>
-          </h3>
-          {totalRaise > 0 && (
-            <span className="font-mono text-xs text-black/55" title="Total raise of deals in this column">
-              {formatGbpCompact(totalRaise)}
-            </span>
-          )}
-        </div>
-        <p className="mt-1 pl-[18px] text-[10px] uppercase tracking-wide text-black/45">
-          {phase.label}
-          {!declined && stage.gate && stage.key !== "PASSED" ? " · Decision gate" : ""}
-          {!declined && stage.optional ? " · If applicable" : ""}
-        </p>
-      </div>
-      <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
-        {cards.map((c) => (
-          <DealCard key={c.id} card={c} saving={saving.has(c.id)} draggable={!declined} />
-        ))}
-      </div>
+      {intake ? (
+        <DeckIntake round={intake.round} header={header}>
+          {list}
+        </DeckIntake>
+      ) : (
+        <>
+          {header}
+          {list}
+        </>
+      )}
     </div>
   );
 }
@@ -282,7 +321,7 @@ function DragPreview({ card }: { card: BoardCard }) {
 }
 
 function CardContent({ card, saving }: { card: BoardCard; saving: boolean }) {
-  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE" || card.declineReason;
+  const hasPills = card.deckState || card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE" || card.declineReason;
   return (
     <>
       <div className="flex items-start justify-between gap-2">
@@ -304,6 +343,17 @@ function CardContent({ card, saving }: { card: BoardCard; saving: boolean }) {
 
       {hasPills && (
         <div className="mt-2 flex flex-wrap gap-1">
+          {card.deckState === "reading" && (
+            <Pill className="inline-flex items-center gap-1 bg-dxv-green/10 text-dxv-green">
+              <Spinner className="h-2.5 w-2.5" />
+              Reading deck…
+            </Pill>
+          )}
+          {card.deckState === "not-screened" && (
+            <Pill className="bg-dxv-yellow/50 text-dxv-green ring-1 ring-dxv-yellow">
+              <span title="Deck stored; the eligibility screen hasn't been run yet">Not screened</span>
+            </Pill>
+          )}
           {card.companyStage && <Pill className="bg-white text-black/75 ring-1 ring-black/15">{card.companyStage}</Pill>}
           {card.sector && <Pill className="bg-dxv-green/10 text-dxv-green">{card.sector}</Pill>}
           {card.round && <Pill className="bg-dxv-yellow text-dxv-green">Round {card.round}</Pill>}

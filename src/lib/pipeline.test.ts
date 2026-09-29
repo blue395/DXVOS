@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deckCardState,
   ALL_STAGES,
   canDecideEligibility,
   canGenerateAssessment,
@@ -11,6 +12,7 @@ import {
   BOARD_STAGES,
   boardColumn,
   boardHref,
+  normaliseCompanyStage,
   eligibilityDisagrees,
   splitLatestComm,
   parseDeclinedFilter,
@@ -372,5 +374,29 @@ describe("eligibilityDisagrees", () => {
     expect(eligibilityDisagrees("Proceed to pipeline", "PROCEED")).toBe(false);
     expect(eligibilityDisagrees("Need more information", "DECLINE")).toBe(true);
     expect(eligibilityDisagrees(null, "DECLINE")).toBe(false);
+  });
+});
+
+describe("normaliseCompanyStage", () => {
+  it("maps free text onto the stage options, keeping anything else", () => {
+    expect(normaliseCompanyStage("Pre-seed")).toBe("Pre-Seed");
+    expect(normaliseCompanyStage("pre seed")).toBe("Pre-Seed");
+    expect(normaliseCompanyStage("SEED")).toBe("Seed");
+    expect(normaliseCompanyStage("series-a")).toBe("Series A");
+    expect(normaliseCompanyStage("Bridge")).toBe("Bridge Round");
+    expect(normaliseCompanyStage("Series B")).toBe("Series B");
+    expect(normaliseCompanyStage("  ")).toBeNull();
+  });
+});
+
+describe("deckCardState", () => {
+  it("shows the board-intake read, then Not screened until a screen exists", () => {
+    expect(deckCardState("SUBMITTED", undefined, false)).toBeNull();
+    expect(deckCardState("SUBMITTED", { status: "PROCESSING", intakeOnly: true }, false)).toBe("reading");
+    expect(deckCardState("SUBMITTED", { status: "COMPLETE", intakeOnly: true }, false)).toBe("not-screened");
+    expect(deckCardState("SUBMITTED", { status: "FAILED", intakeOnly: true }, false)).toBe("not-screened");
+    expect(deckCardState("SUBMITTED", { status: "PROCESSING", intakeOnly: false }, false)).toBeNull();
+    expect(deckCardState("SUBMITTED", { status: "COMPLETE", intakeOnly: false }, true)).toBeNull();
+    expect(deckCardState("ELIGIBILITY_SCREEN", { status: "COMPLETE", intakeOnly: true }, false)).toBeNull();
   });
 });

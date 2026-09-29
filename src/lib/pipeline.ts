@@ -448,7 +448,38 @@ export function focusSections(stage: Stage): DealSection[] {
   }
 }
 
+// ── Company stage ───────────────────────────────────────────────────────────
+
+/** The company stage options (Blue's list); anything else is entered under "Other". */
+export const COMPANY_STAGES = ["Pre-Seed", "Seed", "Series A", "Bridge Round"] as const;
+
+/** Map free text (a deck, an old record) onto the options: "pre seed" is "Pre-Seed". Unknown text is kept as is. */
+export function normaliseCompanyStage(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  const k = t.toLowerCase().replace(/[\s_-]+/g, "");
+  if (k === "preseed") return "Pre-Seed";
+  if (k === "seed") return "Seed";
+  if (k === "seriesa") return "Series A";
+  if (k.includes("bridge")) return "Bridge Round";
+  return t;
+}
+
 // ── Lead angel ──────────────────────────────────────────────────────────────
 
 /** The usual DXV lead angels (anyone else is entered as free text under "Other"). */
 export const LEAD_ANGELS = ["Blué", "Anna C", "Kevin W"] as const;
+
+/** A board card's deck pill: "reading" while the board-intake read runs, "not-screened" once a deck is stored at Submitted without an eligibility screen. */
+export type DeckCardState = "reading" | "not-screened" | null;
+
+export function deckCardState(
+  stage: Stage,
+  latest: { status: "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED"; intakeOnly: boolean } | undefined,
+  screened: boolean,
+): DeckCardState {
+  if (!latest) return null;
+  const running = latest.status === "PENDING" || latest.status === "PROCESSING";
+  if (running) return latest.intakeOnly ? "reading" : null; // a screen in progress needs no pill
+  return !screened && stage === "SUBMITTED" ? "not-screened" : null;
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeDeck, DeckAnalysisError } from "./analyze";
+import { INTAKE_SYSTEM_PROMPT, intakeToExtracted, readDeckIntake } from "./intake";
 import { fakeAnthropicClient, sampleOutput } from "./mock";
 import { DECK_AI_MODEL } from "./prompt";
 import { applyHouseStyle, cleanOutput, renderScreen } from "./render";
@@ -71,5 +72,33 @@ describe("analyzeDeck", () => {
     await expect(analyzeDeck(fakeAnthropicClient({ stopReason: "refusal" }), pdf, "a.pdf")).rejects.toThrow(DeckAnalysisError);
     await expect(analyzeDeck(fakeAnthropicClient({ stopReason: "max_tokens" }), pdf, "a.pdf")).rejects.toThrow(/cut off/);
     await expect(analyzeDeck(fakeAnthropicClient({ output: null }), pdf, "a.pdf")).rejects.toThrow(/expected format/);
+  });
+});
+
+describe("readDeckIntake (board drop)", () => {
+  it("asks only for name, founder and stage, and maps them onto Venture fields", async () => {
+    let sent: { system: string; messages: { content: { type: string; text?: string }[] }[] } | undefined;
+    const r = await readDeckIntake(fakeAnthropicClient({ onRequest: (p) => (sent = p as typeof sent) }), Buffer.from("x"), "Kora Health.pdf");
+    expect(sent?.system).toBe(INTAKE_SYSTEM_PROMPT);
+    expect(sent?.messages[0].content[1].text).toContain("primaryFounder");
+    expect(r.extracted).toEqual({
+      name: "Kora Health",
+      founderNames: "Amara Okafor",
+      founderEmail: null,
+      website: null,
+      sector: null,
+      companyStage: "Pre-Seed", // normalised onto the dropdown's spelling
+      raiseAmountGbp: null,
+      description: null,
+    });
+  });
+
+  it("treats blanks as unknown and reports unreadable output", async () => {
+    expect(intakeToExtracted({ name: "  ", primaryFounder: null, companyStage: "series-a" })).toMatchObject({
+      name: null,
+      founderNames: null,
+      companyStage: "Series A",
+    });
+    await expect(readDeckIntake(fakeAnthropicClient({ output: null }), Buffer.from("x"), "a.pdf")).rejects.toThrow(/expected format/);
   });
 });

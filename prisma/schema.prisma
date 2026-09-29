@@ -443,6 +443,7 @@ model DeckAnalysis {
 
   reviews   EligibilityReview[]
   aiContext Json? // the criteria version and lessons this screen was given (null: built-in defaults)
+  intakeOnly Boolean @default(false) // board upload: only name/founder/stage read, no eligibility screen
 
   @@index([ventureId, createdAt])
 }
