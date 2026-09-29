@@ -7,6 +7,7 @@ import type { DocumentCategory } from "@/generated/prisma/enums";
 import { confirmDocumentUpload, startDocumentUpload } from "@/app/(app)/deals/document-actions";
 import { ACCEPT_ATTRIBUTE, CATEGORIES, CATEGORY_LABELS, checkUpload } from "@/lib/documents";
 import { inputClass } from "@/components/ui";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 /**
  * Upload PDF / Word / Excel files to a deal. Files go straight from the browser to
@@ -67,7 +68,7 @@ export function DocumentUploader({
         const done = await confirmDocumentUpload(start.documentId);
         if (done.error) throw new Error(done.error);
       } catch (e) {
-        return setStatus({ kind: "error", text: e instanceof Error ? e.message : "Upload failed." });
+        return setStatus({ kind: "error", text: actionErrorMessage(e, "Upload failed.") });
       }
     }
     setStatus({ kind: "idle" });

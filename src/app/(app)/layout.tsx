@@ -6,6 +6,7 @@ import { NavLink } from "@/components/nav-link";
 import { NavProgress } from "@/components/nav-progress";
 import { JobTray } from "@/components/job-tray";
 import { SignOutButton } from "@/components/sign-out-button";
+import { StaleVersionBanner } from "@/components/stale-version-banner";
 
 // Shell for every signed-in page. requireAdmin() here protects page *rendering*;
 // server actions still check again themselves.
@@ -42,6 +43,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </header>
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6">{children}</main>
       <JobTray />
+      <StaleVersionBanner />
     </div>
   );
 }

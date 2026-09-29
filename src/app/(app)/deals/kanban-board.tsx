@@ -4,18 +4,43 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
-import type { Stage } from "@/generated/prisma/enums";
-import { BOARD_STAGES, boardColumn, declinedColumn, formatGbpCompact, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
+
+// Drop onto whatever is under the pointer (so the small Declined pill is easy to hit);
+// keyboard dragging has no pointer, so it falls back to overlap.
+const pointerFirst: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : rectIntersection(args);
+};
+
+// The floating preview sits just below-right of the pointer, so it never hides the drop target.
+const besidePointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent || !("clientX" in activatorEvent)) return transform;
+  const e = activatorEvent as PointerEvent;
+  return {
+    ...transform,
+    x: transform.x + e.clientX - draggingNodeRect.left + 14,
+    y: transform.y + e.clientY - draggingNodeRect.top + 14,
+  };
+};
+import type { PassReason, Stage } from "@/generated/prisma/enums";
+import { BOARD_STAGES, boardColumn, declinedColumn, formatGbpCompact, stageLabel, stagePhase, type StageMeta, type StagePhase } from "@/lib/pipeline";
 import { Spinner, WarningIcon } from "@/components/ui";
 import { moveVenture } from "./actions";
+import { PassDialog } from "./pass-dialog";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 export type BoardCard = {
   id: string;
@@ -40,8 +65,19 @@ export type BoardCard = {
 // "live": the pipeline, drag to move. "declined": read-only, grouped by where each deal was declined.
 export type BoardView = "live" | "declined";
 
-export function KanbanBoard({ initialCards, view = "live" }: { initialCards: BoardCard[]; view?: BoardView }) {
+export function KanbanBoard({
+  initialCards,
+  view = "live",
+  toolbar,
+}: {
+  initialCards: BoardCard[];
+  view?: BoardView;
+  /** Filter bar, rendered inside the drag area so its Declined pill can take dropped cards. */
+  toolbar?: React.ReactNode;
+}) {
   const [cards, setCards] = useState(initialCards);
+  const [pendingDecline, setPendingDecline] = useState<BoardCard | null>(null);
+  const [dragging, setDragging] = useState<BoardCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -59,13 +95,18 @@ export function KanbanBoard({ initialCards, view = "live" }: { initialCards: Boa
     useSensor(KeyboardSensor),
   );
 
-  function move(card: BoardCard, to: Stage) {
+  function move(card: BoardCard, to: Stage, passReason?: PassReason, note?: string) {
     const before = cards;
     setError(null);
     setCards((cs) => cs.map((c) => (c.id === card.id ? { ...c, currentStage: to, daysInStage: 0 } : c)));
     setSaving((s) => new Set(s).add(card.id));
     startTransition(async () => {
-      const res = await moveVenture(card.id, { to });
+      let res: { error?: string };
+      try {
+        res = await moveVenture(card.id, { to, passReason, note });
+      } catch (e) {
+        res = { error: actionErrorMessage(e) };
+      }
       setSaving((s) => {
         const next = new Set(s);
         next.delete(card.id);
@@ -79,10 +120,12 @@ export function KanbanBoard({ initialCards, view = "live" }: { initialCards: Boa
   }
 
   function onDragEnd(e: DragEndEvent) {
+    setDragging(null);
     const card = cards.find((c) => c.id === e.active.id);
     const to = e.over?.id as Stage | undefined;
     if (view !== "live" || !card || !to || to === boardColumn(card.currentStage)) return; // (S/EIS deals sit in Investment Complete)
-    move(card, to);
+    if (to === "PASSED") setPendingDecline(card); // dropped on the Declined pill: ask for a reason first
+    else move(card, to);
   }
 
   if (view === "declined") {
@@ -92,10 +135,18 @@ export function KanbanBoard({ initialCards, view = "live" }: { initialCards: Boa
       (col) => col.cards.length > 0,
     );
     if (cards.length === 0) {
-      return <p className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/55">No declined deals in this selection.</p>;
+      return (
+        <DndContext id="deals-board-declined">
+          <div className="space-y-4">
+            {toolbar}
+            <p className="rounded-lg border border-black/10 px-4 py-6 text-center text-sm text-black/55">No declined deals in this selection.</p>
+          </div>
+        </DndContext>
+      );
     }
     return (
       <DndContext id="deals-board-declined">
+        {toolbar && <div className="mb-4">{toolbar}</div>}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {columns.map(({ stage, cards: cs }) => (
             <Column key={stage.key} stage={stage} cards={cs} saving={saving} declined />
@@ -117,15 +168,35 @@ export function KanbanBoard({ initialCards, view = "live" }: { initialCards: Boa
       )}
       {/* Fixed id: dnd-kit otherwise numbers its accessibility ids with a counter that
           differs between server and browser rendering (a hydration mismatch). */}
-      <DndContext id="deals-board" sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext
+        id="deals-board"
+        sensors={sensors}
+        collisionDetection={pointerFirst}
+        onDragStart={(e) => setDragging(cards.find((c) => c.id === e.active.id) ?? null)}
+        onDragCancel={() => setDragging(null)}
+        onDragEnd={onDragEnd}
+      >
+        {toolbar && <div className="mb-4">{toolbar}</div>}
         {/* The linear stages scroll horizontally. Declined deals have their own view (the
-            Declined filter pill); decline a deal from its page. */}
+            Declined filter pill); drop a card on that pill, or use the deal page, to decline. */}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {BOARD_STAGES.map((stage) => (
             <Column key={stage.key} stage={stage} cards={cards.filter((c) => boardColumn(c.currentStage) === stage.key)} saving={saving} />
           ))}
         </div>
+        <DragOverlay dropAnimation={null} modifiers={[besidePointer]}>{dragging ? <DragPreview card={dragging} /> : null}</DragOverlay>
       </DndContext>
+      {pendingDecline && (
+        <PassDialog
+          ventureName={pendingDecline.name}
+          stageLabel={stageLabel(pendingDecline.currentStage)}
+          onCancel={() => setPendingDecline(null)}
+          onConfirm={(reason, note) => {
+            move(pendingDecline, "PASSED", reason, note);
+            setPendingDecline(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -183,20 +254,37 @@ function Pill({ children, className }: { children: React.ReactNode; className: s
 }
 
 function DealCard({ card, saving = false, draggable = true }: { card: BoardCard; saving?: boolean; draggable?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id, disabled: !draggable });
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE" || card.declineReason;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id, disabled: !draggable });
 
+  // While dragging, the card stays put (faded) and a floating copy follows the pointer
+  // (DragOverlay), so it's never clipped by the board's scroll area on its way to the Declined pill.
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...listeners}
       {...attributes}
       className={`relative ${draggable ? "cursor-grab active:cursor-grabbing" : ""} rounded-lg border border-black/10 bg-white p-3 shadow-sm transition hover:-translate-y-px hover:border-dxv-green/40 hover:shadow-md ${
-        isDragging ? "z-10 shadow-lg ring-2 ring-dxv-green" : ""
+        isDragging ? "opacity-40" : ""
       } ${saving ? "opacity-70" : ""}`}
     >
+      <CardContent card={card} saving={saving} />
+    </div>
+  );
+}
+
+/** The floating copy of a card being dragged. */
+function DragPreview({ card }: { card: BoardCard }) {
+  return (
+    <div className="w-60 rotate-2 cursor-grabbing opacity-95 rounded-lg border border-dxv-green bg-white p-3 shadow-2xl ring-2 ring-dxv-green">
+      <CardContent card={card} saving={false} />
+    </div>
+  );
+}
+
+function CardContent({ card, saving }: { card: BoardCard; saving: boolean }) {
+  const hasPills = card.companyStage || card.sector || card.round || card.currentStage === "SEIS_CERTIFICATE" || card.declineReason;
+  return (
+    <>
       <div className="flex items-start justify-between gap-2">
         <Link href={`/deals/${card.id}`} className="font-semibold leading-snug text-black hover:text-dxv-green hover:underline">
           {card.name}
@@ -242,6 +330,6 @@ function DealCard({ card, saving = false, draggable = true }: { card: BoardCard;
           </span>
         )}
       </div>
-    </div>
+    </>
   );
 }

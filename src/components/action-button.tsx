@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { buttonClass, Spinner, type ButtonVariant } from "./ui";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 /** A button that runs a server action with no form fields, with a spinner and inline errors. */
 export function ActionButton({
@@ -32,9 +33,13 @@ export function ActionButton({
         onClick={() => {
           if (confirm && !window.confirm(confirm)) return;
           start(async () => {
-            const res = await run();
-            setError(res.error ?? null);
-            if (!res.error) onDone?.();
+            try {
+              const res = await run();
+              setError(res.error ?? null);
+              if (!res.error) onDone?.();
+            } catch (e) {
+              setError(actionErrorMessage(e));
+            }
           });
         }}
       >

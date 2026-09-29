@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { Spinner } from "@/components/ui";
 import { archiveDocument } from "../document-actions";
+import { actionErrorMessage } from "@/lib/stale-version";
 
 export function ArchiveDocumentButton({ documentId, fileName }: { documentId: string; fileName: string }) {
   const [pending, start] = useTransition();
@@ -15,8 +16,12 @@ export function ArchiveDocumentButton({ documentId, fileName }: { documentId: st
       onClick={() => {
         if (!window.confirm(`Archive ${fileName}? It will be hidden from this deal but kept in storage.`)) return;
         start(async () => {
-          const res = await archiveDocument(documentId);
-          if (res.error) window.alert(res.error);
+          try {
+            const res = await archiveDocument(documentId);
+            if (res.error) window.alert(res.error);
+          } catch (e) {
+            window.alert(actionErrorMessage(e));
+          }
         });
       }}
     >
