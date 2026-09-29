@@ -11,6 +11,7 @@ import {
   BOARD_STAGES,
   boardColumn,
   boardHref,
+  splitLatestComm,
   parseDeclinedFilter,
   declinedColumn,
   cardOneLiner,
@@ -337,5 +338,29 @@ describe("declined board filter", () => {
     expect(declinedColumn("SEIS_CERTIFICATE")).toBe("INVESTMENT_COMPLETE");
     expect(declinedColumn("CAPITAL_TRANSFER")).toBeNull(); // retired stage
     expect(declinedColumn(null)).toBeNull();
+  });
+});
+
+describe("splitLatestComm", () => {
+  it("shows the newest comm and counts hidden ones still to send", () => {
+    const r = splitLatestComm([
+      { id: "a", createdAt: d("2026-09-01"), status: "NOT_YET_SENT", gate: "ELIGIBILITY" as const },
+      { id: "c", createdAt: d("2026-09-03"), status: "SENT", gate: "PITCH_OUTCOME" as const },
+      { id: "b", createdAt: d("2026-09-02"), status: "FOUNDER_ACKNOWLEDGED", gate: "PARTNER_REVIEW" as const },
+    ]);
+    expect(r.latest?.id).toBe("c");
+    expect(r.earlier.map((c) => c.id)).toEqual(["b", "a"]);
+    expect(r.earlierPending).toBe(1);
+    expect(splitLatestComm([]).latest).toBeNull();
+  });
+
+  it("breaks ties (one move, several gates) by dealflow order", () => {
+    const t = d("2026-09-05");
+    const r = splitLatestComm([
+      { id: "elig", createdAt: t, status: "NOT_YET_SENT", gate: "ELIGIBILITY" as const },
+      { id: "pitch", createdAt: t, status: "NOT_YET_SENT", gate: "PITCH_SELECTION" as const },
+      { id: "partner", createdAt: t, status: "NOT_YET_SENT", gate: "PARTNER_REVIEW" as const },
+    ]);
+    expect([r.latest?.id, ...r.earlier.map((c) => c.id)]).toEqual(["pitch", "partner", "elig"]);
   });
 });

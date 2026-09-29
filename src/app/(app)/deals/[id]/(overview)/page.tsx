@@ -15,6 +15,7 @@ import {
   roundOptionCount,
   isInvestedStage,
   investedGbp,
+  splitLatestComm,
   canDecline,
   PASS_REASONS,
   advanceTarget,
@@ -26,6 +27,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Reveal } from "@/components/reveal";
 import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
 import { CommsStatus } from "@/generated/prisma/enums";
+import type { FounderComm } from "@/generated/prisma/client";
 import {
   addDDItem,
   declineVenture,
@@ -117,6 +119,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const focus = new Set(focusSections(v.currentStage));
   const collapse = (s: DealSection) => ({ open: focus.has(s), now: focus.has(s) && s !== "documents" });
   const invested = investedGbp(v);
+  const commsSplit = splitLatestComm(v.founderComms);
   const audits = (entity: "INVESTMENT_VOTE" | "FINAL_INVESTMENT"): AuditEntry[] => v.entryAudits.filter((a) => a.entity === entity);
   const latestMemo = v.memoVersions[0];
   const latestMemoName = latestMemo
@@ -412,44 +415,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
         {/* ── Sidebar ── */}
         <div className="min-w-0 space-y-6">
-          <Card title="Founder comms">
-            {v.founderComms.length === 0 ? (
-              <p className="text-sm text-black/55">No decision gates crossed yet. Comms appear here automatically when this deal passes a gate.</p>
-            ) : (
-              <ul className="space-y-4">
-                {v.founderComms.map((c) => (
-                  <li key={c.id} className={`rounded-md border p-3 ${c.status === "NOT_YET_SENT" ? "border-dxv-yellow bg-dxv-yellow/10" : "border-black/10"}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-medium">{GATE_LABELS[c.gate]}</p>
-                        <p className="text-xs text-black/60">Decision: {c.decision}</p>
-                      </div>
-                      <CommsBadge status={c.status} />
-                    </div>
-                    {c.sentAt && (
-                      <p className="mt-1 text-xs text-black/50">
-                        Sent {formatDate(c.sentAt)}
-                        {c.sentBy ? ` by ${c.sentBy.name}` : ""}
-                        {c.acknowledgedAt ? ` · acknowledged ${formatDate(c.acknowledgedAt)}` : ""}
-                      </p>
-                    )}
-                    <ActionForm action={updateFounderComm.bind(null, c.id)} resetOnSuccess={false} className="mt-2 flex flex-wrap items-end gap-2">
-                      <select name="status" defaultValue={c.status} className={`${inputClass} w-auto flex-1`} aria-label="Status">
-                        {Object.values(CommsStatus).map((s) => (
-                          <option key={s} value={s}>
-                            {commsLabel(s)}
-                          </option>
-                        ))}
-                      </select>
-                      <input name="note" defaultValue={c.note ?? ""} placeholder="Note" className={`${inputClass} w-auto flex-1`} aria-label="Note" />
-                      <SubmitButton variant="secondary">Save</SubmitButton>
-                    </ActionForm>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
           <Card title="Details">
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
@@ -465,6 +430,38 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                   {v.founderEmail}
                 </a>
               </p>
+            )}
+          </Card>
+
+          <Card title="Founder comms">
+            {commsSplit.latest === null ? (
+              <p className="text-sm text-black/55">No decision gates crossed yet. Comms appear here automatically when this deal passes a gate.</p>
+            ) : (
+              <div className="space-y-3">
+                {/* The most recent comm, sent or not; earlier ones fold away. */}
+                <ul>
+                  <CommItem c={commsSplit.latest} />
+                </ul>
+                {commsSplit.earlier.length > 0 && (
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded px-1 py-0.5 text-sm text-dxv-green transition hover:bg-dxv-green/5 [&::-webkit-details-marker]:hidden">
+                      <span aria-hidden className="text-xs transition-transform group-open:rotate-90">
+                        ▶
+                      </span>
+                      <span className="group-open:hidden">Show {commsSplit.earlier.length} earlier</span>
+                      <span className="hidden group-open:inline">Hide {commsSplit.earlier.length} earlier</span>
+                      {commsSplit.earlierPending > 0 && (
+                        <span className="ml-1 rounded-full bg-dxv-yellow px-2 py-px text-xs font-medium">{commsSplit.earlierPending} not yet sent</span>
+                      )}
+                    </summary>
+                    <ul className="mt-3 space-y-3">
+                      {commsSplit.earlier.map((c) => (
+                        <CommItem key={c.id} c={c} />
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
             )}
           </Card>
 
@@ -566,3 +563,38 @@ function VoteList({ votes, emptyText, showTicket }: { votes: VoteRow[]; emptyTex
 
 const declinePillClass =
   "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black bg-white px-3.5 py-1.5 text-sm font-medium text-black transition hover:-translate-y-px hover:bg-black hover:text-white active:translate-y-0";
+
+type CommRow = FounderComm & { sentBy: { name: string } | null };
+
+/** One founder comm: the gate, what the founder is told, status and a quick update form. */
+function CommItem({ c }: { c: CommRow }) {
+  return (
+    <li className={`rounded-md border p-3 ${c.status === "NOT_YET_SENT" ? "border-dxv-yellow bg-dxv-yellow/10" : "border-black/10"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{GATE_LABELS[c.gate]}</p>
+          <p className="text-xs text-black/60">Decision: {c.decision}</p>
+        </div>
+        <CommsBadge status={c.status} />
+      </div>
+      {c.sentAt && (
+        <p className="mt-1 text-xs text-black/50">
+          Sent {formatDate(c.sentAt)}
+          {c.sentBy ? ` by ${c.sentBy.name}` : ""}
+          {c.acknowledgedAt ? ` · acknowledged ${formatDate(c.acknowledgedAt)}` : ""}
+        </p>
+      )}
+      <ActionForm action={updateFounderComm.bind(null, c.id)} resetOnSuccess={false} className="mt-2 flex flex-wrap items-end gap-2">
+        <select name="status" defaultValue={c.status} className={`${inputClass} w-auto flex-1`} aria-label="Status">
+          {Object.values(CommsStatus).map((s) => (
+            <option key={s} value={s}>
+              {commsLabel(s)}
+            </option>
+          ))}
+        </select>
+        <input name="note" defaultValue={c.note ?? ""} placeholder="Note" className={`${inputClass} w-auto flex-1`} aria-label="Note" />
+        <SubmitButton variant="secondary">Save</SubmitButton>
+      </ActionForm>
+    </li>
+  );
+}
