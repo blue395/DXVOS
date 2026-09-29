@@ -126,11 +126,13 @@ a second background function, `analyze-memo-background` (logs under Netlify → 
 
 ## 7. DXV Brain
 
-Uses the same `ANTHROPIC_API_KEY`, with Claude Opus 5.5 and Anthropic's **web search** tool. Web search is an
-organisation-level setting in the Anthropic Console: make sure it's allowed there. If it's off, the Brain still
-answers from DXV OS and Claude's knowledge, but can't search. Replies run in the
-background function `brain-reply-background` (logs under Netlify → Logs → Functions). Web searches are billed
-per search on top of tokens.
+Uses the same `ANTHROPIC_API_KEY`, with Claude Opus 5.5 and Anthropic's **web search** tool. Web search is on for
+an Anthropic organisation unless an admin has turned it off: check at
+https://platform.claude.com/settings/capabilities (Claude Console, Settings → Capabilities; admins only). If it's
+off, every Brain question fails with a Claude API error (400), so keep it on. The same page can restrict which
+domains it searches. Replies run in the
+background function `brain-reply-background` (logs under Netlify → Logs → Functions). Web searches cost $10 per 1,000 searches, on
+top of tokens.
 
 ## 8. Documents
 
