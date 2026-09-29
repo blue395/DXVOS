@@ -7,13 +7,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { AngelStatus } from "@/generated/prisma/enums";
-import { buttonClass, inputClass, Spinner } from "@/components/ui";
+import { buttonClass, Spinner } from "@/components/ui";
 import { guessMapping, IMPORT_FIELDS, mapRow, parseCsv, type ImportField, type ImportRow } from "@/lib/angel-import";
 import { ANGEL_STATUS_LABELS, CERTIFICATION_LABELS } from "@/lib/pipeline";
 import { actionErrorMessage } from "@/lib/stale-version";
 import { importAngels } from "../actions";
 
 const CHUNK = 250; // rows per request
+// Dropdowns sized to their content (the shared inputClass is full width).
+const selectClass = "rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-sm focus:border-dxv-green focus:outline-none";
 const memoryKey = (headers: string[]) => `dxv-angel-import:${headers.join("|").toLowerCase()}`;
 
 function remembered(headers: string[]): (ImportField | null)[] | null {
@@ -37,6 +39,20 @@ export function AngelImport() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [matchedOnly, setMatchedOnly] = useState(false);
+  const [moved, setMoved] = useState<string | null>(null);
+
+  const colName = (i: number) => (headers[i] ? `"${headers[i]}"` : `column ${i + 1}`);
+  /** First non-empty value in this column, to show what it holds. */
+  const example = (i: number) => data.find((r) => r[i]?.trim())?.[i]?.trim() ?? "";
+  const matchedCount = mapping.filter(Boolean).length;
+
+  /** Set column i's field. A field fills from one column only, so it moves from any other column (and we say so). */
+  function choose(i: number, field: ImportField | null) {
+    const from = field ? mapping.findIndex((m, j) => m === field && j !== i) : -1;
+    setMapping((m) => m.map((v, j) => (j === i ? field : field && v === field ? null : v)));
+    setMoved(from >= 0 && field ? `${IMPORT_FIELDS[field]} now comes from ${colName(i)} (no longer from ${colName(from)}).` : null);
+  }
 
   async function load(file: File) {
     setError(null);
@@ -122,28 +138,64 @@ export function AngelImport() {
       {headers.length > 0 && (
         <>
           <div className="rounded-lg border border-black/10 bg-white">
-            <h2 className="border-b border-black/10 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-dxv-green">1. Match the columns</h2>
-            <div className="grid gap-x-6 gap-y-2 p-4 sm:grid-cols-2">
-              {headers.map((h, i) => (
-                <label key={i} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate" title={h}>
-                    {h || <em className="text-black/40">(blank header)</em>}
-                    <span className="block truncate text-xs text-black/40">{data[0]?.[i] || "–"}</span>
-                  </span>
-                  <select
-                    value={mapping[i] ?? ""}
-                    onChange={(e) => setMapping((m) => m.map((v, j) => (j === i ? ((e.target.value || null) as ImportField | null) : v === e.target.value ? null : v)))}
-                    className={`${inputClass} w-52 shrink-0`}
-                  >
-                    <option value="">Don&apos;t import</option>
-                    {(Object.keys(IMPORT_FIELDS) as ImportField[]).map((f) => (
-                      <option key={f} value={f}>
-                        {IMPORT_FIELDS[f]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 px-4 py-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">1. Match the columns</h2>
+              <label className="flex items-center gap-1.5 text-xs text-black/60">
+                <input type="checkbox" checked={matchedOnly} onChange={(e) => setMatchedOnly(e.target.checked)} />
+                Show only matched columns ({matchedCount} of {headers.length})
+              </label>
+            </div>
+            <p className="px-4 pt-3 text-xs text-black/55">
+              For each column in your file (left), choose the DXV OS field it fills (right), or leave it as Don&apos;t import. Each field can come from one
+              column only, so choosing a field that another column already fills moves it here.
+            </p>
+            {moved && (
+              <p role="status" className="mx-4 mt-2 rounded bg-dxv-yellow/40 px-2 py-1 text-xs">
+                {moved}
+              </p>
+            )}
+            <div className="p-4 pt-2">
+              <div className="hidden grid-cols-[minmax(0,1fr)_1.5rem_16rem] gap-3 border-b border-black/10 pb-1 text-[11px] font-medium uppercase tracking-wide text-black/45 sm:grid">
+                <span>Column in your file (example value)</span>
+                <span />
+                <span>DXV OS field</span>
+              </div>
+              <ul className="divide-y divide-black/5">
+                {headers.map((h, i) =>
+                  matchedOnly && !mapping[i] ? null : (
+                    <li key={i} className={`grid items-center gap-x-3 gap-y-1 py-2 sm:grid-cols-[minmax(0,1fr)_1.5rem_16rem] ${mapping[i] ? "bg-dxv-green/[0.04]" : ""}`}>
+                      <span className="min-w-0 px-1 text-sm">
+                        <span className="block truncate font-medium" title={h}>
+                          {h || <em className="font-normal text-black/40">(no header)</em>}
+                        </span>
+                        <span className="block truncate text-xs text-black/45" title={example(i)}>
+                          {example(i) || "empty in the first rows"}
+                        </span>
+                      </span>
+                      <span aria-hidden className="hidden text-center text-black/30 sm:block">
+                        →
+                      </span>
+                      <select
+                        aria-label={`DXV OS field for column ${h || i + 1}`}
+                        value={mapping[i] ?? ""}
+                        onChange={(e) => choose(i, (e.target.value || null) as ImportField | null)}
+                        className={`${selectClass} ${mapping[i] ? "border-dxv-green font-medium text-dxv-green" : "text-black/60"}`}
+                      >
+                        <option value="">Don&apos;t import</option>
+                        {(Object.keys(IMPORT_FIELDS) as ImportField[]).map((f) => {
+                          const from = mapping.findIndex((m, j) => m === f && j !== i);
+                          return (
+                            <option key={f} value={f}>
+                              {IMPORT_FIELDS[f]}
+                              {from >= 0 ? ` (now from "${headers[from] || `column ${from + 1}`}")` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </li>
+                  ),
+                )}
+              </ul>
             </div>
           </div>
 
@@ -152,7 +204,7 @@ export function AngelImport() {
             <div className="space-y-3 p-4 text-sm">
               <label className="flex flex-wrap items-center gap-2">
                 New angels without a status column are added as
-                <select value={status} onChange={(e) => setStatus(e.target.value as AngelStatus)} className={`${inputClass} w-40`}>
+                <select value={status} onChange={(e) => setStatus(e.target.value as AngelStatus)} className={`${selectClass} w-40`}>
                   {(Object.keys(ANGEL_STATUS_LABELS) as AngelStatus[]).map((s) => (
                     <option key={s} value={s}>
                       {ANGEL_STATUS_LABELS[s]}

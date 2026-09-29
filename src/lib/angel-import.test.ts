@@ -20,6 +20,12 @@ describe("guessMapping", () => {
   });
 });
 
+describe("guessMapping (orders export)", () => {
+  it("reads Billing Name as the full name", () => {
+    expect(guessMapping(["Order ID", "Email", "Billing Name", "Billing City"])).toEqual([null, "email", "name", "location"]);
+  });
+});
+
 describe("value parsing", () => {
   it("reads UK dates day-first, ISO and written dates, rejecting nonsense", () => {
     const iso = (s: string) => parseImportDate(s)?.toISOString().slice(0, 10);
