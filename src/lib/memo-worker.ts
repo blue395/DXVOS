@@ -1,6 +1,7 @@
 // Runs one AI memo assessment: claim the job, read the deck, ask Claude, save.
 // Same pattern as deck-worker.ts (plain SQL; shared with the Netlify function).
 import Anthropic from "@anthropic-ai/sdk";
+import { apiErrorMessage, workerAnthropic } from "./ai-client";
 import { Pool } from "pg";
 import { sslOptions } from "./db-ssl";
 import { readDeck } from "./deck-storage";
@@ -17,7 +18,7 @@ export type MemoWorkerDeps = { pool?: Pool; anthropic?: Anthropic; readDeck?: (s
 function defaultAnthropic(): Anthropic {
   if (process.env.DECK_AI_MOCK === "true" && process.env.NODE_ENV !== "production") return fakeMemoClient();
   if (!process.env.ANTHROPIC_API_KEY) throw new MemoFormatError("ANTHROPIC_API_KEY isn't set, so memos can't be drafted yet.");
-  return new Anthropic();
+  return workerAnthropic();
 }
 
 export async function runMemoAnalysis(analysisId: string, deps: MemoWorkerDeps = {}): Promise<void> {
@@ -49,7 +50,7 @@ export async function runMemoAnalysis(analysisId: string, deps: MemoWorkerDeps =
         e instanceof MemoFormatError
           ? e.message
           : e instanceof Anthropic.APIError
-            ? `Claude API error (${e.status ?? "network"}). Try again in a minute.`
+            ? apiErrorMessage(e)
             : e instanceof Error
               ? e.message
               : "Unknown error";

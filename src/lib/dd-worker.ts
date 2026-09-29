@@ -2,6 +2,7 @@
 // build the branded Word file, store it under Documents → Due diligence.
 // Same pattern as memo-worker.ts (plain SQL; shared with the Netlify function).
 import Anthropic from "@anthropic-ai/sdk";
+import { apiErrorMessage, workerAnthropic } from "./ai-client";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { sslOptions } from "./db-ssl";
@@ -28,7 +29,7 @@ export type DDWorkerDeps = {
 function defaultAnthropic(): Anthropic {
   if (process.env.DECK_AI_MOCK === "true" && process.env.NODE_ENV !== "production") return fakeDDClient();
   if (!process.env.ANTHROPIC_API_KEY) throw new DDPlanError("ANTHROPIC_API_KEY isn't set, so DD documents can't be drafted yet.");
-  return new Anthropic();
+  return workerAnthropic();
 }
 
 export async function runDDReport(jobId: string, deps: DDWorkerDeps = {}): Promise<void> {
@@ -84,7 +85,7 @@ export async function runDDReport(jobId: string, deps: DDWorkerDeps = {}): Promi
         e instanceof DDPlanError
           ? e.message
           : e instanceof Anthropic.APIError
-            ? `Claude API error (${e.status ?? "network"}). Try again in a minute.`
+            ? apiErrorMessage(e)
             : e instanceof Error
               ? e.message
               : "Unknown error";

@@ -2,6 +2,7 @@
 // SUGGESTED lessons for the team to approve. Same pattern as memo-worker.ts
 // (plain SQL; shared with the Netlify function).
 import Anthropic from "@anthropic-ai/sdk";
+import { apiErrorMessage, workerAnthropic } from "./ai-client";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { sslOptions } from "./db-ssl";
@@ -18,7 +19,7 @@ export type LessonWorkerDeps = { pool?: Pool; anthropic?: Anthropic };
 function defaultAnthropic(): Anthropic {
   if (process.env.DECK_AI_MOCK === "true" && process.env.NODE_ENV !== "production") return fakeLessonClient();
   if (!process.env.ANTHROPIC_API_KEY) throw new LessonSuggestionError("ANTHROPIC_API_KEY isn't set.");
-  return new Anthropic();
+  return workerAnthropic();
 }
 
 const TRIGGER_ORIGIN: Record<string, string> = {
@@ -66,7 +67,7 @@ export async function runLessonJob(jobId: string, deps: LessonWorkerDeps = {}): 
         client.release();
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Unknown error";
+      const message = e instanceof Anthropic.APIError ? apiErrorMessage(e) : e instanceof Error ? e.message : "Unknown error";
       console.error(`Lesson job ${jobId} failed:`, e);
       await pool.query(`UPDATE "LessonJob" SET status = 'FAILED', error = $2, "completedAt" = now() WHERE id = $1`, [jobId, message.slice(0, 500)]);
     }

@@ -5,6 +5,7 @@
 // Uses plain SQL via `pg` rather than Prisma, so the Netlify function bundle stays
 // small and simple. Shared with the worker: no Next-only imports.
 import Anthropic from "@anthropic-ai/sdk";
+import { apiErrorMessage, workerAnthropic } from "./ai-client";
 import { Pool } from "pg";
 import { analyzeDeck, DeckAnalysisError } from "./deck-ai/analyze";
 import type { AiContextSnapshot, EligibilityPlaybook } from "./playbook/schema";
@@ -22,7 +23,7 @@ export type WorkerDeps = {
 function defaultAnthropic(): Anthropic {
   if (process.env.DECK_AI_MOCK === "true" && process.env.NODE_ENV !== "production") return fakeAnthropicClient();
   if (!process.env.ANTHROPIC_API_KEY) throw new DeckAnalysisError("ANTHROPIC_API_KEY isn't set, so decks can't be read yet.");
-  return new Anthropic();
+  return workerAnthropic();
 }
 
 export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {}): Promise<void> {
@@ -74,7 +75,7 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
         e instanceof DeckAnalysisError
           ? e.message
           : e instanceof Anthropic.APIError
-            ? `Claude API error (${e.status ?? "network"}). Try again in a minute.`
+            ? apiErrorMessage(e)
             : e instanceof Error
               ? e.message
               : "Unknown error";

@@ -2,6 +2,7 @@
 // lookups and web search), saving the text as it streams so the chat shows it arriving.
 // Same pattern as the other AI workers (plain SQL; shared with the Netlify function).
 import Anthropic from "@anthropic-ai/sdk";
+import { apiErrorMessage, workerAnthropic } from "./ai-client";
 import { Pool } from "pg";
 import { fakeBrainCall } from "./brain/mock";
 import { buildBrainSystem, type BrainContext } from "./brain/prompt";
@@ -23,7 +24,7 @@ const SAVE_EVERY_MS = 500;
 function defaultCall(): BrainModelCall {
   if (process.env.DECK_AI_MOCK === "true" && process.env.NODE_ENV !== "production") return fakeBrainCall();
   if (!process.env.ANTHROPIC_API_KEY) throw new BrainError("ANTHROPIC_API_KEY isn't set, so the Brain can't answer yet.");
-  const client = new Anthropic();
+  const client = workerAnthropic();
   return async (params, on) => {
     const stream = client.beta.messages.stream(params);
     stream.on("text", on.onText);
@@ -137,7 +138,7 @@ export async function runBrainReply(messageId: string, deps: BrainWorkerDeps = {
         e instanceof BrainError
           ? e.message
           : e instanceof Anthropic.APIError
-            ? `Claude API error (${e.status ?? "network"}). Try again in a minute.`
+            ? apiErrorMessage(e)
             : e instanceof Error
               ? e.message
               : "Unknown error";
