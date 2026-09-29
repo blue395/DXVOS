@@ -9,15 +9,17 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { EligibilityDecision, PassReason } from "@/generated/prisma/enums";
 import { requireAdmin } from "@/lib/auth";
+import { aiContextFor } from "@/lib/playbook/current";
 import { db } from "@/lib/db";
 import { createUploadTarget, deckPath, MAX_DECK_BYTES, type UploadTarget } from "@/lib/deck-storage";
 import { runDeckAnalysis } from "@/lib/deck-worker";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
 import { recordDeckDocument } from "@/lib/deck-documents";
 import { effectiveDeckStatus, type DeckStatus } from "@/lib/deck-status";
-import { canDecideEligibility, ELIGIBILITY_DECISION_TARGET } from "@/lib/pipeline";
+import { canDecideEligibility, ELIGIBILITY_DECISION_TARGET, eligibilityDisagrees, PASS_REASON_LABELS } from "@/lib/pipeline";
+import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { DomainError, moveVentureStage } from "@/lib/ventures";
-import type { ExtractedFields } from "@/lib/deck-ai/schema";
+import type { EligibilityScreen, ExtractedFields } from "@/lib/deck-ai/schema";
 import type { ActionResult } from "@/lib/action-result";
 
 // ── Upload & analysis ───────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ export async function beginDeckAnalysis(analysisId: string): Promise<ActionResul
   await requireAdmin();
   const analysis = await db.deckAnalysis.findUnique({ where: { id: analysisId } });
   if (!analysis || analysis.status !== "PENDING") return { error: "This upload can't be analysed." };
+  // Snapshot the Playbook version and approved lessons the AI will be given (kept with the screen).
+  await db.deckAnalysis.update({ where: { id: analysisId }, data: { aiContext: await aiContextFor("ELIGIBILITY") } });
   await recordDeckDocument(analysisId); // a deck uploaded on an existing venture: list it under Documents
   await triggerWorker(analysisId);
   return { ok: true };
@@ -81,6 +85,7 @@ export async function rerunDeckAnalysis(ventureId: string): Promise<ActionResult
       fileName: latest.fileName,
       fileSize: latest.fileSize,
       createdById: user.id,
+      aiContext: await aiContextFor("ELIGIBILITY"), // the Playbook version and lessons this screen uses
     },
   });
   await triggerWorker(id);
@@ -187,6 +192,20 @@ export async function decideEligibility(ventureId: string, _prev: ActionResult, 
       decidedById: user.id,
     },
   });
+
+  // Learning moments (best effort): the team decided differently from the AI, or declined.
+  const screen = analysisId ? ((await db.deckAnalysis.findUnique({ where: { id: analysisId }, select: { screen: true } }))?.screen as EligibilityScreen | null) : null;
+  const decided = `${DECISION_LABELS[decision]}${decision === "DECLINE" && passReason ? ` (${PASS_REASON_LABELS[passReason]})` : ""}${note ? `. Note: ${note}` : ""}`;
+  if (eligibilityDisagrees(screen?.recommendation, decision)) {
+    await queueLessonSuggestions({
+      ventureId,
+      trigger: "ELIGIBILITY_DECIDED",
+      moment: `At the eligibility screen the AI recommended "${screen!.recommendation}", but the DXV team decided: ${decided}.`,
+      userId: user.id,
+    });
+  } else if (decision === "DECLINE") {
+    await queueLessonSuggestions({ ventureId, trigger: "DECLINED", moment: `Declined at the eligibility screen: ${decided}.`, userId: user.id });
+  }
 
   revalidatePath(`/deals/${ventureId}`);
   revalidatePath("/deals");

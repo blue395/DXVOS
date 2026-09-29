@@ -8,11 +8,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { aiContextFor } from "@/lib/playbook/current";
+import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { db } from "@/lib/db";
 import { renderScreen } from "@/lib/deck-ai/render";
 import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import type { MemoContext } from "@/lib/memo-ai/context";
-import { CRITERIA, type MemoContent } from "@/lib/memo-ai/schema";
+import type { MemoContent } from "@/lib/memo-ai/schema";
 import { MEMO_JOB_PREFIX, runMemoAnalysis } from "@/lib/memo-worker";
 import { canGenerateAssessment, formatGbp, PASS_REASON_LABELS } from "@/lib/pipeline";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
@@ -68,6 +70,7 @@ export async function generateAssessment(ventureId: string): Promise<ActionResul
     ),
     founderCommsNotes: v.founderComms.map((c) => `${c.decision}: ${c.note}`),
     deck: { storagePath: deck.storagePath, fileName: deck.fileName },
+    ai: await aiContextFor("ASSESSMENT"), // the Playbook version and approved lessons this draft uses
   };
 
   const analysis = await db.$transaction(async (tx) => {
@@ -185,7 +188,7 @@ export async function saveMemoText(draftId: string, _prev: ActionResult, formDat
 }
 
 const ScoreFormSchema = z.object({
-  criterion: z.enum(CRITERIA),
+  criterion: z.string().trim().min(1), // must be one of this draft's criteria (checked below)
   score: z.coerce.number().int().min(1).max(5),
   justification: z.string().trim().min(1, "Add a justification"),
   reason: z
@@ -246,6 +249,28 @@ export async function finaliseMemo(draftId: string, _prev: ActionResult, formDat
     // The draft is done: it now lives on as the issue.
     await tx.memoDraft.update({ where: { id: draftId }, data: { archivedAt: new Date() } });
   });
+
+  // Learning moment (best effort): the team changed the AI's scores before issuing the memo.
+  const [analysis, changes, issues] = await Promise.all([
+    db.memoAnalysis.findUnique({ where: { id: draft.analysisId }, select: { output: true } }),
+    db.memoScoreChange.findMany({ where: { draftId }, orderBy: { changedAt: "asc" } }),
+    db.memoVersion.count({ where: { ventureId: draft.ventureId, kind: "REVIEWED_MEMO" } }),
+  ]);
+  const aiScores = new Map(((analysis?.output as MemoContent | null)?.scores ?? []).map((s) => [s.criterion, s.score]));
+  const diffs = draft.content.scores
+    .filter((s) => aiScores.has(s.criterion) && aiScores.get(s.criterion) !== s.score)
+    .map((s) => {
+      const why = changes.filter((c) => c.criterion === s.criterion && c.reason).map((c) => c.reason);
+      return `${s.criterion} ${aiScores.get(s.criterion)} to ${s.score}${why.length ? ` (team's reason: ${why.join("; ")})` : ""}`;
+    });
+  if (diffs.length) {
+    await queueLessonSuggestions({
+      ventureId: draft.ventureId,
+      trigger: "MEMO_REVIEWED",
+      moment: `The DXV team released DXV Review Issue ${issues} after changing the AI's scores: ${diffs.join("; ")}.`,
+      userId: user.id,
+    });
+  }
   revalidateAssessment(draft.ventureId);
   return { ok: true };
 }

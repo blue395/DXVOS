@@ -38,7 +38,7 @@ export function fakeMemoClient(opts: { memo?: MemoContent | null; stopReason?: s
         return {
           model: "mock-model",
           stop_reason: opts.stopReason ?? "end_turn",
-          parsed_output: opts.memo === undefined ? sampleMemo() : opts.memo,
+          parsed_output: opts.memo === undefined ? withRequestedCriteria(sampleMemo(), params) : opts.memo,
           usage: { input_tokens: 4321, output_tokens: 2100 },
         };
       },
@@ -50,4 +50,14 @@ export function fakeMemoClient(opts: { memo?: MemoContent | null; stopReason?: s
 async function mockDelay() {
   const ms = Number(process.env.DECK_AI_MOCK_DELAY_MS ?? 0);
   if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+}
+
+/** Like the real model, score whatever criteria the prompt lists (the Playbook can change them). */
+function withRequestedCriteria(memo: MemoContent, params: unknown): MemoContent {
+  const system = (params as { system?: unknown }).system;
+  if (typeof system !== "string") return memo;
+  const section = system.split("§2.")[1]?.split("§3.")[0] ?? "";
+  const names = [...section.matchAll(/^\d+\. (.+?) — /gm)].map((m) => m[1]);
+  if (!names.length) return memo;
+  return { ...memo, scores: names.map((criterion, i) => ({ criterion, score: memo.scores[i]?.score ?? 3, justification: `Sample justification for ${criterion}.` })) };
 }

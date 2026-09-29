@@ -4,7 +4,7 @@ import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
 import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
-import { totalScore, MAX_TOTAL_SCORE, type MemoContent } from "@/lib/memo-ai/schema";
+import { maxScore, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
 import { canGenerateAssessment } from "@/lib/pipeline";
 import { AiTag, Card, ExportLinks, formatDateTime, StageBadge } from "@/components/ui";
 import { CopyButton } from "../eligibility-client";
@@ -163,7 +163,8 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
                   <ExportLinks href={`/api/export/ai-draft/${a.id}`} />
                   <AiTag>AI Draft</AiTag>
                   <span>
-                    {a.model} · run by {a.createdBy.name} · {formatDateTime(a.completedAt ?? a.createdAt)}
+                    {a.model} · criteria v{(a.context as { ai?: { playbookVersion?: number } }).ai?.playbookVersion ?? 0} · run by {a.createdBy.name} ·{" "}
+                    {formatDateTime(a.completedAt ?? a.createdAt)}
                   </span>
                 </div>
               </div>
@@ -222,7 +223,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
             <Card title="Mark complete">
               <p className="mb-3 text-sm text-black/60">
                 Releases {reviewDraftName(draft.number)} as <strong>{reviewIssueName(draft.number)}</strong> (
-                {totalScore(m.scores)}/{MAX_TOTAL_SCORE}): locked, for sharing with the syndicate before the Pre-Selection vote.
+                {totalScore(m.scores)}/{maxScore(m.scores)}): locked, for sharing with the syndicate before the Pre-Selection vote.
                 To change it later, revise it into {reviewDraftName(draft.number + 1)} and issue again.
               </p>
               <div className="flex flex-wrap items-end gap-3">

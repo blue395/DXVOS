@@ -11,6 +11,7 @@ import {
   BOARD_STAGES,
   boardColumn,
   boardHref,
+  eligibilityDisagrees,
   splitLatestComm,
   parseDeclinedFilter,
   declinedColumn,
@@ -362,5 +363,14 @@ describe("splitLatestComm", () => {
       { id: "partner", createdAt: t, status: "NOT_YET_SENT", gate: "PARTNER_REVIEW" as const },
     ]);
     expect([r.latest?.id, ...r.earlier.map((c) => c.id)]).toEqual(["pitch", "partner", "elig"]);
+  });
+});
+
+describe("eligibilityDisagrees", () => {
+  it("spots when the team decided differently from the AI", () => {
+    expect(eligibilityDisagrees("Decline", "PROCEED")).toBe(true);
+    expect(eligibilityDisagrees("Proceed to pipeline", "PROCEED")).toBe(false);
+    expect(eligibilityDisagrees("Need more information", "DECLINE")).toBe(true);
+    expect(eligibilityDisagrees(null, "DECLINE")).toBe(false);
   });
 });

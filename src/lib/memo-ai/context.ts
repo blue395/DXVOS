@@ -2,6 +2,8 @@
 // (the memo document asks for the eligibility screen etc. "rather than starting cold").
 // Snapshotted onto each MemoAnalysis, so every draft records what it was given.
 
+import type { AiContextSnapshot, AssessmentPlaybook } from "../playbook/schema";
+
 export type MemoContext = {
   ventureName: string;
   dxvRound: string; // "Round 3" or "Not assigned"
@@ -10,6 +12,8 @@ export type MemoContext = {
   eligibilityDecisions: string[]; // partner decisions and notes
   founderCommsNotes: string[];
   deck: { storagePath: string; fileName: string } | null;
+  /** Playbook version and approved lessons given to the AI (absent on jobs before 2026-09-30: defaults). */
+  ai?: AiContextSnapshot<AssessmentPlaybook>;
 };
 
 export function renderContext(c: MemoContext): string {

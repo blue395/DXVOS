@@ -55,6 +55,11 @@ model User {
   finalInvestmentsPaid    FinalInvestment[]   @relation("FinalInvestmentPaidBy")
   finalInvestmentsRemoved FinalInvestment[]   @relation("FinalInvestmentRemovedBy")
   entryAudits             EntryAudit[]
+  playbookVersions        PlaybookVersion[]
+  lessonsCreated          Lesson[]            @relation("LessonCreatedBy")
+  lessonsApproved         Lesson[]            @relation("LessonApprovedBy")
+  lessonsUpdated          Lesson[]            @relation("LessonUpdatedBy")
+  lessonJobs              LessonJob[]
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -128,6 +133,8 @@ model Venture {
   ddReportJobs       DDReportJob[]
   finalInvestments   FinalInvestment[]
   entryAudits        EntryAudit[]
+  lessons            Lesson[]
+  lessonJobs         LessonJob[]
 
   @@index([currentStage])
 }
@@ -434,7 +441,8 @@ model DeckAnalysis {
   startedAt    DateTime?
   completedAt  DateTime?
 
-  reviews EligibilityReview[]
+  reviews   EligibilityReview[]
+  aiContext Json? // the criteria version and lessons this screen was given (null: built-in defaults)
 
   @@index([ventureId, createdAt])
 }
@@ -527,6 +535,103 @@ model DDReportJob {
   createdAt    DateTime           @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
+
+  @@index([ventureId, createdAt])
+}
+
+// ── Playbook: DXV's criteria and lessons (feeds the AI; later, the DXV Brain) ──
+
+enum PlaybookKind {
+  ELIGIBILITY // the eligibility screen criteria
+  ASSESSMENT // the investment assessment scoring criteria and taxonomy
+}
+
+// Append-only: every save of the criteria is a new numbered version (who, when, why).
+// The AI uses the latest version; each AI run records the version it was given.
+// Version 0 is the built-in default (DXV's original documents), not stored.
+model PlaybookVersion {
+  id          String       @id @default(cuid())
+  kind        PlaybookKind
+  version     Int
+  content     Json // shape: src/lib/playbook/schema.ts
+  note        String? // what changed and why
+  createdById String
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
+
+  @@unique([kind, version])
+}
+
+enum LessonScope {
+  GENERAL
+  ELIGIBILITY
+  ASSESSMENT
+  DUE_DILIGENCE
+  PORTFOLIO
+}
+
+enum LessonStatus {
+  SUGGESTED // proposed by the AI, waiting for a person
+  APPROVED // used by the AI steps
+  ARCHIVED // kept, not used (nothing is deleted)
+}
+
+enum LessonSource {
+  HUMAN
+  AI
+}
+
+// What DXV has learned. Approved lessons are given to the AI eligibility screen and
+// investment assessment; they are the DXV Brain's knowledge base later.
+model Lesson {
+  id           String       @id @default(cuid())
+  title        String
+  body         String
+  scope        LessonScope  @default(GENERAL)
+  status       LessonStatus @default(APPROVED)
+  source       LessonSource @default(HUMAN)
+  origin       String? // e.g. "Suggested when Papcup was declined at Pitch Outcome"
+  ventureId    String? // the deal it came from, if any
+  venture      Venture?     @relation(fields: [ventureId], references: [id], onDelete: SetNull)
+  jobId        String? // the AI job that suggested it
+  job          LessonJob?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  createdById  String? // null when suggested by the AI
+  createdBy    User?        @relation("LessonCreatedBy", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   User?        @relation("LessonApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  updatedById  String?
+  updatedBy    User?        @relation("LessonUpdatedBy", fields: [updatedById], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status, scope])
+}
+
+enum LessonTrigger {
+  DECLINED // a deal was declined
+  MEMO_REVIEWED // a DXV Review Issue was released after the team changed the AI's scores
+  ELIGIBILITY_DECIDED // the team's eligibility decision differed from the AI's recommendation
+}
+
+// Background job: the AI reviews a moment in a deal and suggests lessons (status SUGGESTED).
+model LessonJob {
+  id           String             @id @default(cuid())
+  ventureId    String
+  venture      Venture            @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  trigger      LessonTrigger
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  context      Json
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation(fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  lessons      Lesson[]
 
   @@index([ventureId, createdAt])
 }

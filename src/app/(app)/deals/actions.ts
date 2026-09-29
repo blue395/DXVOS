@@ -19,7 +19,8 @@ import { DomainError, moveVentureStage } from "@/lib/ventures";
 import { recordDeckDocument } from "@/lib/deck-documents";
 import type { ActionResult } from "@/lib/action-result";
 import type { EntrySnapshot } from "@/lib/audit";
-import { canDecline, latestVotePerAngel, normaliseAngelName } from "@/lib/pipeline";
+import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
+import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,11 +139,22 @@ export async function moveVenture(
   const parsed = MoveSchema.safeParse(input);
   if (!parsed.success) return { error: firstError(parsed.error) };
 
+  let moved;
   try {
-    await moveVentureStage({ ventureId, userId: user.id, ...parsed.data });
+    moved = await moveVentureStage({ ventureId, userId: user.id, ...parsed.data });
   } catch (e) {
     if (e instanceof DomainError) return { error: e.message };
     throw e;
+  }
+  // A decline is a learning moment: ask the AI to suggest lessons (best effort, reviewed in the Playbook).
+  if (parsed.data.to === "PASSED" && moved.passedFromStage) {
+    const reason = parsed.data.passReason ? PASS_REASON_LABELS[parsed.data.passReason] : "no reason given";
+    await queueLessonSuggestions({
+      ventureId,
+      trigger: "DECLINED",
+      moment: `Declined at ${stageLabel(moved.passedFromStage)}. Reason: ${reason}.${parsed.data.note ? ` Note: ${parsed.data.note}` : ""}`,
+      userId: user.id,
+    });
   }
   revalidateDeal(ventureId);
   revalidatePath("/activity");

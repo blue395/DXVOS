@@ -41,5 +41,6 @@ export function renderScreen(s: EligibilityScreen): string {
     `DXV thesis fit: ${s.thesisFit.rating} - ${s.thesisFit.reasoning}`,
     `Red flags: ${redFlags}`,
     `Next step: ${s.nextStep}`,
+    ...(s.otherCriteria ?? []).map((c) => `${c.criterion}: ${c.assessment}`),
   ].join("\n\n");
 }

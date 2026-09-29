@@ -20,6 +20,7 @@ const screen = {
   thesisFit: { rating: "Not stated" as const, reasoning: "The deck does not state founder backgrounds." },
   redFlags: [],
   nextStep: "Confirm founder background.",
+  otherCriteria: [{ criterion: "UK company", assessment: "Met: registered in England." }],
 };
 const ctx: DDContext = {
   ventureName: "Kora Health",

@@ -14,6 +14,7 @@ type Analysis = {
   fileName: string;
   model: string | null;
   screen: unknown;
+  aiContext?: unknown; // the Playbook version and lessons it was given
   createdAt: Date;
   startedAt: Date | null;
   completedAt: Date | null;
@@ -190,6 +191,9 @@ function ScreenView({
         <Row label="DXV thesis fit" value={`${screen.thesisFit.rating} - ${screen.thesisFit.reasoning}`} />
         <Row label="Red flags" value={screen.redFlags.length ? screen.redFlags.join("; ") : "None identified"} />
         <Row label="Next step" value={screen.nextStep} />
+        {(screen.otherCriteria ?? []).map((c) => (
+          <Row key={c.criterion} label={c.criterion} value={c.assessment} />
+        ))}
       </dl>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-black/50">
@@ -197,7 +201,7 @@ function ScreenView({
         <ExportLinks href={`/api/export/screen/${analysis.id}`} />
         <RerunButton ventureId={ventureId} />
         <span>
-          {analysis.fileName} · {analysis.model} · run by {analysis.createdBy.name} ·{" "}
+          {analysis.fileName} · {analysis.model} · criteria v{playbookVersionOf(analysis.aiContext)} · run by {analysis.createdBy.name} ·{" "}
           {formatDateTime(analysis.completedAt ?? analysis.createdAt)}
         </span>
       </div>
@@ -215,4 +219,9 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd>{value}</dd>
     </>
   );
+}
+
+/** Which Playbook version a screen was given (0 = DXV's original template, or screens from before versioning). */
+function playbookVersionOf(aiContext: unknown): number {
+  return (aiContext as { playbookVersion?: number } | null)?.playbookVersion ?? 0;
 }
