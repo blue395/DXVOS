@@ -25,7 +25,7 @@ import {
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Reveal } from "@/components/reveal";
-import { Card, CommsBadge, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
+import { Card, CommsBadge, ExportLinks, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
 import { CommsStatus } from "@/generated/prisma/enums";
 import type { FounderComm } from "@/generated/prisma/client";
 import {
@@ -69,6 +69,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               uploadedBy: { select: { name: true } },
               ddItem: { select: { title: true } },
               memoVersion: { select: { id: true } },
+              ddReportJob: { select: { id: true } }, // generated DD reports can also be exported as PDF
             },
           },
           memoAnalyses: { orderBy: { number: "desc" }, take: 1 },
@@ -110,7 +111,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
   const issueNo = issueNumbers(v.memoVersions.filter((m) => m.kind === "REVIEWED_MEMO"));
-  const docs: DocRow[] = v.documents.map((d) => ({ ...d, isMemoVersion: !!d.memoVersion }));
+  const docs: DocRow[] = v.documents.map((d) => ({ ...d, isMemoVersion: !!d.memoVersion, ddReportJobId: d.ddReportJob?.id ?? null }));
   const latestDeck = docs.find((d) => d.category === "DECK");
 
 
@@ -281,6 +282,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                       ) : null}
                       {i === 0 && <span className="ml-2 rounded bg-dxv-yellow px-1.5 text-xs font-medium text-dxv-green">Latest</span>}
                       {m.summary && <p className="text-black/65">{m.summary}</p>}
+                      {m.kind === "REVIEWED_MEMO" && (
+                        <div className="mt-1">
+                          <ExportLinks href={`/api/export/issue/${m.id}`} />
+                        </div>
+                      )}
                     </div>
                     <span className="shrink-0 text-xs text-black/50">
                       {m.createdBy.name} · {formatDate(m.createdAt)}
