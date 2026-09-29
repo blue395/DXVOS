@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dealsByStage,
   deckCardState,
   ALL_STAGES,
   canDecideEligibility,
@@ -398,5 +399,16 @@ describe("deckCardState", () => {
     expect(deckCardState("SUBMITTED", { status: "PROCESSING", intakeOnly: false }, false)).toBeNull();
     expect(deckCardState("SUBMITTED", { status: "COMPLETE", intakeOnly: false }, true)).toBeNull();
     expect(deckCardState("ELIGIBILITY_SCREEN", { status: "COMPLETE", intakeOnly: true }, false)).toBeNull();
+  });
+});
+
+describe("dealsByStage", () => {
+  it("counts S/EIS Certificate deals as Investment Complete and has no S/EIS row", () => {
+    const rows = dealsByStage(["SUBMITTED", "INVESTMENT_COMPLETE", "SEIS_CERTIFICATE", "PASSED"]);
+    const count = (k: string) => rows.find((r) => r.key === k)?.count;
+    expect(rows.some((r) => r.key === "SEIS_CERTIFICATE")).toBe(false);
+    expect(count("INVESTMENT_COMPLETE")).toBe(2);
+    expect(count("SUBMITTED")).toBe(1);
+    expect(rows.at(-1)).toMatchObject({ key: "PASSED", label: "Declined", count: 1 });
   });
 });
