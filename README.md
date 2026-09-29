@@ -60,11 +60,14 @@ src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Clau
 src/lib/deck-storage.ts       Supabase Storage (prod) / .data/<bucket> (dev), for decks and documents
 src/lib/documents.ts          Document rules: allowed types (PDF/Word/Excel), 50 MB limit, categories
 src/app/(app)/deals/document-actions.ts   Upload, confirm, archive documents
-netlify/functions/            analyze-deck-background, analyze-memo-background, generate-dd-background: the long-running workers
+netlify/functions/            analyze-deck-background, analyze-memo-background, generate-dd-background, suggest-lessons-background, brain-reply-background: the long-running workers
 src/lib/memo-ai/              AI memo: prompt (edit here), schema + scoring criteria, rendering, context, mock
 src/lib/memo-worker.ts        Runs one memo assessment
 src/lib/dd-doc/               DD document: prompt (edit here), schema, context, Word builder (docx), mock
 src/lib/dd-worker.ts          Runs one DD document job (AI plan, build .docx, store under Documents)
+src/lib/brain/                DXV Brain: instructions (from the Playbook), read-only tools, reply loop, mock
+src/lib/brain-worker.ts       Writes one Brain reply (streams text into the database as Claude writes)
+src/components/brain/         The floating Brain panel (on every page) and its Markdown renderer
 src/app/(app)/deals/[id]/assessment/   Full assessment page (AI drafts, review copy, reviewed versions)
 src/components/               Shared UI (ActionForm, Card, badges…)
 scripts/                      seed.ts (dev), create-admin.ts
@@ -162,7 +165,7 @@ function `generate-dd-background`.
 
 ## Playbook: DXV's criteria and lessons (`/playbook`)
 
-The feedback loop behind the AI, and the foundation for the DXV Brain.
+The feedback loop behind the AI, and what the DXV Brain knows DXV's criteria and lessons from.
 - **Eligibility criteria** and **Investment assessment criteria** are editable by the team (add, remove, rename,
   reorder; the four core eligibility criteria can be reworded but not removed). Every save is a new, noted
   version (`PlaybookVersion`, append-only) with history and restore; version 0 is DXV's original documents,
@@ -174,6 +177,28 @@ The feedback loop behind the AI, and the foundation for the DXV Brain.
   a deal is declined, when the team changes the AI's scores before issuing a memo, or when an eligibility
   decision differs from the AI's recommendation. Suggestions wait for a person to approve (menu badge).
   Approved eligibility/assessment/general lessons (newest 40) are given to those AI steps.
+
+## DXV Brain (floating AI assistant, every page)
+
+The **DXV Brain** button (bottom right, or Ctrl+J) opens a chat with Claude Opus 5.5 that is DXV-first:
+- **Instructions** (`src/lib/brain/prompt.ts`) describe DXV and carry the current Playbook criteria and approved
+  lessons (all scopes, newest 80), snapshotted onto each chat (`BrainConversation.context`), like every AI job.
+- **Reads DXV OS, changes nothing.** Its tools (`src/lib/brain/tools.ts`) are read-only lookups: list deals, a
+  deal's full record, the memo, the DD plan, the stored deck, pipeline totals, recent activity. There are no
+  write tools; asked to change something, it says where a partner does that.
+- **Knows the page**: each question carries a hidden note with the time and, on a deal page, which deal.
+- **Web search** (Anthropic's server tool) for market and public facts, with cited sources shown under the answer;
+  it's told never to search with confidential DXV information.
+- **Chats are private** to the person who started them (`BrainConversation.userId`; every query is scoped to
+  the signed-in user) and archived, never deleted. Each message stores exactly what went to and came back from
+  Claude and is replayed unchanged, so follow-ups keep full context. A deck the Brain read is stored as a
+  pointer to the PDF, not the file.
+- **How a reply runs**: `askBrain()` saves the question and a pending reply, then starts the background function
+  `brain-reply-background` (answers can take longer than a normal request allows). The worker streams Claude's
+  text into the database every half second; the panel checks once a second while a reply is being written
+  (the one place a component polls), so text appears as it's written. Safety-filter declines retry on
+  Anthropic's designated fallback model (`fallbacks: "default"`).
+- Local development: `DECK_AI_MOCK=true` gives a canned reply that exercises a lookup, streaming and a source.
 
 ## Exporting documents (PDF and Word)
 
