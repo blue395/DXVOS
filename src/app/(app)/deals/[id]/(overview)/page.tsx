@@ -23,6 +23,7 @@ import {
   advanceTarget,
   focusSections,
   gatesCrossed,
+  teamCardOneLiner,
   type DealSection,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -50,6 +51,7 @@ import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
 import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../investment-sections";
 import { AngelsCard } from "../angels-card";
+import { AdoptOneLinerButton } from "../one-liner-button";
 import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
@@ -121,6 +123,12 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const issueNo = issueNumbers(v.memoVersions.filter((m) => m.kind === "REVIEWED_MEMO"));
   const docs: DocRow[] = v.documents.map((d) => ({ ...d, isMemoVersion: !!d.memoVersion, ddReportJobId: d.ddReportJob?.id ?? null }));
   const latestDeck = docs.find((d) => d.category === "DECK");
+  // The one line the team and members both see; until it's set, a suggestion for the team only.
+  const oneLine = teamCardOneLiner({
+    oneLiner: v.oneLiner,
+    aiSummary: (v.deckAnalyses.find((a) => a.screen)?.screen as { oneLineSummary?: string } | null | undefined)?.oneLineSummary,
+    description: v.description,
+  });
 
 
   // Layout follows the dealflow: sections that matter at this stage start open and
@@ -182,6 +190,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </span>
           ))}
         </div>
+        {oneLine && !oneLine.suggestion && <p className="mt-1 text-base text-black/75">{oneLine.text}</p>}
         <p className="mt-1 text-sm text-black/60">
           {[
             v.round ? `Round ${v.round}` : null,
@@ -448,6 +457,22 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 <SubmitButton>Save details</SubmitButton>
               </ActionForm>
             </details>
+            <div className="mt-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-black/55">One-line description</p>
+              {oneLine && !oneLine.suggestion ? (
+                <p className="mt-0.5">{oneLine.text}</p>
+              ) : (
+                <div className="mt-1 space-y-1.5 rounded border-l-4 border-dxv-yellow bg-dxv-yellow/15 px-2 py-1.5 text-xs">
+                  <p>Not set yet, so members see no description for this deal.</p>
+                  {oneLine && (
+                    <>
+                      <p className="italic text-black/70">Suggested: {oneLine.text}</p>
+                      <AdoptOneLinerButton ventureId={v.id} />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             {v.description && <p className="mt-3 whitespace-pre-wrap text-sm text-black/75">{v.description}</p>}
             <div className="mt-3 text-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-black/55">Founder diversity</p>

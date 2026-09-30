@@ -172,6 +172,7 @@ function DealsPanel({
                   >
                     <Link href={dealHref(d.id)} className="group min-w-0 flex-1">
                       <span className="block font-semibold text-dxv-green group-hover:underline">{d.name}</span>
+                      {d.oneLiner && <span className="block text-sm text-black/70">{d.oneLiner}</span>}
                       {d.sector && <span className="block text-sm text-black/55">{d.sector}</span>}
                       <span className={`mt-0.5 block text-xs ${needsVote ? "font-medium text-black" : "text-black/60"}`}>{answerLine(d)}</span>
                     </Link>

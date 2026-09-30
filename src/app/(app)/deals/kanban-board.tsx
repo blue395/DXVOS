@@ -52,6 +52,8 @@ export type BoardCard = {
   companyStage: string | null;
   raiseAmountGbp: number | null;
   oneLiner: string | null;
+  /** No one-liner set yet: this is a suggestion (AI screen / internal notes), seen by the team only. */
+  oneLinerSuggested: boolean;
   /** Days since the deck was first uploaded; null if no deck yet. */
   deckDaysAgo: number | null;
   currentStage: Stage;
@@ -330,7 +332,14 @@ function CardContent({ card, saving }: { card: BoardCard; saving: boolean }) {
         </span>
       </div>
 
-      {card.oneLiner && <p className="mt-1 line-clamp-2 text-xs leading-snug text-black/60">{card.oneLiner}</p>}
+      {card.oneLiner &&
+        (card.oneLinerSuggested ? (
+          <p className="mt-1 line-clamp-2 text-xs italic leading-snug text-black/45" title="No one-line description yet: members see none. Set it in the deal's Details.">
+            Suggested: {card.oneLiner}
+          </p>
+        ) : (
+          <p className="mt-1 line-clamp-2 text-xs leading-snug text-black/60">{card.oneLiner}</p>
+        ))}
 
       {hasPills && (
         <div className="mt-2 flex flex-wrap gap-1">

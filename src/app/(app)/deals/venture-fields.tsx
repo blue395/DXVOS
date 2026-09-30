@@ -14,6 +14,7 @@ type VentureValues = {
   round?: number | null;
   leadAngel?: string | null;
   description?: string | null;
+  oneLiner?: string | null;
   founderDiversity?: string[];
 };
 
@@ -48,6 +49,11 @@ export function VentureFields({
       <Field aiSuggested={tag("name")} label="Company name *">
         <input name="name" required defaultValue={v.name ?? ""} className={inputClass} />
       </Field>
+      <div className="sm:col-span-2">
+        <Field label="One-line description" hint="What they do, in a sentence. The one line the team and members both see: boards, deal pages and portfolios.">
+          <input name="oneLiner" maxLength={200} defaultValue={v.oneLiner ?? ""} placeholder="e.g. Repeat-prescription software for independent UK pharmacies" className={inputClass} />
+        </Field>
+      </div>
       <Field aiSuggested={tag("founderNames")} label="Founder(s)">
         <input name="founderNames" defaultValue={v.founderNames ?? ""} className={inputClass} />
       </Field>

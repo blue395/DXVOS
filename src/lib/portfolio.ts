@@ -14,19 +14,21 @@ import { firstSentences, resolveAngelId, type HoldingStatusKey, type PortfolioHo
  * internal description or AI screens) and its founder diversity: the deal's own
  * `founderDiversity`, the single source of truth (edited in the deal page's Details).
  */
-export function dxvCompanyFacts(v: { angelSummary: string | null; founderDiversity: string[]; memoVersions: { content: unknown }[] }): {
+export function dxvCompanyFacts(v: { oneLiner: string | null; angelSummary: string | null; founderDiversity: string[]; memoVersions: { content: unknown }[] }): {
   about: string | null;
   diversityThemes: string[];
 } {
   const memo = v.memoVersions[0]?.content as { executiveSummary?: unknown } | null | undefined;
   return {
-    about: firstSentences(v.angelSummary) ?? firstSentences(typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null),
+    // The deal's one-liner first: the same line the team and members see everywhere else.
+    about: v.oneLiner?.trim() || firstSentences(v.angelSummary) || firstSentences(typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null),
     diversityThemes: v.founderDiversity,
   };
 }
 
 /** Prisma select for dxvCompanyFacts(): the members' summary, founder diversity and the latest locked memo. */
 export const companyFactsSelect = {
+  oneLiner: true,
   angelSummary: true,
   founderDiversity: true,
   memoVersions: { where: { kind: "REVIEWED_MEMO" as const }, orderBy: { version: "desc" as const }, take: 1, select: { content: true } },

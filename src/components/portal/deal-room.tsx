@@ -25,6 +25,7 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
           <h1 className="text-2xl font-semibold text-dxv-green">{deal.name}</h1>
           <PhaseBadge phase={deal.phase} />
         </div>
+        {deal.oneLiner && <p className="mt-1 text-base text-black/75">{deal.oneLiner}</p>}
         <p className="mt-1 text-sm text-black/60">
           {[deal.sector, deal.companyStage, deal.raiseAmountGbp ? `Raising ${formatGbp(deal.raiseAmountGbp)}` : null].filter(Boolean).join(" · ")}
           {deal.website && (

@@ -7,7 +7,7 @@ import {
   committedAngelIds,
   teamRevokeBlock,
   memberBoardCards,
-  memberCardOneLiner,
+  teamCardOneLiner,
   parseMoneyMinor,
   formatMoneyMinor,
   holdingMultiple,
@@ -751,12 +751,11 @@ describe("my portfolio", () => {
   });
 });
 
-describe("members' board card one-liner", () => {
-  it("uses the members' summary, and the memo only once members can read it", () => {
-    const memo = "Repeat-prescription software for pharmacies. More detail.";
-    expect(memberCardOneLiner({ angelSummary: "Pharmacy software. Second sentence.", memoSummary: memo, phase: null })).toBe("Pharmacy software.");
-    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: null })).toBeNull();
-    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: "pitch-selection" })).toBeNull();
-    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: "post-pitch" })).toBe("Repeat-prescription software for pharmacies.");
+describe("deal one-liner", () => {
+  it("shows the deal's own line to everyone; the team alone gets a marked suggestion until there is one", () => {
+    expect(teamCardOneLiner({ oneLiner: "Pharmacy software.", aiSummary: "AI says something." })).toEqual({ text: "Pharmacy software.", suggestion: false });
+    expect(teamCardOneLiner({ oneLiner: null, aiSummary: "AI says something." })).toEqual({ text: "AI says something.", suggestion: true });
+    expect(teamCardOneLiner({ oneLiner: " ", aiSummary: null, description: "Internal notes first. More." })).toEqual({ text: "Internal notes first.", suggestion: true });
+    expect(teamCardOneLiner({ oneLiner: null })).toBeNull();
   });
 });

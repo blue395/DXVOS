@@ -17,7 +17,6 @@ import {
   committedAngelIds,
   latestCertification,
   memberBoardCards,
-  memberCardOneLiner,
   nextOnboardingStep,
   type AngelDealPhase,
 } from "@/lib/pipeline";
@@ -40,6 +39,8 @@ export type DealListItem = {
   id: string;
   name: string;
   sector: string | null;
+  /** The deal's one-line description (the same line the team sees). */
+  oneLiner: string | null;
   phase: AngelDealPhase;
   sharedAt: Date;
   /** What this angel can record now (pitch selection vote or EOI), if anything. */
@@ -59,6 +60,7 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
       id: true,
       name: true,
       sector: true,
+      oneLiner: true,
       currentStage: true,
       sharedWithAngelsAt: true,
       preSelectionVotes: angelId ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true } } : false,
@@ -82,7 +84,7 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
     const eoi = v.investmentVotes?.[0];
     const myAnswer =
       voteKind === "pre-selection" && pre ? { interested: pre.interested, maxTicketGbp: null } : voteKind === "eoi" && eoi ? { interested: eoi.interested, maxTicketGbp: eoi.maxTicketGbp } : null;
-    return [{ id: v.id, name: v.name, sector: v.sector, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer, deck: v.documents[0] ?? null }];
+    return [{ id: v.id, name: v.name, sector: v.sector, oneLiner: v.oneLiner, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer, deck: v.documents[0] ?? null }];
   });
 }
 
@@ -99,7 +101,7 @@ export type MemberBoardCard = {
   companyStage: string | null;
   round: number | null;
   raiseAmountGbp: number | null;
-  /** Written for members (never the AI screen or internal description): memberCardOneLiner(). */
+  /** The deal's one-line description (Venture.oneLiner): the same line the team sees. */
   oneLiner: string | null;
   column: Stage;
   phase: AngelDealPhase | null;
@@ -124,30 +126,22 @@ export async function loadMemberBoard(): Promise<{ round: number | null; cards: 
       round: true,
       currentStage: true,
       sharedWithAngelsAt: true,
-      angelSummary: true,
-      memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, take: 1, select: { content: true } },
+      oneLiner: true,
     },
   });
   return {
     round,
-    cards: memberBoardCards(rows, round).map((c) => {
-      const memo = c.memoVersions[0]?.content as { executiveSummary?: unknown } | null | undefined;
-      return {
-        id: c.id,
-        name: c.name,
-        sector: c.sector,
-        companyStage: c.companyStage,
-        round: c.round,
-        raiseAmountGbp: c.raiseAmountGbp,
-        oneLiner: memberCardOneLiner({
-          angelSummary: c.angelSummary,
-          memoSummary: typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null,
-          phase: c.phase,
-        }),
-        column: c.column,
-        phase: c.phase,
-      };
-    }),
+    cards: memberBoardCards(rows, round).map((c) => ({
+      id: c.id,
+      name: c.name,
+      sector: c.sector,
+      companyStage: c.companyStage,
+      round: c.round,
+      raiseAmountGbp: c.raiseAmountGbp,
+      oneLiner: c.oneLiner,
+      column: c.column,
+      phase: c.phase,
+    })),
   };
 }
 
@@ -157,6 +151,8 @@ export type DealRoom = {
   id: string;
   name: string;
   sector: string | null;
+  /** The deal's one-line description (the same line the team sees). */
+  oneLiner: string | null;
   companyStage: string | null;
   raiseAmountGbp: number | null;
   website: string | null;
@@ -200,6 +196,7 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
         id: true,
         name: true,
         sector: true,
+        oneLiner: true,
         companyStage: true,
         raiseAmountGbp: true,
         website: true,
@@ -257,6 +254,7 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
     id: v.id,
     name: v.name,
     sector: v.sector,
+    oneLiner: v.oneLiner,
     companyStage: v.companyStage,
     raiseAmountGbp: v.raiseAmountGbp,
     website: v.website,
