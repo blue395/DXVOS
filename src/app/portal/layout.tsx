@@ -25,6 +25,9 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
                 <Link href="/portal/deals" className="rounded px-2.5 py-1.5 hover:bg-white/10">
                   Deals
                 </Link>
+                <Link href="/portal/portfolio" className="rounded px-2.5 py-1.5 hover:bg-white/10">
+                  My portfolio
+                </Link>
                 <Link href="/portal/profile" className="rounded px-2.5 py-1.5 hover:bg-white/10">
                   My profile
                 </Link>

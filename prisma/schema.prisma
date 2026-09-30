@@ -366,6 +366,8 @@ model FinalInvestment {
   removedById String?
   removedBy   User?     @relation("FinalInvestmentRemovedBy", fields: [removedById], references: [id])
 
+  holding PortfolioHolding? // the angel's own details for this investment (My Portfolio)
+
   @@index([ventureId, createdAt])
 }
 
@@ -774,6 +776,7 @@ model Angel {
   user              User?                @relation("AngelUser")
   invites           AngelInvite[]
   events            AngelEvent[]
+  portfolio         PortfolioHolding[]
 
   @@index([status])
 }
@@ -976,4 +979,72 @@ model MemberRound {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ── My Portfolio (angels) ───────────────────────────────────────────────────
+
+enum HoldingStatus {
+  ACTIVE // "alive"
+  EXITED // sold / acquired: see proceeds
+  WRITTEN_OFF // failed: worth nothing
+}
+
+enum InvestmentInstrument {
+  EQUITY // ordinary shares
+  ASA // advance subscription agreement
+  CLN // convertible loan note
+  SAFE
+  OTHER
+}
+
+enum TaxReliefScheme {
+  SEIS
+  EIS
+  NONE
+}
+
+// An angel's own record of an investment, private to them (the team app never shows
+// it). Either an investment made outside DXV (finalInvestmentId null: every field is
+// theirs), or their details on a DXV syndicate investment (finalInvestmentId set: the
+// company, amount and date come from DXV; this adds shares, value, paperwork, notes).
+// Money in minor units (pence/cents). Removing one only sets archivedAt.
+model PortfolioHolding {
+  id                String                @id @default(cuid())
+  angelId           String
+  angel             Angel                 @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  finalInvestmentId String?               @unique
+  finalInvestment   FinalInvestment?      @relation(fields: [finalInvestmentId], references: [id], onDelete: Cascade)
+
+  // Outside DXV only (DXV investments take these from the deal and the ticket)
+  companyName  String?
+  description  String?
+  sector       String?
+  investedVia  String? // "Direct", a syndicate or platform
+  round        String? // "Pre-Seed", "Seed", ...
+  investedOn   DateTime?
+  currency     String                @default("GBP") // GBP, EUR, USD
+  amountMinor  Int?
+
+  instrument                InvestmentInstrument?
+  valuationAtInvestment     Int? // whole currency units
+  sharePrice                Float?
+  shares                    Int?
+  currentValueMinor         Int?
+  currentValueOn            DateTime?
+  status                    HoldingStatus         @default(ACTIVE)
+  proceedsMinor             Int? // exited: what they received
+  taxScheme                 TaxReliefScheme?
+  taxCertificateReceived    Boolean               @default(false) // SEIS3 / EIS3
+  shareCertificateReceived  Boolean               @default(false)
+  keyDate                   DateTime? // e.g. an ASA longstop, a follow-on, an exit window
+  keyDateNote               String?
+  source                    String? // how they heard about it
+  rationale                 String?
+  notes                     String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([angelId, archivedAt])
 }

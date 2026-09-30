@@ -45,6 +45,8 @@ export type DealListItem = {
   voteKind: "pre-selection" | "eoi" | null;
   /** This angel's latest answer for that vote (null: not answered yet, or no angel given). */
   myAnswer: { interested: boolean; maxTicketGbp: number | null } | null;
+  /** The deal's current pitch deck (the same one the deal room shows), for one-click viewing. */
+  deck: { id: string; fileName: string; mimeType: string } | null;
 };
 
 /** Every deal members can see now, newest share first; with `angelId`, that angel's own vote status on each. */
@@ -62,6 +64,13 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
       investmentVotes: angelId
         ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true } }
         : false,
+      // The latest uploaded deck (members see it from Member Pitch Selection on, like the deal room).
+      documents: {
+        where: { category: "DECK", uploadedAt: { not: null }, archivedAt: null },
+        orderBy: { uploadedAt: "desc" },
+        take: 1,
+        select: { id: true, fileName: true, mimeType: true },
+      },
     },
   });
   return rows.flatMap((v) => {
@@ -72,7 +81,7 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
     const eoi = v.investmentVotes?.[0];
     const myAnswer =
       voteKind === "pre-selection" && pre ? { interested: pre.interested, maxTicketGbp: null } : voteKind === "eoi" && eoi ? { interested: eoi.interested, maxTicketGbp: eoi.maxTicketGbp } : null;
-    return [{ id: v.id, name: v.name, sector: v.sector, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer }];
+    return [{ id: v.id, name: v.name, sector: v.sector, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer, deck: v.documents[0] ?? null }];
   });
 }
 

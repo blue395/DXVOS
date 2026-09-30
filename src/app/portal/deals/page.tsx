@@ -62,7 +62,7 @@ export default async function MemberBoardPage() {
                           <span className="mt-1.5 block">
                             <PhaseBadge phase={c.phase} />
                           </span>
-                          <span className="mt-1.5 block text-xs font-semibold text-dxv-green">Open deal →</span>
+                          <span className="mt-1.5 block text-xs font-semibold text-dxv-green">View deal →</span>
                         </Link>
                       </li>
                     ) : (

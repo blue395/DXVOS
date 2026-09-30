@@ -33,6 +33,7 @@ export default async function PreviewPage({ params }: PageProps<"/angels/[id]/pr
           cert={latestCertification(angel.certifications)}
           deals={access ? deals : []}
           dealHref={(dealId) => `/deals/${dealId}/angel-view`}
+          deckHref={(docId, download) => `/api/documents/${docId}${download ? "?download=1" : ""}`}
           boardHref={null}
           preview
         />
