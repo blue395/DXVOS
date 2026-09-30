@@ -17,6 +17,7 @@ import {
   committedAngelIds,
   latestCertification,
   memberBoardCards,
+  memberCardOneLiner,
   nextOnboardingStep,
   type AngelDealPhase,
 } from "@/lib/pipeline";
@@ -91,7 +92,18 @@ export async function currentMemberRound(): Promise<number | null> {
   return latest?.round ?? null;
 }
 
-export type MemberBoardCard = { id: string; name: string; sector: string | null; column: Stage; phase: AngelDealPhase | null };
+export type MemberBoardCard = {
+  id: string;
+  name: string;
+  sector: string | null;
+  companyStage: string | null;
+  round: number | null;
+  raiseAmountGbp: number | null;
+  /** Written for members (never the AI screen or internal description): memberCardOneLiner(). */
+  oneLiner: string | null;
+  column: Stage;
+  phase: AngelDealPhase | null;
+};
 
 /**
  * The members' read-only board: the offered round's live deals, name and sector only.
@@ -103,9 +115,40 @@ export async function loadMemberBoard(): Promise<{ round: number | null; cards: 
   const rows = await db.venture.findMany({
     where: { round, currentStage: { not: "PASSED" } },
     orderBy: { stageEnteredAt: "asc" },
-    select: { id: true, name: true, sector: true, round: true, currentStage: true, sharedWithAngelsAt: true },
+    select: {
+      id: true,
+      name: true,
+      sector: true,
+      companyStage: true,
+      raiseAmountGbp: true,
+      round: true,
+      currentStage: true,
+      sharedWithAngelsAt: true,
+      angelSummary: true,
+      memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, take: 1, select: { content: true } },
+    },
   });
-  return { round, cards: memberBoardCards(rows, round).map((c) => ({ id: c.id, name: c.name, sector: c.sector, column: c.column, phase: c.phase })) };
+  return {
+    round,
+    cards: memberBoardCards(rows, round).map((c) => {
+      const memo = c.memoVersions[0]?.content as { executiveSummary?: unknown } | null | undefined;
+      return {
+        id: c.id,
+        name: c.name,
+        sector: c.sector,
+        companyStage: c.companyStage,
+        round: c.round,
+        raiseAmountGbp: c.raiseAmountGbp,
+        oneLiner: memberCardOneLiner({
+          angelSummary: c.angelSummary,
+          memoSummary: typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null,
+          phase: c.phase,
+        }),
+        column: c.column,
+        phase: c.phase,
+      };
+    }),
+  };
 }
 
 export type DealRoomDoc = { id: string; fileName: string; mimeType: string; sizeBytes: number; category: DocumentCategory; uploadedAt: Date | null };

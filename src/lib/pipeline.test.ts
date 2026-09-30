@@ -7,6 +7,7 @@ import {
   committedAngelIds,
   teamRevokeBlock,
   memberBoardCards,
+  memberCardOneLiner,
   parseMoneyMinor,
   formatMoneyMinor,
   holdingMultiple,
@@ -747,5 +748,15 @@ describe("my portfolio", () => {
     expect(firstSentences("No full stop here")).toBe("No full stop here");
     expect(firstSentences("")).toBeNull();
     expect(firstSentences("a ".repeat(200), 2, 20)).toMatch(/…$/);
+  });
+});
+
+describe("members' board card one-liner", () => {
+  it("uses the members' summary, and the memo only once members can read it", () => {
+    const memo = "Repeat-prescription software for pharmacies. More detail.";
+    expect(memberCardOneLiner({ angelSummary: "Pharmacy software. Second sentence.", memoSummary: memo, phase: null })).toBe("Pharmacy software.");
+    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: null })).toBeNull();
+    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: "pitch-selection" })).toBeNull();
+    expect(memberCardOneLiner({ angelSummary: null, memoSummary: memo, phase: "post-pitch" })).toBe("Repeat-prescription software for pharmacies.");
   });
 });

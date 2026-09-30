@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PhaseBadge } from "@/components/portal/deal-room";
 import { requireAngel } from "@/lib/auth";
 import { PHASE_STYLE } from "@/lib/board-style";
-import { MEMBER_BOARD_STAGES, stagePhase } from "@/lib/pipeline";
+import { MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
 import { angelHasDealAccess, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
 
 export const metadata = { title: "Deals board · DXV Members" };
@@ -56,8 +56,9 @@ export default async function MemberBoardPage() {
             {MEMBER_BOARD_STAGES.map((s) => {
               const col = cards.filter((c) => c.column === s.key);
               const phase = PHASE_STYLE[stagePhase(s.key)];
+              const totalRaise = col.reduce((a, c) => a + (c.raiseAmountGbp ?? 0), 0);
               return (
-                <div key={s.key} className={`flex w-60 shrink-0 flex-col rounded-xl border ${phase.column}`}>
+                <div key={s.key} className={`flex w-56 shrink-0 flex-col rounded-xl border ${phase.column}`}>
                   <div className={`border-b px-3 py-2.5 ${phase.header}`}>
                     <h2 className="flex items-center gap-2 text-sm font-semibold leading-tight text-dxv-green">
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${phase.dot}`} />
@@ -65,6 +66,11 @@ export default async function MemberBoardPage() {
                         {s.label}
                       </span>
                       <span className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20">{col.length}</span>
+                      {totalRaise > 0 && (
+                        <span className="font-mono text-xs font-normal text-black/55" title="Total raise of the companies in this column">
+                          {formatGbpCompact(totalRaise)}
+                        </span>
+                      )}
                     </h2>
                     <p className="mt-1 pl-[18px] text-[10px] uppercase tracking-wide text-black/45">{phase.label}</p>
                   </div>
@@ -83,8 +89,33 @@ export default async function MemberBoardPage() {
   );
 }
 
+/** A card like the team board's: name and raise, a one-liner written for members, then stage, sector and round. */
+function CardBody({ c, muted = false }: { c: MemberBoardCard; muted?: boolean }) {
+  return (
+    <>
+      <span className="flex items-start justify-between gap-2">
+        <span className={`font-semibold leading-snug ${muted ? "text-black/75" : "text-black"}`}>{c.name}</span>
+        {c.raiseAmountGbp ? (
+          <span className="shrink-0 font-mono text-xs font-semibold text-dxv-green" title="Raising">
+            {formatGbpCompact(c.raiseAmountGbp)}
+          </span>
+        ) : null}
+      </span>
+      {c.oneLiner && <span className="mt-1 line-clamp-2 block text-xs leading-snug text-black/60">{c.oneLiner}</span>}
+      <span className="mt-2 flex flex-wrap gap-1">
+        {c.companyStage && <Pill className="bg-white text-black/75 ring-1 ring-black/15">{c.companyStage}</Pill>}
+        {c.sector && <Pill className="bg-dxv-green/10 text-dxv-green">{c.sector}</Pill>}
+        {c.round && <Pill className="bg-dxv-yellow text-dxv-green">Round {c.round}</Pill>}
+      </span>
+    </>
+  );
+}
+
+function Pill({ className, children }: { className: string; children: React.ReactNode }) {
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{children}</span>;
+}
+
 function BoardCard({ c, anchor }: { c: MemberBoardCard; anchor: boolean }) {
-  const sector = c.sector && <span className="rounded-full bg-dxv-green/10 px-2 py-0.5 text-[11px] font-medium text-dxv-green">{c.sector}</span>;
   if (c.phase) {
     return (
       <Link
@@ -92,22 +123,20 @@ function BoardCard({ c, anchor }: { c: MemberBoardCard; anchor: boolean }) {
         href={`/portal/deals/${c.id}`}
         className="block scroll-mx-8 scroll-mt-20 rounded-lg border-2 border-dxv-green bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md"
       >
-        <span className="block font-semibold leading-snug text-black">{c.name}</span>
-        <span className="mt-2 flex flex-wrap gap-1">
-          {sector}
+        <CardBody c={c} />
+        <span className="mt-2.5 flex items-center justify-between gap-2 border-t border-black/5 pt-2">
           <PhaseBadge phase={c.phase} />
+          <span className="whitespace-nowrap text-xs font-semibold text-dxv-green">View deal →</span>
         </span>
-        <span className="mt-2.5 flex items-center justify-end border-t border-black/5 pt-2 text-xs font-semibold text-dxv-green">View deal →</span>
       </Link>
     );
   }
   const before = MEMBER_BOARD_STAGES.findIndex((b) => b.key === c.column) < PITCH_SELECTION_INDEX;
   return (
     <div className="rounded-lg border border-black/10 bg-white/80 p-3 shadow-sm" title="Details open from Member Pitch Selection">
-      <span className="block font-semibold leading-snug text-black/70">{c.name}</span>
-      {sector && <span className="mt-2 flex flex-wrap gap-1">{sector}</span>}
+      <CardBody c={c} muted />
       <span className="mt-2.5 block border-t border-black/5 pt-2 text-[11px] text-black/45">
-        {before ? "Details from Member Pitch Selection" : "Not open to members yet"}
+        {before ? "Deck and details from Member Pitch Selection" : "Not open to members yet"}
       </span>
     </div>
   );
