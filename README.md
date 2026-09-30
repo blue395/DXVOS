@@ -262,6 +262,14 @@ statement (and have finished onboarding):
 - **Never shown**: eligibility screens, AI drafts and working drafts, AI-generated DD reports, notes, other
   members' votes. Files are served by `/api/portal/documents/[id]`, which re-checks access on every request.
 
+## Founder diversity (one source of truth)
+
+Each deal's **Details** (deal page sidebar, *Edit venture details*; also on New venture) has **Founder
+diversity** tick-boxes from the Playbook's themes, plus Other. Only what founders have stated. This field
+(`Venture.founderDiversity`) is what both the team Portfolio and members' My Portfolio read. The memo's own
+Diversity themes (DXV Review Draft) fill it when a memo is issued and the field is still empty; after that, edit
+it in Details. Hand-added syndicate investments (no deal) keep their themes on the Portfolio entry.
+
 ## Portfolio (`/portfolio`, team)
 
 The DXV syndicate's investments in one table: every deal at Investment Complete (or S/EIS) appears

@@ -11,20 +11,24 @@ import { firstSentences, resolveAngelId, type HoldingStatusKey, type PortfolioHo
 /**
  * What DXV already knows about a company, for portfolios: a sentence or two about it (the
  * summary written for members, else the opening of the latest locked DXV memo; never the
- * internal description or AI screens) and its founder diversity themes (from that memo).
+ * internal description or AI screens) and its founder diversity: the deal's own
+ * `founderDiversity`, the single source of truth (edited in the deal page's Details).
  */
-export function dxvCompanyFacts(v: { angelSummary: string | null; memoVersions: { content: unknown }[] }): { about: string | null; diversityThemes: string[] } {
-  const memo = v.memoVersions[0]?.content as { executiveSummary?: unknown; header?: { diversityThemes?: unknown } } | null | undefined;
-  const themes = memo?.header?.diversityThemes;
+export function dxvCompanyFacts(v: { angelSummary: string | null; founderDiversity: string[]; memoVersions: { content: unknown }[] }): {
+  about: string | null;
+  diversityThemes: string[];
+} {
+  const memo = v.memoVersions[0]?.content as { executiveSummary?: unknown } | null | undefined;
   return {
     about: firstSentences(v.angelSummary) ?? firstSentences(typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null),
-    diversityThemes: Array.isArray(themes) ? themes.filter((t): t is string => typeof t === "string") : [],
+    diversityThemes: v.founderDiversity,
   };
 }
 
-/** Prisma select for dxvCompanyFacts(): the members' summary and the latest locked memo. */
+/** Prisma select for dxvCompanyFacts(): the members' summary, founder diversity and the latest locked memo. */
 export const companyFactsSelect = {
   angelSummary: true,
+  founderDiversity: true,
   memoVersions: { where: { kind: "REVIEWED_MEMO" as const }, orderBy: { version: "desc" as const }, take: 1, select: { content: true } },
 };
 

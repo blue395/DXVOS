@@ -49,11 +49,8 @@ export default async function SyndicateDealPage({ params }: PageProps<"/portfoli
       <SyndicateForm
         action={saveSyndicateDealDetails.bind(null, v.id)}
         added={false}
-        v={{
-          ...(o ?? {}),
-          description: o?.description ?? facts.about,
-          diversityThemes: o?.diversityThemes.length ? o.diversityThemes : facts.diversityThemes,
-        }}
+        v={{ ...(o ?? {}), description: o?.description ?? facts.about, diversityThemes: facts.diversityThemes }}
+        dealHref={`/deals/${v.id}#details`}
         submitLabel="Save details"
       />
     </div>

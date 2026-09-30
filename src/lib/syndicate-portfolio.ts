@@ -77,7 +77,7 @@ export async function loadSyndicatePortfolio(): Promise<{ rows: SyndicateRow[]; 
       angelsCount: angels.size || null,
       stage: v.currentStage,
       ...details(o),
-      diversityThemes: o?.diversityThemes.length ? o.diversityThemes : facts.diversityThemes,
+      diversityThemes: facts.diversityThemes, // the deal's founderDiversity: one source of truth
     };
   });
 

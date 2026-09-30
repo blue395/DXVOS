@@ -831,6 +831,9 @@ export function teamRevokeBlock(actorId: string, targetId: string, activeTeamLog
 
 // ── Members' round board (Blue, 2026-09-30) ─────────────────────────────────
 
+/** The members' board columns: the team board's, without intake (Submitted, Eligibility Screen: members needn't see those; Blue, 2026-09-30). */
+export const MEMBER_BOARD_STAGES: StageMeta[] = BOARD_STAGES.filter((s) => !s.intake);
+
 /**
  * The read-only deals board members see: the live deals of the round DXV has opened to
  * members (chosen on the Dashboard), by board column. Declined deals never appear. A card
@@ -845,7 +848,7 @@ export function memberBoardCards<T extends { round: number | null; currentStage:
   return ventures.flatMap((v) => {
     if (v.round !== round || v.currentStage === "PASSED") return [];
     const column = boardColumn(v.currentStage);
-    if (!BOARD_STAGES.some((s) => s.key === column)) return [];
+    if (!MEMBER_BOARD_STAGES.some((s) => s.key === column)) return [];
     return [{ ...v, column, phase: angelDealVisibility(v) }];
   });
 }

@@ -89,8 +89,8 @@ export default async function PortfolioPage() {
         <DiversityCard themes={diversity.themes} notRecorded={diversity.notRecorded} companies={summary.companies} />
       </div>
       <p className="text-xs text-black/50">
-        Values are the team&apos;s own estimates. Founder diversity comes from each deal&apos;s DXV memo unless the team sets it here, and only
-        records what founders have stated.
+        Values are the team&apos;s own estimates. Founder diversity comes from each deal&apos;s Details (its single source of truth, also used by
+        members&apos; portfolios) and only records what founders have stated.
       </p>
     </div>
   );

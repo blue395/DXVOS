@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { PhaseBadge } from "@/components/portal/deal-room";
 import { requireAngel } from "@/lib/auth";
 import { PHASE_STYLE } from "@/lib/board-style";
-import { BOARD_STAGES, stagePhase } from "@/lib/pipeline";
+import { MEMBER_BOARD_STAGES, stagePhase } from "@/lib/pipeline";
 import { angelHasDealAccess, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
 
 export const metadata = { title: "Deals board · DXV Members" };
 
-const PITCH_SELECTION_INDEX = BOARD_STAGES.findIndex((b) => b.key === "PITCH_SELECTION");
+const PITCH_SELECTION_INDEX = MEMBER_BOARD_STAGES.findIndex((b) => b.key === "PITCH_SELECTION");
 
 /**
  * The members' deals board, in the same style as the team's board: read-only, the round
@@ -22,7 +22,7 @@ export default async function MemberBoardPage() {
   if (!access) redirect("/portal");
   const open = cards.filter((c) => c.phase).length;
   // The first open card in board order, for the "open to you" jump link.
-  const firstOpenId = BOARD_STAGES.flatMap((s) => cards.filter((c) => c.column === s.key && c.phase))[0]?.id;
+  const firstOpenId = MEMBER_BOARD_STAGES.flatMap((s) => cards.filter((c) => c.column === s.key && c.phase))[0]?.id;
 
   return (
     <div className="space-y-4">
@@ -53,7 +53,7 @@ export default async function MemberBoardPage() {
         // Full width (wider than the portal's reading column), like the team board.
         <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-auto px-4 pb-4">
           <div className="mx-auto flex w-max gap-3">
-            {BOARD_STAGES.map((s) => {
+            {MEMBER_BOARD_STAGES.map((s) => {
               const col = cards.filter((c) => c.column === s.key);
               const phase = PHASE_STYLE[stagePhase(s.key)];
               return (
@@ -101,7 +101,7 @@ function BoardCard({ c, anchor }: { c: MemberBoardCard; anchor: boolean }) {
       </Link>
     );
   }
-  const before = BOARD_STAGES.findIndex((b) => b.key === c.column) < PITCH_SELECTION_INDEX;
+  const before = MEMBER_BOARD_STAGES.findIndex((b) => b.key === c.column) < PITCH_SELECTION_INDEX;
   return (
     <div className="rounded-lg border border-black/10 bg-white/80 p-3 shadow-sm" title="Details open from Member Pitch Selection">
       <span className="block font-semibold leading-snug text-black/70">{c.name}</span>

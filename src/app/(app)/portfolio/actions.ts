@@ -9,7 +9,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { INSTRUMENT_LABELS, isInvestedStage, parseList, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
+import { INSTRUMENT_LABELS, isInvestedStage, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
+import { founderDiversityFrom } from "@/components/founder-diversity-field";
 import type { ActionResult } from "@/lib/action-result";
 
 const text = (max: number) =>
@@ -81,7 +82,7 @@ const AddedSchema = DetailsSchema.extend({
 });
 
 type Details = z.infer<typeof DetailsSchema>;
-const detailsData = (d: Details, formData: FormData) => ({
+const detailsData = (d: Details) => ({
   description: d.description,
   instrument: d.instrument,
   valuationAtInvestment: d.valuation === null ? null : Math.round(d.valuation / 100),
@@ -91,8 +92,6 @@ const detailsData = (d: Details, formData: FormData) => ({
   status: d.status,
   proceedsMinor: d.status === "EXITED" ? d.proceeds : null,
   taxScheme: d.taxScheme,
-  // Ticked themes plus anything typed under "Other".
-  diversityThemes: parseList([...formData.getAll("theme").map(String), String(formData.get("otherThemes") ?? "")].join(",")),
   notes: d.notes,
 });
 
@@ -110,7 +109,9 @@ export async function saveSyndicateHolding(holdingId: string | null, _prev: Acti
   const d = parsed.data;
   if (d.amount === null) return { error: "Enter the amount the syndicate invested." };
   const data = {
-    ...detailsData(d, formData),
+    ...detailsData(d),
+    // Hand-added investments have no deal, so their founder diversity lives here.
+    diversityThemes: founderDiversityFrom(formData),
     companyName: d.companyName,
     sector: d.sector,
     round: d.round,
@@ -138,7 +139,7 @@ export async function saveSyndicateDealDetails(ventureId: string, _prev: ActionR
   if (!parsed.success) return { error: firstError(parsed.error) };
   const v = await db.venture.findUnique({ where: { id: ventureId }, select: { currentStage: true } });
   if (!v || !isInvestedStage(v.currentStage)) return { error: "That deal isn't in the portfolio (it isn't at Investment Complete)." };
-  const data = { ...detailsData(parsed.data, formData), updatedById: user.id, archivedAt: null };
+  const data = { ...detailsData(parsed.data), updatedById: user.id, archivedAt: null };
   await db.syndicateHolding.upsert({
     where: { ventureId },
     create: { ...data, ventureId, createdById: user.id },

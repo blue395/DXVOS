@@ -248,6 +248,9 @@ export async function finaliseMemo(draftId: string, _prev: ActionResult, formDat
     });
     // The draft is done: it now lives on as the issue.
     await tx.memoDraft.update({ where: { id: draftId }, data: { archivedAt: new Date() } });
+    // The deal's founder diversity (its single source of truth) takes the issued memo's themes if it has none yet.
+    const themes = issueDiversityThemes(draft.content);
+    if (themes.length) await tx.venture.updateMany({ where: { id: draft.ventureId, founderDiversity: { isEmpty: true } }, data: { founderDiversity: themes } });
   });
 
   // Learning moment (best effort): the team changed the AI's scores before issuing the memo.
@@ -295,4 +298,9 @@ export async function reviseIssue(memoVersionId: string): Promise<ActionResult> 
   });
   revalidateAssessment(issue.ventureId);
   return { ok: true };
+}
+
+/** The themes a memo states (dropping "not stated"-style entries). */
+function issueDiversityThemes(content: MemoContent): string[] {
+  return content.header.diversityThemes.map((t) => t.trim()).filter((t) => t && !/^(not stated|none|n\/a|unknown)$/i.test(t));
 }

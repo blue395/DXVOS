@@ -81,7 +81,7 @@ export function MemoTextForm({ draftId, m, version }: { draftId: string; m: Memo
         <Field label="Impact themes" hint="Comma-separated, e.g. Health, Social Mobility">
           <input name="impactThemes" defaultValue={m.header.impactThemes.join(", ")} className={inputClass} />
         </Field>
-        <Field label="Diversity themes" hint="Only where the founder has stated it. Comma-separated.">
+        <Field label="Diversity themes" hint="Only where the founder has stated it. Comma-separated. Issuing the memo fills the deal's Founder diversity (in Details) if it's empty; that's what the portfolios use.">
           <input name="diversityThemes" defaultValue={m.header.diversityThemes.join(", ")} className={inputClass} />
         </Field>
       </fieldset>

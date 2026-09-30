@@ -22,6 +22,7 @@ import type { EntrySnapshot } from "@/lib/audit";
 import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { angelIdForName } from "@/lib/angels";
+import { founderDiversityFrom } from "@/components/founder-diversity-field";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export async function createVenture(_prev: ActionResult, formData: FormData): Pr
   const venture = await db.venture.create({
     data: {
       ...parsed.data,
+      founderDiversity: founderDiversityFrom(formData),
       createdById: user.id,
       stageChanges: { create: { fromStage: null, toStage: "SUBMITTED", changedById: user.id } },
     },
@@ -118,7 +120,7 @@ export async function updateVenture(ventureId: string, _prev: ActionResult, form
   const parsed = VentureSchema.safeParse(form(formData));
   if (!parsed.success) return { error: firstError(parsed.error) };
 
-  await db.venture.update({ where: { id: ventureId }, data: parsed.data });
+  await db.venture.update({ where: { id: ventureId }, data: { ...parsed.data, founderDiversity: founderDiversityFrom(formData) } });
   revalidateDeal(ventureId);
   return { ok: true };
 }
