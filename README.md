@@ -253,12 +253,24 @@ statement (and have finished onboarding):
   investments made outside DXV (modelled on Blue's angel tracker). Tiles: invested, value today, multiple,
   companies, estimated S/EIS relief; breakdowns by sector and year; *Coming up* (3-year S/EIS holding periods and
   the angel's key dates); CSV download. Totals per currency, never converted. Private to the angel.
+  (Since 2026-09-30: *By founder diversity* replaces the dates box, using the themes in DXV's memos; "What they
+  do" starts from the members' summary or the memo; one Notes box.)
 - **Round board** (`/portal/deals`): a read-only board of the round the team opens to members on the Dashboard
   (*Round open to members*, under Deals by stage; every change kept in `MemberRound`). Cards show only company
   name and sector; declined deals never appear; a card opens into its deal room only once the deal is shared and
   at Member Pitch Selection or later.
 - **Never shown**: eligibility screens, AI drafts and working drafts, AI-generated DD reports, notes, other
   members' votes. Files are served by `/api/portal/documents/[id]`, which re-checks access on every request.
+
+## Portfolio (`/portfolio`, team)
+
+The DXV syndicate's investments in one table: every deal at Investment Complete (or S/EIS) appears
+automatically, with the syndicate amount from its paid Final Investment tickets and the number of angels who paid.
+*Details* adds what the deal doesn't hold (value today, status and proceeds, instrument, valuation, S/EIS,
+founder diversity if the memo has none, notes); *+ Add a syndicate investment* records investments not tracked as
+deals (e.g. earlier rounds). A green headline band (invested, value today, multiple, companies, angels
+investing), and breakdowns by sector, year and founder diversity (shared with the members' My Portfolio).
+Entries are archived, never deleted; who added or last edited each is shown.
 
 ## Team logins (`/team`)
 

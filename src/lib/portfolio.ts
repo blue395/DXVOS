@@ -6,7 +6,27 @@ import "server-only";
 import type { InvestmentInstrument, Stage } from "@/generated/prisma/enums";
 import { aliasMap } from "@/lib/angels";
 import { db } from "@/lib/db";
-import { resolveAngelId, type HoldingStatusKey, type PortfolioHoldingLike, type TaxSchemeKey } from "@/lib/pipeline";
+import { firstSentences, resolveAngelId, type HoldingStatusKey, type PortfolioHoldingLike, type TaxSchemeKey } from "@/lib/pipeline";
+
+/**
+ * What DXV already knows about a company, for portfolios: a sentence or two about it (the
+ * summary written for members, else the opening of the latest locked DXV memo; never the
+ * internal description or AI screens) and its founder diversity themes (from that memo).
+ */
+export function dxvCompanyFacts(v: { angelSummary: string | null; memoVersions: { content: unknown }[] }): { about: string | null; diversityThemes: string[] } {
+  const memo = v.memoVersions[0]?.content as { executiveSummary?: unknown; header?: { diversityThemes?: unknown } } | null | undefined;
+  const themes = memo?.header?.diversityThemes;
+  return {
+    about: firstSentences(v.angelSummary) ?? firstSentences(typeof memo?.executiveSummary === "string" ? memo.executiveSummary : null),
+    diversityThemes: Array.isArray(themes) ? themes.filter((t): t is string => typeof t === "string") : [],
+  };
+}
+
+/** Prisma select for dxvCompanyFacts(): the members' summary and the latest locked memo. */
+export const companyFactsSelect = {
+  angelSummary: true,
+  memoVersions: { where: { kind: "REVIEWED_MEMO" as const }, orderBy: { version: "desc" as const }, take: 1, select: { content: true } },
+};
 
 export type PortfolioRow = PortfolioHoldingLike & {
   key: string;
@@ -27,6 +47,8 @@ export type PortfolioRow = PortfolioHoldingLike & {
   notes: string | null;
   /** DXV only: the deal has reached the S/EIS certificate stage. */
   dxvCertificatesStage: boolean;
+  /** Founder diversity themes (DXV investments: from the locked memo). */
+  diversityThemes: string[];
 };
 
 export type PendingInterest = { ventureId: string; company: string; maxTicketGbp: number; stage: Stage };
@@ -77,7 +99,7 @@ async function myFinals(angelId: string) {
   const [finals, aliases] = await Promise.all([
     db.finalInvestment.findMany({
       where: { removedAt: null, OR: [{ angelId }, { angelId: null }] },
-      include: { venture: { select: { id: true, name: true, sector: true, companyStage: true, currentStage: true } }, holding: true },
+      include: { venture: { select: { id: true, name: true, sector: true, companyStage: true, currentStage: true, ...companyFactsSelect } }, holding: true },
     }),
     aliasMap(),
   ]);
@@ -108,13 +130,14 @@ export async function loadPortfolio(angelId: string): Promise<{ rows: PortfolioR
 
   const dxv: PortfolioRow[] = finals.map((f) => {
     const o = f.holding && f.holding.angelId === angelId ? f.holding : null;
+    const facts = dxvCompanyFacts(f.venture);
     return {
       key: `d-${f.id}`,
       holdingId: o?.id ?? null,
       finalInvestmentId: f.id,
       company: f.venture.name,
       source: "DXV",
-      description: o?.description ?? null,
+      description: o?.description ?? facts.about,
       sector: f.venture.sector ?? o?.sector ?? null,
       investedVia: "Diversity X Ventures",
       round: f.venture.companyStage,
@@ -123,6 +146,7 @@ export async function loadPortfolio(angelId: string): Promise<{ rows: PortfolioR
       amountMinor: f.ticketGbp * 100,
       pending: !f.paidAt,
       dxvCertificatesStage: f.venture.currentStage === "SEIS_CERTIFICATE",
+      diversityThemes: facts.diversityThemes,
       ...overlayFields(o),
     };
   });
@@ -142,6 +166,7 @@ export async function loadPortfolio(angelId: string): Promise<{ rows: PortfolioR
     amountMinor: o.amountMinor,
     pending: false,
     dxvCertificatesStage: false,
+    diversityThemes: [], // not recorded for investments outside DXV (special-category data)
     ...overlayFields(o),
   }));
 

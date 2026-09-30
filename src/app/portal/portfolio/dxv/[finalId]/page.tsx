@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { formatDate } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
 import { formatGbp } from "@/lib/pipeline";
-import { ownsFinalInvestment } from "@/lib/portfolio";
+import { dxvCompanyFacts, ownsFinalInvestment } from "@/lib/portfolio";
 import { saveDxvDetails } from "../../actions";
 import { HoldingForm } from "../../holding-form";
 
@@ -15,6 +15,8 @@ export default async function DxvHoldingPage({ params }: PageProps<"/portal/port
   const f = await ownsFinalInvestment(angel.id, finalId);
   if (!f) notFound();
   const o = f.holding?.angelId === angel.id ? f.holding : null;
+  // "About the company" starts from what DXV already has (members' summary or the memo), until they write their own.
+  const about = o?.description ?? dxvCompanyFacts(f.venture).about;
   return (
     <div className="space-y-4">
       <Link href="/portal/portfolio" className="text-sm text-dxv-green hover:underline">
@@ -28,7 +30,7 @@ export default async function DxvHoldingPage({ params }: PageProps<"/portal/port
           below.
         </p>
       </div>
-      <HoldingForm action={saveDxvDetails.bind(null, f.id)} outside={false} v={o ?? {}} submitLabel="Save my details" />
+      <HoldingForm action={saveDxvDetails.bind(null, f.id)} outside={false} v={{ ...(o ?? {}), description: about }} submitLabel="Save my details" />
     </div>
   );
 }

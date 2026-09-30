@@ -7,7 +7,7 @@ export default function Loading() {
       <Skeleton className="h-8 w-56" />
       <div className="flex gap-3 overflow-hidden">
         {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-64 w-40 shrink-0" />
+          <Skeleton key={i} className="h-64 w-60 shrink-0" />
         ))}
       </div>
     </div>

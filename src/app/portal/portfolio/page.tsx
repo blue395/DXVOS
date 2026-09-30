@@ -10,17 +10,17 @@ import {
   formatMoneyMinor,
   holdingMultiple,
   holdingValueMinor,
+  diversityBreakdown,
   latestCertification,
   nextOnboardingStep,
-  portfolioDates,
   portfolioSummary,
+  reliefHoldingEnds,
   stageLabel,
 } from "@/lib/pipeline";
 import { loadPortfolio, type PortfolioRow } from "@/lib/portfolio";
+import { Breakdown, DiversityCard, formatMultiple as multiple, HeadlineBand, OtherCurrencies } from "@/components/portfolio/portfolio-view";
 
 export const metadata = { title: "My portfolio · DXV Members" };
-
-const multiple = (m: number | null) => (m === null ? "–" : `${m.toFixed(2)}x`);
 
 /** The angel's investments in one place: DXV syndicate investments (automatic) and their own. */
 export default async function PortfolioPage() {
@@ -35,7 +35,7 @@ export default async function PortfolioPage() {
   const summary = portfolioSummary(rows);
   const gbp = summary.byCurrency.find((c) => c.currency === "GBP");
   const others = summary.byCurrency.filter((c) => c.currency !== "GBP");
-  const dates = portfolioDates(rows).slice(0, 8);
+  const diversity = diversityBreakdown(rows);
   const counted = rows.filter((r) => !r.pending);
 
   return (
@@ -67,23 +67,20 @@ export default async function PortfolioPage() {
       ) : (
         <>
           {/* Headline numbers (GBP) */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Tile label="Invested" value={formatMoneyMinor(gbp?.investedMinor ?? 0)} />
-            <Tile label="Value today" value={formatMoneyMinor(gbp?.valueMinor ?? 0)} hint="Your latest valuations; at cost where you haven't revalued" />
-            <Tile label="Multiple" value={multiple(gbp?.multiple ?? null)} hint="(Value today + money received) ÷ invested" />
-            <Tile
-              label="Companies"
-              value={String(summary.companies)}
-              hint={`${summary.active} active · ${summary.exited} exited · ${summary.writtenOff} written off · ${summary.viaDxv} via DXV`}
-            />
-            <Tile label="Est. S/EIS relief" value={formatMoneyMinor(summary.reliefMinor)} hint="SEIS 50%, EIS 30% of the amount: an estimate, not tax advice" />
-          </div>
-          {others.map((c) => (
-            <p key={c.currency} className="text-sm text-black/65">
-              Plus in {c.currency} (not converted): invested {formatMoneyMinor(c.investedMinor, c.currency)}, value today{" "}
-              {formatMoneyMinor(c.valueMinor, c.currency)}, {multiple(c.multiple)}.
-            </p>
-          ))}
+          <HeadlineBand
+            tiles={[
+              { label: "Invested", value: formatMoneyMinor(gbp?.investedMinor ?? 0) },
+              { label: "Value today", value: formatMoneyMinor(gbp?.valueMinor ?? 0), hint: "Your latest valuations; at cost where you haven't revalued" },
+              { label: "Multiple", value: multiple(gbp?.multiple ?? null), hint: "(Value today + money received) ÷ invested", accent: true },
+              {
+                label: "Companies",
+                value: String(summary.companies),
+                hint: `${summary.active} active · ${summary.exited} exited · ${summary.writtenOff} written off · ${summary.viaDxv} via DXV`,
+              },
+              { label: "Est. S/EIS relief", value: formatMoneyMinor(summary.reliefMinor), hint: "SEIS 50%, EIS 30% of the amount: an estimate, not tax advice" },
+            ]}
+          />
+          <OtherCurrencies totals={others} />
 
           {(summary.pending.length > 0 || pendingInterest.length > 0) && (
             <section className="rounded-lg border border-dxv-yellow bg-dxv-yellow/10 p-4 text-sm">
@@ -106,9 +103,9 @@ export default async function PortfolioPage() {
           {counted.length > 0 && (
             // Wider than the portal's reading column so every column fits.
             <div className="relative left-1/2 w-screen -translate-x-1/2 px-4">
-              <div className="mx-auto max-w-6xl overflow-x-auto rounded-lg border border-black/10 bg-white">
+              <div className="mx-auto max-w-6xl overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
                 <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="bg-dxv-green/[0.04] text-xs uppercase tracking-wide text-black/55">
+                  <thead className="bg-dxv-green text-xs uppercase tracking-wide text-white/85">
                     <tr>
                       <th className="px-3 py-2 font-medium">Company</th>
                       <th className="px-3 py-2 font-medium">Invested</th>
@@ -135,21 +132,12 @@ export default async function PortfolioPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Breakdown title="By sector (GBP)" rows={summary.bySector} total={gbp?.investedMinor ?? 0} />
             <Breakdown title="By year invested (GBP)" rows={summary.byYear} total={gbp?.investedMinor ?? 0} />
-            <section className="rounded-lg border border-black/10 bg-white p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-dxv-green">Coming up</h2>
-              {dates.length === 0 ? (
-                <p className="text-sm text-black/55">No dates to diarise. S/EIS holding periods and key dates you add appear here.</p>
-              ) : (
-                <ul className="space-y-1.5 text-sm">
-                  {dates.map((d, i) => (
-                    <li key={i}>
-                      <span className="font-medium">{formatDate(d.date)}</span> · {d.company}
-                      <span className="block text-xs text-black/55">{d.what}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <DiversityCard
+              themes={diversity.themes}
+              notRecorded={diversity.notRecorded}
+              companies={summary.companies}
+              note="Themes come from DXV's investment memos, so they show for your DXV investments."
+            />
           </div>
         </>
       )}
@@ -165,7 +153,7 @@ export default async function PortfolioPage() {
 function HoldingRow({ r }: { r: PortfolioRow }) {
   const m = holdingMultiple(r);
   return (
-    <tr className="align-top">
+    <tr className="align-top transition hover:bg-dxv-yellow/10">
       <td className="px-3 py-2.5">
         <span className="font-semibold text-dxv-green">{r.company}</span>
         {r.source === "DXV" && <span className="ml-1.5 rounded bg-dxv-green px-1.5 py-px text-[10px] font-bold tracking-wide text-white">DXV</span>}
@@ -177,7 +165,7 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
         <span className="block text-xs text-black/55">{[r.description, r.sector, r.source === "OUTSIDE" ? r.investedVia : null].filter(Boolean).join(" · ")}</span>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5">{r.investedOn ? formatDate(r.investedOn) : "–"}</td>
-      <td className="px-3 py-2.5">
+      <td className="whitespace-nowrap px-3 py-2.5">
         {r.round ?? "–"}
         {r.instrument && <span className="block text-xs text-black/55">{INSTRUMENT_LABELS[r.instrument]}</span>}
       </td>
@@ -210,6 +198,7 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
           <>
             {r.taxScheme}
             <span className="block text-xs text-black/55">{r.taxCertificateReceived ? "✓ certificate" : r.dxvCertificatesStage ? "Certificates being issued" : "Certificate awaited"}</span>
+            {r.status === "ACTIVE" && r.investedOn && <span className="block text-xs text-black/55">Hold until {formatDate(reliefHoldingEnds(r.investedOn))}</span>}
           </>
         ) : (
           (r.taxScheme === "NONE" ? "None" : "–")
@@ -225,44 +214,5 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
         </Link>
       </td>
     </tr>
-  );
-}
-
-function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-black/10 bg-white p-3" title={hint}>
-      <p className="text-xs font-medium uppercase tracking-wide text-black/55">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-dxv-green">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] leading-snug text-black/50">{hint}</p>}
-    </div>
-  );
-}
-
-/** Invested amount per group, as bars of one colour with the value written beside each. */
-function Breakdown({ title, rows, total }: { title: string; rows: { label: string; investedMinor: number; count: number }[]; total: number }) {
-  const max = Math.max(1, ...rows.map((r) => r.investedMinor));
-  return (
-    <section className="rounded-lg border border-black/10 bg-white p-4">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-dxv-green">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="text-sm text-black/55">No GBP investments yet.</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {rows.map((r) => (
-            <li
-              key={r.label}
-              className="grid grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-2 text-sm"
-              title={`${r.label}: ${formatMoneyMinor(r.investedMinor)} across ${r.count} compan${r.count === 1 ? "y" : "ies"}${total ? ` (${Math.round((r.investedMinor / total) * 100)}%)` : ""}`}
-            >
-              <span className="truncate text-black/75">{r.label}</span>
-              <span className="h-3">
-                <span className="block h-full rounded-r-[4px] bg-dxv-green" style={{ width: `${(r.investedMinor / max) * 100}%` }} />
-              </span>
-              <span className="text-right tabular-nums text-black/75">{formatMoneyMinor(r.investedMinor)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
