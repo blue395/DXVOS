@@ -2,7 +2,7 @@
 // ("Preview as angel") exactly as the angel sees it. Server-component safe.
 import Link from "next/link";
 import { buttonClass, formatDate } from "@/components/ui";
-import { CERTIFICATION_LABELS, certState, canSeeLiveDeals, type CertLike } from "@/lib/pipeline";
+import { CERTIFICATION_LABELS, certState, canSeeLiveDeals, formatGbp, type CertLike } from "@/lib/pipeline";
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
 import type { DealListItem } from "@/lib/portal-deals";
 import { PhaseBadge } from "./deal-room";
@@ -24,6 +24,8 @@ export function PortalHome({
   cert,
   deals,
   dealHref = (id) => `/portal/deals/${id}`,
+  boardRound = null,
+  boardHref = "/portal/deals",
   preview = false,
 }: {
   angel: PortalAngel;
@@ -31,6 +33,10 @@ export function PortalHome({
   /** The deals shared with members (only passed when this angel may see deals). */
   deals: DealListItem[];
   dealHref?: (id: string) => string;
+  /** The round open on the members' deals board (null: none). */
+  boardRound?: number | null;
+  /** Where the board link goes (null hides it, e.g. in the team's preview). */
+  boardHref?: string | null;
   preview?: boolean;
 }) {
   const state = certState(cert);
@@ -42,6 +48,8 @@ export function PortalHome({
         <h1 className="text-2xl font-semibold text-dxv-green">Hello {first}</h1>
         <p className="text-sm text-black/60">Your DXV member home.</p>
       </div>
+
+      <DealsPanel access={access} deals={deals} dealHref={dealHref} boardRound={boardRound} boardHref={boardHref} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-4">
@@ -80,29 +88,6 @@ export function PortalHome({
         </section>
 
         <section className="rounded-lg border border-black/10 bg-white p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Deals</h2>
-          {access && deals.length > 0 ? (
-            <ul className="mt-2 divide-y divide-black/10">
-              {deals.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                  <Link href={dealHref(d.id)} className="min-w-0 flex-1 font-medium text-dxv-green hover:underline">
-                    {d.name}
-                    {d.sector && <span className="font-normal text-black/55"> · {d.sector}</span>}
-                  </Link>
-                  <PhaseBadge phase={d.phase} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-black/65">
-              {access
-                ? "No deals are shared with you right now. When DXV opens a deal for members' pitch selection vote, it will appear here with its pitch deck."
-                : "Deals appear here for members with a current investor statement."}
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-lg border border-black/10 bg-white p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Your profile</h2>
           <dl className="mt-2 space-y-1 text-sm">
             <Row label="Email" value={angel.email} />
@@ -125,6 +110,90 @@ export function PortalHome({
       </div>
     </div>
   );
+}
+
+/** The member home's headline: the deals open to this member, what each needs from them, and the round board. */
+function DealsPanel({
+  access,
+  deals,
+  dealHref,
+  boardRound,
+  boardHref,
+}: {
+  access: boolean;
+  deals: DealListItem[];
+  dealHref: (id: string) => string;
+  boardRound: number | null;
+  boardHref: string | null;
+}) {
+  const toVote = deals.filter((d) => d.voteKind && !d.myAnswer).length;
+  return (
+    <section className="rounded-lg border-2 border-dxv-green bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 bg-dxv-green/[0.04] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-dxv-green">Deals open to you</h2>
+          {access && <span className="rounded-full bg-dxv-green px-2.5 py-0.5 text-sm font-semibold text-white">{deals.length}</span>}
+        </div>
+        {access && boardRound !== null && boardHref && (
+          <Link href={boardHref} className="text-sm font-medium text-dxv-green underline">
+            See the Round {boardRound} board →
+          </Link>
+        )}
+      </div>
+      <div className="p-4">
+        {!access ? (
+          <p className="text-sm text-black/65">Deals appear here for members with a current investor statement.</p>
+        ) : deals.length === 0 ? (
+          <p className="text-sm text-black/65">
+            No deals are open to you right now. When DXV opens a deal for members&apos; pitch selection vote, it will appear here with its pitch deck.
+          </p>
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-black/65">
+              Open a deal to read its pitch deck, DXV&apos;s memo and documents, and record your vote.
+              {toVote > 0 && (
+                <span className="ml-1 rounded bg-dxv-yellow px-1.5 py-0.5 font-medium text-dxv-green">
+                  {toVote} {toVote === 1 ? "deal needs" : "deals need"} your vote
+                </span>
+              )}
+            </p>
+            <ul className="space-y-2">
+              {deals.map((d) => {
+                const needsVote = !!d.voteKind && !d.myAnswer;
+                return (
+                  <li key={d.id}>
+                    <Link
+                      href={dealHref(d.id)}
+                      className="group flex flex-wrap items-center gap-3 rounded-lg border border-black/10 p-3 transition hover:-translate-y-px hover:border-dxv-green hover:bg-dxv-green/[0.03] hover:shadow-sm"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-dxv-green group-hover:underline">{d.name}</span>
+                        {d.sector && <span className="block text-sm text-black/55">{d.sector}</span>}
+                        <span className="mt-0.5 block text-xs text-black/60">{answerLine(d)}</span>
+                      </span>
+                      <PhaseBadge phase={d.phase} />
+                      <span
+                        className={`rounded-md px-3 py-1.5 text-sm font-medium ${needsVote ? "bg-dxv-yellow text-dxv-green" : "border border-dxv-green/40 text-dxv-green"}`}
+                      >
+                        {needsVote ? "Vote now →" : "View →"}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function answerLine(d: DealListItem): string {
+  if (!d.voteKind) return "Read the documents";
+  if (!d.myAnswer) return d.voteKind === "pre-selection" ? "Should they pitch? Your vote is needed" : "Would you invest? Your investment vote is needed";
+  if (d.voteKind === "pre-selection") return d.myAnswer.interested ? "✓ You voted: yes, hear their pitch" : "✓ You voted: not for me";
+  return d.myAnswer.interested ? `✓ You voted: interested, up to ${formatGbp(d.myAnswer.maxTicketGbp ?? 0)}` : "✓ You voted: not investing";
 }
 
 /** Where the how-to video goes (added later). */

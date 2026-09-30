@@ -36,7 +36,7 @@ export default async function WelcomePage() {
           the founders pitch.
         </li>
         <li>
-          <strong>2. After the pitch.</strong> You&apos;ll see the deck, DXV&apos;s investment memo and supporting documents, and can tell us if you&apos;re
+          <strong>2. Investment votes.</strong> You&apos;ll see the deck, DXV&apos;s investment memo and supporting documents, and can tell us if you&apos;re
           interested in investing and roughly how much.
         </li>
         <li>

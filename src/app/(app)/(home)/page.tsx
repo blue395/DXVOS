@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { dealsByStage, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact } from "@/lib/pipeline";
+import { dealsByStage, GATE_LABELS, daysSince, dashboardMetrics, formatGbp, formatGbpCompact, memberBoardCards } from "@/lib/pipeline";
+import { MemberRoundSelect } from "./member-round-select";
 import { Card, formatDate } from "@/components/ui";
 import { loadAngelRows } from "@/lib/angels";
 
@@ -10,11 +11,13 @@ import { loadAngelRows } from "@/lib/angels";
 export default async function DashboardPage() {
   const now = new Date();
 
-  const [ventures, awaiting, angels] = await requireAdminWith(() =>
+  const [ventures, awaiting, angels, memberRound] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findMany({
         select: {
           currentStage: true,
+          round: true,
+          sharedWithAngelsAt: true,
           investedAmountGbp: true,
           finalInvestments: { where: { removedAt: null }, select: { ticketGbp: true, paidAt: true } },
         },
@@ -26,8 +29,14 @@ export default async function DashboardPage() {
         include: { venture: { select: { id: true, name: true } } },
       }),
       loadAngelRows(),
+      db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, include: { by: { select: { name: true } } } }),
     ]),
   );
+  // The members' deals board: which round, and how much of it members can open.
+  const offeredRound = memberRound?.round ?? null;
+  const boardCards = memberBoardCards(ventures, offeredRound);
+  const maxRound = Math.max(0, ...ventures.map((v) => v.round ?? 0));
+  const roundOptions = Array.from({ length: maxRound + 1 }, (_, i) => i + 1);
   const members = angels.filter((a) => a.status === "MEMBER").length;
   const certNeeded = angels.filter((a) => a.needsAction).length;
 
@@ -85,6 +94,18 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
+          <div className="mt-4 space-y-1.5 border-t border-black/10 pt-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Round open to members:</span>
+              <MemberRoundSelect current={offeredRound} rounds={roundOptions} />
+            </div>
+            <p className="text-xs text-black/55">
+              {offeredRound === null
+                ? "Members see no deals board."
+                : `Members see Round ${offeredRound}'s ${boardCards.length} live deal${boardCards.length === 1 ? "" : "s"} on a read-only board (name and sector only); ${boardCards.filter((c) => c.phase).length} open with details (shared, from Member Pitch Selection on).`}
+              {memberRound && ` Set by ${memberRound.by.name}, ${formatDate(memberRound.createdAt)}.`}
+            </p>
+          </div>
         </Card>
 
         <div id="awaiting">

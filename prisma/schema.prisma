@@ -76,6 +76,7 @@ model User {
   teamInvites             TeamInvite[]         @relation("TeamInviteUser")
   teamEventsDone          TeamEvent[]          @relation("TeamEventActor")
   teamEvents              TeamEvent[]          @relation("TeamEventSubject")
+  memberRounds            MemberRound[]
   complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
   complianceTextsApproved ComplianceText[]     @relation("ComplianceTextApprovedBy")
 }
@@ -957,6 +958,21 @@ model TeamEvent {
   detail    String?
   actorId   String
   actor     User     @relation("TeamEventActor", fields: [actorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ── Members' round board ────────────────────────────────────────────────────
+
+// Append-only: which DXV round members see on their read-only deals board (set on the
+// Dashboard). The latest row counts; round null = no board. Card details still open only
+// from Member Pitch Selection, for shared deals.
+model MemberRound {
+  id        String   @id @default(cuid())
+  round     Int?
+  byId      String
+  by        User     @relation(fields: [byId], references: [id])
   createdAt DateTime @default(now())
 
   @@index([createdAt])

@@ -243,6 +243,12 @@ statement (and have finished onboarding):
   member** previews it. AI-drafted DD reports can't be shared: download, review, then upload the final version.
 - **Votes** from the portal land in the deal's Pre-Selection votes and Commitments as the angel (linked by
   `angelId`); the latest per angel counts, as before.
+- **Member home**: *Deals open to you* leads the page, with each deal's phase ("Investment Votes" at Pitch
+  Outcome), the member's own answer or "Vote now →", and a link to the round board.
+- **Round board** (`/portal/deals`): a read-only board of the round the team opens to members on the Dashboard
+  (*Round open to members*, under Deals by stage; every change kept in `MemberRound`). Cards show only company
+  name and sector; declined deals never appear; a card opens into its deal room only once the deal is shared and
+  at Member Pitch Selection or later.
 - **Never shown**: eligibility screens, AI drafts and working drafts, AI-generated DD reports, notes, other
   members' votes. Files are served by `/api/portal/documents/[id]`, which re-checks access on every request.
 

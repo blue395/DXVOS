@@ -9,7 +9,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 export default async function PortalLayout({ children }: LayoutProps<"/portal">) {
   const { user, angel } = await requireAngel();
   return (
-    <div className="flex min-h-full flex-1 flex-col">
+    <div className="flex min-h-full flex-1 flex-col overflow-x-clip">
       <header className="bg-dxv-green text-white">
         <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
           <Link href="/portal" className="flex items-center gap-2">
@@ -21,6 +21,9 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
               <>
                 <Link href="/portal" className="rounded px-2.5 py-1.5 hover:bg-white/10">
                   Home
+                </Link>
+                <Link href="/portal/deals" className="rounded px-2.5 py-1.5 hover:bg-white/10">
+                  Deals
                 </Link>
                 <Link href="/portal/profile" className="rounded px-2.5 py-1.5 hover:bg-white/10">
                   My profile
