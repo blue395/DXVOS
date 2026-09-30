@@ -1,15 +1,15 @@
-// Open a deal-room document (angels only). Checks, on every request: a signed-in angel
+// Open a deal-room document (angels, and partners using the portal as their angel record). Checks, on every request: a signed-in angel
 // with deal access, a deal shared with members at a stage that shows this document.
 // Redirects to a Supabase signed URL that expires after 60 seconds (streams the local
 // file in development). Every open is logged in the angel's history.
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasMemberAccess } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { readObject, signedObjectUrl } from "@/lib/deck-storage";
 import { angelHasDealAccess, angelMayOpenDocument } from "@/lib/portal-deals";
 
 export async function GET(req: Request, ctx: RouteContext<"/api/portal/documents/[id]">) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "ANGEL" || !user.angelId) return new Response("Unauthorised", { status: 401 });
+  if (!user || !hasMemberAccess(user) || !user.angelId) return new Response("Unauthorised", { status: 401 });
   const { id } = await ctx.params;
   const [angel, allowed, doc] = await Promise.all([
     db.angel.findUnique({ where: { id: user.angelId } }),

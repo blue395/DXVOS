@@ -40,6 +40,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <NavLink href="/activity">Activity</NavLink>
           </nav>
           <div className="flex items-center gap-3 text-sm">
+            {user.angelId && (
+              <Link href="/portal" className="rounded bg-dxv-yellow px-2 py-1 font-medium text-dxv-green transition hover:bg-white" title="Your own member portal, as an angel">
+                Member portal
+              </Link>
+            )}
             <Link href="/team" className="rounded px-2 py-1 text-white/80 transition hover:bg-white/10 hover:text-white" title="Team logins">
               Team
             </Link>

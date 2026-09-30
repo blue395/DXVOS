@@ -13,7 +13,9 @@ import { teamRevokeBlock } from "@/lib/pipeline";
 import { requestOrigin } from "@/lib/request-origin";
 import type { ActionResult } from "@/lib/action-result";
 
-export type TeamLinkResult = { error: string } | { ok: true; link: string; expiresAt: string };
+export type TeamLinkResult =
+  | { error: string; /** The email is a member (angel) login: offer to give that same login team access. */ memberLogin?: { userId: string; name: string } }
+  | { ok: true; link: string; expiresAt: string };
 
 const InviteSchema = z.object({
   name: z.string().trim().min(2, "Enter their name").max(120),
@@ -46,18 +48,41 @@ export async function inviteTeamMember(input: { name: string; email: string }): 
   const admin = await requireAdmin();
   const parsed = InviteSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
-  const clash = await db.user.findUnique({ where: { email: parsed.data.email }, select: { role: true, disabledAt: true } });
+  const clash = await db.user.findUnique({ where: { email: parsed.data.email }, select: { id: true, name: true, role: true, disabledAt: true } });
+  if (clash?.role === "ANGEL") {
+    // Partners are angels too: one login for both, so their member login gets team access.
+    return clash.disabledAt
+      ? { error: "That email is a member login whose access is revoked. Restore it on their angel page first." }
+      : { error: `${clash.name} already signs in to the member portal with this email.`, memberLogin: { userId: clash.id, name: clash.name } };
+  }
   if (clash) {
     return {
-      error:
-        clash.role === "ADMIN"
-          ? clash.disabledAt
-            ? "That email's team access was revoked. Restore it in the list above instead."
-            : "That email already has a team login. Use a password reset link if they're locked out."
-          : "That email is a member (angel) portal login. Use a different email, such as their DXV address, for their team login.",
+      error: clash.disabledAt
+        ? "That email's team access was revoked. Restore it in the list above instead."
+        : "That email already has a team login. Use a password reset link if they're locked out.",
     };
   }
   return newLink({ kind: "INVITE", ...parsed.data, userId: null }, admin.id);
+}
+
+/**
+ * Give a member's (angel's) existing login team access: the same email and password,
+ * now the team app too, with the member portal one click away. For DXV's partners.
+ */
+export async function grantTeamAccess(userId: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true, role: true, disabledAt: true, angelId: true } });
+  if (!user || user.role !== "ANGEL" || user.disabledAt) return { error: "That member login can't be given team access." };
+  await db.$transaction([
+    db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } }),
+    db.teamEvent.create({ data: { subjectId: user.id, email: user.email, kind: "member-given-team-access", detail: "Same login, now team and member", actorId: admin.id } }),
+    ...(user.angelId
+      ? [db.angelEvent.create({ data: { angelId: user.angelId, kind: "given-team-access", detail: `By ${admin.name}`, actorId: admin.id } })]
+      : []),
+  ]);
+  revalidatePath("/team");
+  if (user.angelId) revalidatePath(`/angels/${user.angelId}`);
+  return { ok: true };
 }
 
 /** A one-time link to set a new password (while there's no email service). */
