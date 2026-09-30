@@ -212,6 +212,10 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
   WhatsApp or email. Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
+- **Forgot password / sign-in links** (everyone, team and members): the sign-in page's *Forgot your password?*
+  and *Email me a sign-in link* email a one-time link from angels@diversityx.vc (reset: 30 minutes; magic
+  sign-in: 15 minutes). The page never says whether an email has a login. Set up in `docs/DEPLOY.md` §9; until
+  then the options are hidden and the team still makes reset links by hand.
 - **Onboarding** (`/join/<token>` then `/portal/...`): set a password and accept the member terms → **Your details**
   ("Is this you?" for members DXV already knows, questions for new ones: sectors, cheque size, experience, how they
   heard, optional self-declared tags) → **Investor statement** (HNW or self-certified sophisticated, the approved

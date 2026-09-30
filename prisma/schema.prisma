@@ -28,16 +28,17 @@ enum Role {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String      @id @default(cuid())
+  email        String      @unique
   name         String
   passwordHash String
-  role         Role      @default(ADMIN)
-  createdAt    DateTime  @default(now())
-  angelId      String?   @unique // ANGEL users: their Angel record
-  angel        Angel?    @relation("AngelUser", fields: [angelId], references: [id])
+  role         Role        @default(ADMIN)
+  createdAt    DateTime    @default(now())
+  angelId      String?     @unique // ANGEL users: their Angel record
+  angel        Angel?      @relation("AngelUser", fields: [angelId], references: [id])
   disabledAt   DateTime? // access revoked: treated as signed out everywhere
   lastSignInAt DateTime?
+  loginLinks   LoginLink[]
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -1022,38 +1023,38 @@ enum TaxReliefScheme {
 // company, amount and date come from DXV; this adds shares, value, paperwork, notes).
 // Money in minor units (pence/cents). Removing one only sets archivedAt.
 model PortfolioHolding {
-  id                String                @id @default(cuid())
+  id                String           @id @default(cuid())
   angelId           String
-  angel             Angel                 @relation(fields: [angelId], references: [id], onDelete: Cascade)
-  finalInvestmentId String?               @unique
-  finalInvestment   FinalInvestment?      @relation(fields: [finalInvestmentId], references: [id], onDelete: Cascade)
+  angel             Angel            @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  finalInvestmentId String?          @unique
+  finalInvestment   FinalInvestment? @relation(fields: [finalInvestmentId], references: [id], onDelete: Cascade)
 
   // Outside DXV only (DXV investments take these from the deal and the ticket)
-  companyName  String?
-  description  String?
-  sector       String?
-  investedVia  String? // "Direct", a syndicate or platform
-  round        String? // "Pre-Seed", "Seed", ...
-  investedOn   DateTime?
-  currency     String                @default("GBP") // GBP, EUR, USD
-  amountMinor  Int?
+  companyName String?
+  description String?
+  sector      String?
+  investedVia String? // "Direct", a syndicate or platform
+  round       String? // "Pre-Seed", "Seed", ...
+  investedOn  DateTime?
+  currency    String    @default("GBP") // GBP, EUR, USD
+  amountMinor Int?
 
-  instrument                InvestmentInstrument?
-  valuationAtInvestment     Int? // whole currency units
-  sharePrice                Float?
-  shares                    Int?
-  currentValueMinor         Int?
-  currentValueOn            DateTime?
-  status                    HoldingStatus         @default(ACTIVE)
-  proceedsMinor             Int? // exited: what they received
-  taxScheme                 TaxReliefScheme?
-  taxCertificateReceived    Boolean               @default(false) // SEIS3 / EIS3
-  shareCertificateReceived  Boolean               @default(false)
-  keyDate                   DateTime? // e.g. an ASA longstop, a follow-on, an exit window
-  keyDateNote               String?
-  source                    String? // how they heard about it
-  rationale                 String?
-  notes                     String?
+  instrument               InvestmentInstrument?
+  valuationAtInvestment    Int? // whole currency units
+  sharePrice               Float?
+  shares                   Int?
+  currentValueMinor        Int?
+  currentValueOn           DateTime?
+  status                   HoldingStatus         @default(ACTIVE)
+  proceedsMinor            Int? // exited: what they received
+  taxScheme                TaxReliefScheme?
+  taxCertificateReceived   Boolean               @default(false) // SEIS3 / EIS3
+  shareCertificateReceived Boolean               @default(false)
+  keyDate                  DateTime? // e.g. an ASA longstop, a follow-on, an exit window
+  keyDateNote              String?
+  source                   String? // how they heard about it
+  rationale                String?
+  notes                    String?
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1103,4 +1104,28 @@ model SyndicateHolding {
   archivedAt  DateTime?
 
   @@index([archivedAt])
+}
+
+// ── Self-service sign-in links ─────────────────────────────────────────────
+// "Forgot password?" on the sign-in page emails a one-time link: a password reset, or a
+// magic link that signs the person straight in. Any login (team or member) can ask; only
+// the token's SHA-256 hash is stored; links are short-lived and used once. Rows are kept.
+enum LoginLinkKind {
+  RESET
+  MAGIC
+}
+
+model LoginLink {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  kind        LoginLinkKind
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime? // a newer link of the same kind was sent
+  requestedIp String?
+  createdAt   DateTime      @default(now())
+
+  @@index([userId, createdAt])
 }

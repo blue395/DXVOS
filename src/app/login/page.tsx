@@ -1,31 +1,42 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, homeFor } from "@/lib/auth";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, inputClass } from "@/components/ui";
+import { mailConfigured } from "@/lib/mail";
 import { login } from "./actions";
+import { AuthCard } from "./auth-card";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
   if (user) redirect(homeFor(user.role));
+  const emailLinks = mailConfigured();
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-dxv-green px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
-        <div className="mb-6">
-          <p className="inline-block rounded bg-dxv-yellow px-2 py-0.5 text-xs font-bold tracking-widest text-dxv-green">DXV</p>
-          <h1 className="mt-3 text-2xl font-semibold text-dxv-green">DXV OS</h1>
-          <p className="text-sm text-black/60">Sign in (DXV team and members)</p>
+    <AuthCard subtitle="Sign in (DXV team and members)">
+      <ActionForm action={login} className="space-y-4" resetOnSuccess={false}>
+        <Field label="Email">
+          <input name="email" type="email" autoComplete="email" required className={inputClass} />
+        </Field>
+        <Field label="Password">
+          <input name="password" type="password" autoComplete="current-password" required className={inputClass} />
+        </Field>
+        <SubmitButton pendingLabel="Signing in…" doneLabel="Signed in">
+          Sign in
+        </SubmitButton>
+      </ActionForm>
+      {emailLinks ? (
+        <div className="mt-5 space-y-1 border-t border-black/10 pt-4 text-sm">
+          <Link href="/login/help?kind=RESET" className="block font-medium text-dxv-green underline">
+            Forgot your password?
+          </Link>
+          <Link href="/login/help?kind=MAGIC" className="block text-dxv-green underline">
+            Email me a sign-in link instead
+          </Link>
         </div>
-        <ActionForm action={login} className="space-y-4" resetOnSuccess={false}>
-          <Field label="Email">
-            <input name="email" type="email" autoComplete="email" required className={inputClass} />
-          </Field>
-          <Field label="Password">
-            <input name="password" type="password" autoComplete="current-password" required className={inputClass} />
-          </Field>
-          <SubmitButton>Sign in</SubmitButton>
-        </ActionForm>
-      </div>
-    </main>
+      ) : (
+        <p className="mt-5 border-t border-black/10 pt-4 text-xs text-black/55">Forgotten your password? Ask the DXV team for a reset link.</p>
+      )}
+    </AuthCard>
   );
 }

@@ -141,6 +141,42 @@ Excel; 50 MB max). Check it exists under Supabase → Storage; if not, create it
 settings (Private). Storage use grows with every file: the free plan includes 1 GB, Pro 100 GB.
 Stored files aren't included in Supabase's database backups.
 
+## 9. Email: "Forgot password?" and sign-in links
+
+The sign-in page offers **Forgot your password?** and **Email me a sign-in link** once email is set
+up. DXV OS sends from DXV's Google Workspace account `angels@diversityx.vc` through Google's mail
+server, using an *app password* (a separate password just for DXV OS, which you can revoke any time
+without changing the account's own password). Until these settings exist, the links stay hidden and
+the page says to ask the team for a reset link.
+
+1. **Turn on 2-Step Verification** for `angels@diversityx.vc` (Google Account → Security). App
+   passwords only exist on accounts with it. If the option is missing, a Workspace admin must allow
+   it: Admin console → Security → Authentication → 2-Step Verification → *Allow users to turn on*.
+2. **Create the app password:** signed in as `angels@diversityx.vc`, open
+   <https://myaccount.google.com/apppasswords>, name it `DXV OS`, **Create**. Google shows a
+   16-letter password once: copy it straight into Netlify (next step), never into chat or email.
+   (If the page says app passwords aren't available, a Workspace admin has turned them off:
+   Admin console → Security → *Less secure apps & app passwords*.)
+3. **Netlify → Site configuration → Environment variables**, add:
+
+   | Key | Value | Secret? |
+   |---|---|---|
+   | `SMTP_HOST` | `smtp.gmail.com` | |
+   | `SMTP_PORT` | `465` | |
+   | `SMTP_USER` | `angels@diversityx.vc` | |
+   | `SMTP_PASS` | the 16-letter app password (spaces don't matter) | ☑ Yes |
+   | `MAIL_FROM` | `DXV <angels@diversityx.vc>` | |
+   | `APP_URL` | the address people use, e.g. `https://app.diversityxventures.com` (no trailing slash) | |
+
+   `APP_URL` is the address put in emailed links. It's fixed on purpose, never taken from the
+   request, so nobody can trick DXV OS into emailing a link to another website.
+4. **Redeploy** (Deploys → Trigger deploy), then test: sign out → *Email me a sign-in link* → your
+   own email. The email arrives from `angels@diversityx.vc`; replies go to that inbox.
+
+Limits: Google Workspace sends up to about 2,000 emails a day per account, far above DXV's needs.
+To move to a dedicated email service later (e.g. Resend, Postmark), change the five `SMTP_`/`MAIL_`
+values to theirs: no code change.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.
@@ -162,6 +198,8 @@ Stored files aren't included in Supabase's database backups.
 | Deck upload says "Deck storage isn't configured" | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SECRET_KEY` missing — add them and redeploy |
 | Upload fails with "Bucket not found" | The `decks` bucket wasn't created — see §5.4 |
 | Screen fails: "ANTHROPIC_API_KEY isn't set" | Add the key (§5.3) and redeploy |
+| Sign-in page has no "Forgot your password?" link | Email isn't set up: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` and `APP_URL` (or Netlify's `URL`) are all needed (§9) |
+| "We couldn't send the email just now" | Check the function log: `Invalid login` / `535` means the app password is wrong or was revoked (§9.2) |
 | Screen fails: "Claude API error (401)" / "(403)" | Key wrong or revoked, or no billing set up on the Anthropic account |
 | Screen stays "Reading…" then times out | Check Netlify → Logs → Functions → `analyze-deck-background` for the error |
 | Build fails: secrets scanning found `NEXT_PUBLIC_SUPABASE_…` | It was marked secret — untick "Contains secret values" for the two `NEXT_PUBLIC_` variables |
