@@ -713,6 +713,27 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
 /** Minimum password length for angel logins. */
 export const MIN_PASSWORD_LENGTH = 10;
 
+// ── Self-service sign-in links ("Forgot password?") ─────────────────────────
+
+/** How long an emailed link works: a magic sign-in link is shorter-lived than a reset. */
+export const LOGIN_LINK_MINUTES = { RESET: 30, MAGIC: 15 } as const;
+/** At most this many emailed links per login per hour (stops inbox flooding). */
+export const LOGIN_LINKS_PER_HOUR = 5;
+
+export type LoginLinkState = "ok" | "used" | "expired";
+
+/** Whether an emailed sign-in link still works (a newer link of the same kind replaces it). */
+export function loginLinkState(link: { usedAt: Date | null; revokedAt: Date | null; expiresAt: Date }, now = new Date()): LoginLinkState {
+  if (link.usedAt || link.revokedAt) return "used";
+  return link.expiresAt <= now ? "expired" : "ok";
+}
+
+/** Whether a login may use self-service sign-in: not revoked, and an angel's record still active. */
+export function canSignIn(user: { role: string; disabledAt: Date | null; angel: { archivedAt: Date | null } | null }): boolean {
+  if (user.disabledAt) return false;
+  return user.role !== "ANGEL" || (!!user.angel && !user.angel.archivedAt);
+}
+
 // ── Deal room (what angels see of a deal; Blue, 2026-10-04) ────────────────
 
 /**

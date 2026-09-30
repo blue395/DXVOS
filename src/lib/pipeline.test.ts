@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canSignIn,
+  loginLinkState,
   angelDealPhase,
   angelDealVisibility,
   angelSeesDocument,
@@ -757,5 +759,23 @@ describe("deal one-liner", () => {
     expect(teamCardOneLiner({ oneLiner: null, aiSummary: "AI says something." })).toEqual({ text: "AI says something.", suggestion: true });
     expect(teamCardOneLiner({ oneLiner: " ", aiSummary: null, description: "Internal notes first. More." })).toEqual({ text: "Internal notes first.", suggestion: true });
     expect(teamCardOneLiner({ oneLiner: null })).toBeNull();
+  });
+});
+
+describe("self-service sign-in links", () => {
+  const now = new Date("2026-10-01T12:00:00Z");
+  const later = new Date("2026-10-01T12:10:00Z");
+  it("works once, until it expires or a newer link replaces it", () => {
+    expect(loginLinkState({ usedAt: null, revokedAt: null, expiresAt: later }, now)).toBe("ok");
+    expect(loginLinkState({ usedAt: now, revokedAt: null, expiresAt: later }, now)).toBe("used");
+    expect(loginLinkState({ usedAt: null, revokedAt: now, expiresAt: later }, now)).toBe("used");
+    expect(loginLinkState({ usedAt: null, revokedAt: null, expiresAt: now }, now)).toBe("expired");
+  });
+  it("is only for active logins", () => {
+    expect(canSignIn({ role: "ADMIN", disabledAt: null, angel: null })).toBe(true);
+    expect(canSignIn({ role: "ADMIN", disabledAt: now, angel: null })).toBe(false);
+    expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: { archivedAt: null } })).toBe(true);
+    expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: { archivedAt: now } })).toBe(false);
+    expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: null })).toBe(false);
   });
 });
