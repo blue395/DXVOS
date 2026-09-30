@@ -831,6 +831,17 @@ export function teamRevokeBlock(actorId: string, targetId: string, activeTeamLog
 
 // ── Members' round board (Blue, 2026-09-30) ─────────────────────────────────
 
+/**
+ * A members' board card's one-liner: from the summary DXV writes for members; failing
+ * that, the memo's opening only once members can read the memo (an open deal, after the
+ * pitch). Never the AI screen's summary or the internal description (the team card's).
+ */
+export function memberCardOneLiner(v: { angelSummary: string | null; memoSummary: string | null; phase: AngelDealPhase | null }): string | null {
+  const fromSummary = cardOneLiner(null, v.angelSummary);
+  if (fromSummary) return fromSummary;
+  return v.phase && angelSeesMemo(v.phase) ? cardOneLiner(null, v.memoSummary) : null;
+}
+
 /** The members' board columns: the team board's, without intake (Submitted, Eligibility Screen: members needn't see those; Blue, 2026-09-30). */
 export const MEMBER_BOARD_STAGES: StageMeta[] = BOARD_STAGES.filter((s) => !s.intake);
 

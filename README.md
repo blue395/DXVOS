@@ -255,6 +255,9 @@ statement (and have finished onboarding):
   the angel's key dates); CSV download. Totals per currency, never converted. Private to the angel.
   (Since 2026-09-30: *By founder diversity* replaces the dates box, using the themes in DXV's memos; "What they
   do" starts from the members' summary or the memo; one Notes box.)
+- **Round board cards** look like the team's: name and raise, a one-liner written for members (the members'
+  summary; the memo's opening only once members can read it; never the AI screen or internal description), then
+  company stage, sector and round pills; column headers show each column's total raise. No intake columns.
 - **Round board** (`/portal/deals`): a read-only board of the round the team opens to members on the Dashboard
   (*Round open to members*, under Deals by stage; every change kept in `MemberRound`). Cards show only company
   name and sector; declined deals never appear; a card opens into its deal room only once the deal is shared and
