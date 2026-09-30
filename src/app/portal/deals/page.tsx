@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PhaseBadge } from "@/components/portal/deal-room";
 import { requireAngel } from "@/lib/auth";
 import { PHASE_STYLE } from "@/lib/board-style";
 import { MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
@@ -124,10 +123,7 @@ function BoardCard({ c, anchor }: { c: MemberBoardCard; anchor: boolean }) {
         className="block scroll-mx-8 scroll-mt-20 rounded-lg border-2 border-dxv-green bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md"
       >
         <CardBody c={c} />
-        <span className="mt-2.5 flex items-center justify-between gap-2 border-t border-black/5 pt-2">
-          <PhaseBadge phase={c.phase} />
-          <span className="whitespace-nowrap text-xs font-semibold text-dxv-green">View deal →</span>
-        </span>
+        <span className="mt-2.5 block border-t border-black/5 pt-2 text-right text-xs font-semibold text-dxv-green">View deal →</span>
       </Link>
     );
   }
