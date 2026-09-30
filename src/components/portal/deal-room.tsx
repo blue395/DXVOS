@@ -57,6 +57,21 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
         </Section>
       )}
 
+      {deal.ddOpen && deal.committed && (
+        <Section title="Due diligence">
+          <p className="mb-2 text-sm text-black/65">Shared with members who committed to invest in {deal.name}.</p>
+          {deal.ddDocuments.length ? (
+            <ul className="divide-y divide-black/10">
+              {deal.ddDocuments.map((d) => (
+                <DocLink key={d.id} d={d} href={docHref} showCategory />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-black/55">DXV will share its due diligence here as it&apos;s completed.</p>
+          )}
+        </Section>
+      )}
+
       {deal.phase !== "pitch-selection" && (
         <Section title="Documents">
           {deal.documents.length ? (

@@ -165,13 +165,17 @@ async function listDeals(pool: Pool, input: Record<string, unknown>): Promise<st
       founderNames: string | null;
       stageEnteredAt: Date;
       passedFromStage: Stage | null;
+      passReason: PassReason | null;
+      createdAt: Date;
+      importedAt: Date | null;
     }>(
-      `SELECT id, name, "currentStage", round, sector, "companyStage", "raiseAmountGbp", "leadAngel", "founderNames", "stageEnteredAt", "passedFromStage"
+      `SELECT id, name, "currentStage", round, sector, "companyStage", "raiseAmountGbp", "leadAngel", "founderNames", "stageEnteredAt", "passedFromStage",
+              "passReason", "createdAt", "importedAt"
        FROM "Venture"
        WHERE ($1::boolean OR "currentStage" <> 'PASSED')
          AND ($2::text = '' OR name ILIKE '%' || $2 || '%' OR "founderNames" ILIKE '%' || $2 || '%' OR sector ILIKE '%' || $2 || '%')
          AND ($3::int IS NULL OR round = $3)
-       ORDER BY "stageEnteredAt" ASC LIMIT 200`,
+       ORDER BY ("currentStage" = 'PASSED'), "stageEnteredAt" ASC LIMIT 600`,
       [input.include_declined === true || stageName === "declined", search, round],
     )
   ).rows.filter((v) => !stageName || stageLabel(v.currentStage).toLowerCase().includes(stageName));
@@ -184,7 +188,11 @@ async function listDeals(pool: Pool, input: Record<string, unknown>): Promise<st
         [
           `- ${v.name} (id ${v.id})`,
           stageLabel(v.currentStage) + (v.passedFromStage ? ` at ${stageLabel(v.passedFromStage)}` : ""),
-          `${Math.floor((now - new Date(v.stageEnteredAt).getTime()) / 86400000)}d in stage`,
+          v.currentStage === "PASSED"
+            ? `declined ${d(v.stageEnteredAt)}${v.passReason ? ` (${PASS_REASON_LABELS[v.passReason]})` : ""}`
+            : `${Math.floor((now - new Date(v.stageEnteredAt).getTime()) / 86400000)}d in stage`,
+          `received ${d(v.createdAt)}`,
+          v.importedAt ? "from past records" : "",
           v.round ? `Round ${v.round}` : "",
           v.companyStage ?? "",
           v.sector ?? "",

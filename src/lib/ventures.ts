@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import type { PassReason, Stage } from "@/generated/prisma/enums";
 import { db } from "./db";
 import { gatesCrossed } from "./pipeline";
@@ -58,4 +59,66 @@ export async function moveVentureStage(opts: {
 
     return updated;
   });
+}
+
+export type HistoricalDeal = {
+  name: string;
+  founderNames: string | null;
+  founderEmail: string | null;
+  website: string | null;
+  sector: string | null;
+  companyStage: string | null;
+  raiseAmountGbp: number | null;
+  round: number | null;
+  leadAngel: string | null;
+  description: string | null;
+  passedFromStage: Stage;
+  passReason: PassReason;
+  passNote: string | null;
+  createdAt: Date;
+  declinedAt: Date;
+};
+
+/**
+ * Add deals DXV declined before DXV OS (the historical import), straight into Declined
+ * with their original dates. Their stage history records when each was received and
+ * declined. Unlike a live decline, no founder update is flagged as owed (that was handled
+ * at the time) and no AI lesson is suggested. All or nothing.
+ */
+export async function importHistoricalDeclinedVentures(deals: HistoricalDeal[], userId: string) {
+  const importedAt = new Date();
+  const rows = deals.map((d) => ({ id: randomUUID(), d }));
+  const note = "Imported from DXV's historical records";
+  await db.$transaction([
+    db.venture.createMany({
+      data: rows.map(({ id, d }) => ({
+        id,
+        name: d.name,
+        founderNames: d.founderNames,
+        founderEmail: d.founderEmail,
+        website: d.website,
+        sector: d.sector,
+        companyStage: d.companyStage,
+        raiseAmountGbp: d.raiseAmountGbp,
+        round: d.round,
+        leadAngel: d.leadAngel,
+        description: d.description,
+        currentStage: "PASSED" as const,
+        stageEnteredAt: d.declinedAt,
+        passReason: d.passReason,
+        passNote: d.passNote,
+        passedFromStage: d.passedFromStage,
+        createdAt: d.createdAt,
+        createdById: userId,
+        importedAt,
+      })),
+    }),
+    db.stageChange.createMany({
+      data: rows.flatMap(({ id, d }) => [
+        { ventureId: id, fromStage: null, toStage: "SUBMITTED" as const, note, changedById: userId, changedAt: d.createdAt },
+        { ventureId: id, fromStage: d.passedFromStage, toStage: "PASSED" as const, passReason: d.passReason, note: d.passNote, changedById: userId, changedAt: d.declinedAt },
+      ]),
+    }),
+  ]);
+  return rows.length;
 }

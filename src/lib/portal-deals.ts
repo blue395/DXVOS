@@ -6,12 +6,15 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { Angel } from "@/generated/prisma/client";
 import type { DocumentCategory, Stage } from "@/generated/prisma/enums";
+import { aliasMap } from "@/lib/angels";
 import {
+  angelDdOpen,
   angelDealVisibility,
   angelSeesDocument,
   angelSeesMemo,
   angelVoteKind,
   canSeeLiveDeals,
+  committedAngelIds,
   latestCertification,
   nextOnboardingStep,
   type AngelDealPhase,
@@ -60,6 +63,11 @@ export type DealRoom = {
   deck: DealRoomDoc | null;
   memo: { id: string; name: string; spec: DocSpec } | null;
   documents: DealRoomDoc[];
+  /** Due-diligence documents: only for members who committed, once DD has started. */
+  ddDocuments: DealRoomDoc[];
+  /** DD has started on this deal (whether or not this angel committed). */
+  ddOpen: boolean;
+  committed: boolean;
   voteKind: "pre-selection" | "eoi" | null;
   myPreSelection: { interested: boolean; note: string | null; createdAt: Date } | null;
   myEoi: { interested: boolean; maxTicketGbp: number; note: string | null; createdAt: Date } | null;
@@ -79,38 +87,47 @@ const docSelect = {
 
 /**
  * One deal as members see it, or null if they can't see it. `angelId` loads that
- * angel's own votes (null for the team's preview).
+ * angel's own votes and whether they committed (null for the team's preview, which can
+ * ask to see it as a committed member).
  */
-export async function loadDealRoom(ventureId: string, angelId: string | null): Promise<DealRoom | null> {
-  const v = await db.venture.findUnique({
-    where: { id: ventureId },
-    select: {
-      id: true,
-      name: true,
-      sector: true,
-      companyStage: true,
-      raiseAmountGbp: true,
-      website: true,
-      angelSummary: true,
-      currentStage: true,
-      sharedWithAngelsAt: true,
-      documents: { where: { uploadedAt: { not: null }, archivedAt: null }, orderBy: { uploadedAt: "desc" }, select: docSelect },
-      memoVersions: {
-        where: { kind: "REVIEWED_MEMO" },
-        orderBy: { version: "desc" },
-        select: { id: true, version: true, content: true, createdAt: true },
+export async function loadDealRoom(ventureId: string, angelId: string | null, opts: { previewCommitted?: boolean } = {}): Promise<DealRoom | null> {
+  const [v, eois, finals, aliases] = await Promise.all([
+    db.venture.findUnique({
+      where: { id: ventureId },
+      select: {
+        id: true,
+        name: true,
+        sector: true,
+        companyStage: true,
+        raiseAmountGbp: true,
+        website: true,
+        angelSummary: true,
+        currentStage: true,
+        sharedWithAngelsAt: true,
+        documents: { where: { uploadedAt: { not: null }, archivedAt: null }, orderBy: { uploadedAt: "desc" }, select: docSelect },
+        memoVersions: {
+          where: { kind: "REVIEWED_MEMO" },
+          orderBy: { version: "desc" },
+          select: { id: true, version: true, content: true, createdAt: true },
+        },
+        preSelectionVotes: angelId
+          ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, note: true, createdAt: true } }
+          : false,
+        investmentVotes: angelId
+          ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true, note: true, createdAt: true } }
+          : false,
       },
-      preSelectionVotes: angelId
-        ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, note: true, createdAt: true } }
-        : false,
-      investmentVotes: angelId
-        ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true, note: true, createdAt: true } }
-        : false,
-    },
-  });
+    }),
+    // Who committed (read here, never returned): their latest EOI on this deal, or a final ticket.
+    angelId ? db.investmentVote.findMany({ where: { ventureId, removedAt: null }, select: { angelId: true, angelName: true, interested: true, createdAt: true } }) : [],
+    angelId ? db.finalInvestment.findMany({ where: { ventureId, removedAt: null }, select: { angelId: true, angelName: true } }) : [],
+    angelId ? aliasMap() : new Map<string, string>(),
+  ]);
   if (!v) return null;
   const phase = angelDealVisibility(v);
   if (!phase) return null;
+  const committed = angelId ? committedAngelIds(eois, finals, aliases).has(angelId) : !!opts.previewCommitted;
+  const dd = { open: angelDdOpen(v.currentStage), committed };
 
   const strip = (d: (typeof v.documents)[number]): DealRoomDoc => ({
     id: d.id,
@@ -121,7 +138,9 @@ export async function loadDealRoom(ventureId: string, angelId: string | null): P
     uploadedAt: d.uploadedAt,
   });
   const deck = v.documents.find((d) => d.category === "DECK") ?? null;
-  const documents = v.documents.filter((d) => d.id !== deck?.id && !d.ddReportJob && angelSeesDocument(phase, d)).map(strip);
+  const shareable = v.documents.filter((d) => d.id !== deck?.id && !d.ddReportJob && angelSeesDocument(phase, d, dd));
+  const documents = shareable.filter((d) => d.angelVisibleFrom !== "DUE_DILIGENCE").map(strip);
+  const ddDocuments = shareable.filter((d) => d.angelVisibleFrom === "DUE_DILIGENCE").map(strip);
 
   // The latest locked DXV Review Issue (never AI drafts or working drafts).
   let memo: DealRoom["memo"] = null;
@@ -144,27 +163,30 @@ export async function loadDealRoom(ventureId: string, angelId: string | null): P
     deck: deck && strip(deck),
     memo,
     documents,
+    ddDocuments,
+    ddOpen: dd.open,
+    committed,
     voteKind: angelVoteKind(v.currentStage),
     myPreSelection: v.preSelectionVotes?.[0] ?? null,
     myEoi: v.investmentVotes?.[0] ?? null,
   };
 }
 
-/** Whether this angel may open this document: the deal's current deck, or a document shared for the deal's phase. */
-export async function angelMayOpenDocument(documentId: string) {
-  const doc = await db.document.findUnique({ where: { id: documentId }, select: { ventureId: true, ...docSelect } });
+/** Whether this angel may open this document: the deal's current deck, or a document shared with them for the deal's phase. */
+export async function angelMayOpenDocument(documentId: string, angelId: string) {
+  const doc = await db.document.findUnique({ where: { id: documentId }, select: { ventureId: true } });
   if (!doc) return null;
-  const room = await loadDealRoom(doc.ventureId, null);
+  const room = await loadDealRoom(doc.ventureId, angelId);
   if (!room) return null;
-  const ok = room.deck?.id === doc.id || room.documents.some((d) => d.id === doc.id);
+  const ok = room.deck?.id === documentId || [...room.documents, ...room.ddDocuments].some((d) => d.id === documentId);
   return ok ? { ventureId: doc.ventureId, ventureName: room.name } : null;
 }
 
-/** How many members could open a shared deal right now (signed up, onboarded, statement current). For the team's view. */
-export async function countAngelsWithDealAccess(now = new Date()): Promise<number> {
+/** The members who could open a shared deal right now (signed up, onboarded, statement current). For the team's view. */
+export async function angelIdsWithDealAccess(now = new Date()): Promise<Set<string>> {
   const angels = await db.angel.findMany({
     where: { status: "MEMBER", archivedAt: null, onboardedAt: { not: null }, restrictedDeclaredAt: null, user: { is: { disabledAt: null } } },
-    select: { status: true, archivedAt: true, certifications: { select: { signedOn: true, expiresOn: true } } },
+    select: { id: true, status: true, archivedAt: true, certifications: { select: { signedOn: true, expiresOn: true } } },
   });
-  return angels.filter((a) => canSeeLiveDeals(a, latestCertification(a.certifications), now)).length;
+  return new Set(angels.filter((a) => canSeeLiveDeals(a, latestCertification(a.certifications), now)).map((a) => a.id));
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdminWith } from "@/lib/auth";
-import { angelNameOptions } from "@/lib/angels";
+import { aliasMap, angelNameOptions } from "@/lib/angels";
 import { db } from "@/lib/db";
 import {
   GATE_LABELS,
@@ -11,6 +11,7 @@ import {
   commitmentTotal,
   formatGbp,
   latestVotePerAngel,
+  committedAngelIds,
   stageLabel,
   canGenerateAssessment,
   roundOptionCount,
@@ -49,12 +50,12 @@ import { DDItemRemove, DDItemToggle } from "../dd-item-controls";
 import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
 import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../investment-sections";
 import { AngelsCard } from "../angels-card";
-import { countAngelsWithDealAccess } from "@/lib/portal-deals";
+import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
 
-  const [v, { _max }, angelNames, membersWithAccess] = await requireAdminWith(() =>
+  const [v, { _max }, angelNames, withAccess, aliases] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -103,7 +104,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       }),
       db.venture.aggregate({ _max: { round: true } }),
       angelNameOptions(),
-      countAngelsWithDealAccess(),
+      angelIdsWithDealAccess(),
+      aliasMap(),
     ]),
   );
   if (!v) notFound();
@@ -169,6 +171,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           <h1 className="text-3xl font-semibold text-dxv-green">{v.name}</h1>
           <StageBadge stage={v.currentStage} />
           <span className="text-sm text-black/55">{daysSince(v.stageEnteredAt, now)} days in stage</span>
+          {v.importedAt && (
+            <span className="rounded-full bg-black/10 px-2.5 py-0.5 text-xs font-medium" title={`Added by the historical import on ${formatDate(v.importedAt)}`}>
+              Imported from past records
+            </span>
+          )}
           {warnings.map((w) => (
             <span key={w} className="inline-flex items-center gap-1.5 rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-medium text-dxv-green">
               <WarningIcon title={w} /> {w}
@@ -457,12 +464,16 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             stage={v.currentStage}
             sharedAt={v.sharedWithAngelsAt}
             summary={v.angelSummary}
-            docs={v.documents.filter((d) => !d.ddReportJob)} // AI-generated DD reports stay team-only
+            docs={v.documents.map((d) => ({ ...d, aiDraft: !!d.ddReportJob }))}
             latestIssueName={(() => {
               const issue = v.memoVersions.find((m) => m.kind === "REVIEWED_MEMO");
               return issue ? reviewIssueName(issueNo.get(issue.id)!) : null;
             })()}
-            membersWithAccess={membersWithAccess}
+            membersWithAccess={withAccess.size}
+            committed={(() => {
+              const ids = committedAngelIds(v.investmentVotes, v.finalInvestments, aliases);
+              return { total: ids.size, withAccess: [...ids].filter((id) => withAccess.has(id)).length };
+            })()}
             log={v.shareLog}
           />
 

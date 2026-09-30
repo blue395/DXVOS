@@ -5,20 +5,13 @@
 // Every step is logged in AngelEvent.
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { complianceReady } from "@/lib/compliance";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
+import { requestOrigin } from "@/lib/request-origin";
 
 export type InviteLinkResult = { error: string } | { ok: true; link: string; expiresAt: string };
-
-async function origin() {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 /**
  * A new one-time link for this angel: an invite (first sign-up) or a password reset.
@@ -59,7 +52,7 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
     }),
   ]);
   revalidatePath(`/angels/${angelId}`);
-  return { ok: true, link: `${await origin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
+  return { ok: true, link: `${await requestOrigin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
 }
 
 /** Switch off an angel's login (they're treated as signed out everywhere). Kept, not deleted. */

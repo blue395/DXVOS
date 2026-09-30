@@ -111,9 +111,16 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
               : "Drag a card to move it between stages, or onto the Declined pill to decline it. Every move is logged."}
           </p>
         </div>
-        <Link href="/deals/new" className={buttonClass("accent")}>
-          + New venture
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {declined && (
+            <Link href="/deals/import" className={buttonClass("secondary")}>
+              Import past declined deals
+            </Link>
+          )}
+          <Link href="/deals/new" className={buttonClass("accent")}>
+            + New venture
+          </Link>
+        </div>
       </div>
       {/* The filter bar goes inside the board so its Declined pill can take dropped cards. */}
       <KanbanBoard

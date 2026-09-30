@@ -3,6 +3,9 @@ import {
   angelDealPhase,
   angelDealVisibility,
   angelSeesDocument,
+  angelDdOpen,
+  committedAngelIds,
+  teamRevokeBlock,
   angelSeesMemo,
   angelVoteKind,
   nextOnboardingStep,
@@ -565,7 +568,7 @@ describe("deal room", () => {
   it("unlocks the memo after the pitch and documents by their chosen phase", () => {
     expect(angelSeesMemo("pitch-selection")).toBe(false);
     expect(angelSeesMemo("post-pitch")).toBe(true);
-    const doc = (angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | null, o: object = {}) => ({ angelVisibleFrom, archivedAt: null, uploadedAt: now, ...o });
+    const doc = (angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | "DUE_DILIGENCE" | null, o: object = {}) => ({ angelVisibleFrom, archivedAt: null, uploadedAt: now, ...o });
     expect(angelSeesDocument("commitments", doc(null))).toBe(false);
     expect(angelSeesDocument("pitch-selection", doc("POST_PITCH"))).toBe(false);
     expect(angelSeesDocument("post-pitch", doc("POST_PITCH"))).toBe(true);
@@ -573,11 +576,50 @@ describe("deal room", () => {
     expect(angelSeesDocument("commitments", doc("COMMITMENTS"))).toBe(true);
     expect(angelSeesDocument("commitments", doc("POST_PITCH", { archivedAt: now }))).toBe(false);
     expect(angelSeesDocument("commitments", doc("POST_PITCH", { uploadedAt: null }))).toBe(false);
+    // Due-diligence documents: DD started AND the angel committed.
+    expect(angelSeesDocument("commitments", doc("DUE_DILIGENCE"))).toBe(false);
+    expect(angelSeesDocument("commitments", doc("DUE_DILIGENCE"), { open: true, committed: false })).toBe(false);
+    expect(angelSeesDocument("commitments", doc("DUE_DILIGENCE"), { open: false, committed: true })).toBe(false);
+    expect(angelSeesDocument("commitments", doc("DUE_DILIGENCE"), { open: true, committed: true })).toBe(true);
+    expect(angelSeesDocument("commitments", doc("DUE_DILIGENCE", { archivedAt: now }), { open: true, committed: true })).toBe(false);
   });
   it("opens pre-selection voting, then EOIs until DD", () => {
     expect(angelVoteKind("PITCH_SELECTION")).toBe("pre-selection");
     expect(angelVoteKind("PITCH_OUTCOME")).toBe("eoi");
     expect(angelVoteKind("INVESTMENT_COMMITMENTS")).toBe("eoi");
     expect(angelVoteKind("DUE_DILIGENCE")).toBeNull();
+  });
+});
+
+describe("due diligence sharing", () => {
+  const t = (d: number) => new Date(Date.UTC(2026, 9, d));
+  it("opens DD documents from Due Diligence on", () => {
+    expect(angelDdOpen("INVESTMENT_COMMITMENTS")).toBe(false);
+    expect(angelDdOpen("DUE_DILIGENCE")).toBe(true);
+    expect(angelDdOpen("INVESTMENT_COMPLETE")).toBe(true);
+    expect(angelDdOpen("PASSED")).toBe(false);
+  });
+  it("counts an angel as committed from their latest EOI, or a final ticket", () => {
+    const aliases = new Map([["kevin w", "kevin"]]);
+    const ids = committedAngelIds(
+      [
+        { angelId: "anna", angelName: "Anna", interested: true, createdAt: t(1) },
+        { angelId: "anna", angelName: "Anna", interested: false, createdAt: t(2) }, // changed her mind
+        { angelId: null, angelName: "Kevin W", interested: true, createdAt: t(1) }, // linked by alias
+        { angelId: null, angelName: "Someone Unlinked", interested: true, createdAt: t(1) },
+        { angelId: "bo", angelName: "Bo", interested: false, createdAt: t(1) },
+      ],
+      [{ angelId: "bo", angelName: "Bo" }],
+      aliases,
+    );
+    expect([...ids].sort()).toEqual(["bo", "kevin"]);
+  });
+});
+
+describe("team access", () => {
+  it("never lets the team lock itself out", () => {
+    expect(teamRevokeBlock("me", "me", 3)).toMatch(/own/);
+    expect(teamRevokeBlock("me", "anna", 1)).toMatch(/last/);
+    expect(teamRevokeBlock("me", "anna", 2)).toBeNull();
   });
 });

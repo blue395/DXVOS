@@ -760,9 +760,47 @@ export const angelSeesMemo = (phase: AngelDealPhase) => atLeast(phase, "post-pit
  * Whether a (non-deck) document is shown in this phase: only if the team chose a phase
  * for it and that phase has been reached. Archived or unfinished uploads never.
  */
-export function angelSeesDocument(phase: AngelDealPhase, doc: { angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | null; archivedAt: Date | null; uploadedAt: Date | null }): boolean {
+export function angelSeesDocument(
+  phase: AngelDealPhase,
+  doc: { angelVisibleFrom: AngelDocVisibility | null; archivedAt: Date | null; uploadedAt: Date | null },
+  dd: { open: boolean; committed: boolean } = { open: false, committed: false },
+): boolean {
   if (doc.archivedAt || !doc.uploadedAt || !doc.angelVisibleFrom) return false;
+  // Due-diligence documents: only once DD has started, and only for members who committed.
+  if (doc.angelVisibleFrom === "DUE_DILIGENCE") return dd.open && dd.committed;
   return atLeast(phase, doc.angelVisibleFrom === "POST_PITCH" ? "post-pitch" : "commitments");
+}
+
+export type AngelDocVisibility = "POST_PITCH" | "COMMITMENTS" | "DUE_DILIGENCE";
+
+/** Due-diligence documents open to committed members from Due Diligence on (and stay open after investing). */
+export function angelDdOpen(stage: Stage): boolean {
+  return stage === "DUE_DILIGENCE" || stage === "INVESTMENT_COMPLETE" || stage === "SEIS_CERTIFICATE";
+}
+
+/**
+ * The angels who committed to a deal: their latest (live) EOI says interested, or they
+ * have a (live) Final Investment ticket. Entries link to angels by angelId or a confirmed
+ * alias; unlinked typed names count for nobody. Callers pass only live (not removed) rows.
+ */
+export function committedAngelIds(
+  eois: { angelId: string | null; angelName: string; interested: boolean; createdAt: Date }[],
+  finals: { angelId: string | null; angelName: string }[],
+  aliases: Map<string, string>,
+): Set<string> {
+  const latest = new Map<string, { interested: boolean; createdAt: Date }>();
+  for (const e of eois) {
+    const id = resolveAngelId(e, aliases);
+    if (!id) continue;
+    const cur = latest.get(id);
+    if (!cur || e.createdAt >= cur.createdAt) latest.set(id, e);
+  }
+  const ids = new Set([...latest].filter(([, e]) => e.interested).map(([id]) => id));
+  for (const f of finals) {
+    const id = resolveAngelId(f, aliases);
+    if (id) ids.add(id);
+  }
+  return ids;
 }
 
 /** What an angel can record at this stage: interest in hearing the pitch, then their EOI. */
@@ -772,4 +810,21 @@ export function angelVoteKind(stage: Stage): "pre-selection" | "eoi" | null {
   return null;
 }
 
-export const ANGEL_DOC_PHASE_LABELS = { POST_PITCH: "From the post-pitch vote", COMMITMENTS: "From Investment Commitments" } as const;
+export const ANGEL_DOC_PHASE_LABELS: Record<AngelDocVisibility, string> = {
+  POST_PITCH: "From the post-pitch vote",
+  COMMITMENTS: "From Investment Commitments",
+  DUE_DILIGENCE: "From Due Diligence: committed members only",
+};
+
+// ── Team logins (DXV partners) ──────────────────────────────────────────────
+
+/**
+ * Why a team member's access can't be switched off right now, or null if it can.
+ * Everyone on the team has the same rights; the only guards stop the team locking
+ * itself out: nobody revokes their own login, and the last active login stays.
+ */
+export function teamRevokeBlock(actorId: string, targetId: string, activeTeamLogins: number): string | null {
+  if (actorId === targetId) return "You can't revoke your own access.";
+  if (activeTeamLogins <= 1) return "This is the last active team login.";
+  return null;
+}
