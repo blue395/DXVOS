@@ -32,6 +32,11 @@ export type HoldingDefaults = {
   notes?: string | null;
 };
 
+/** One notes box: earlier "why I invested" and "how I heard" answers are folded in (saving keeps them there). */
+function mergedNotes(v: HoldingDefaults): string {
+  return [v.rationale, v.notes, v.source ? `How I heard about it: ${v.source}` : null].filter(Boolean).join("\n\n");
+}
+
 const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
 const amount = (minor: number | null | undefined) => (minor == null ? "" : String(minor % 100 === 0 ? minor / 100 : (minor / 100).toFixed(2)));
 
@@ -90,9 +95,11 @@ export function HoldingForm({
       )}
       {!outside && (
         <Section title="About the company">
-          <Field label="What they do (for your own reference)">
-            <input name="description" defaultValue={v.description ?? ""} className={inputClass} />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="What they do" hint="Filled in from what DXV has on the company; edit it as you like">
+              <textarea name="description" rows={2} defaultValue={v.description ?? ""} className={inputClass} />
+            </Field>
+          </div>
         </Section>
       )}
 
@@ -160,27 +167,10 @@ export function HoldingForm({
         </label>
       </Section>
 
-      <Section title="Dates to diarise">
-        <Field label="Key date">
-          <input name="keyDate" type="date" defaultValue={day(v.keyDate)} className={inputClass} />
-        </Field>
-        <Field label="What happens then">
-          <input name="keyDateNote" defaultValue={v.keyDateNote ?? ""} placeholder="e.g. ASA longstop, follow-on round" className={inputClass} />
-        </Field>
-      </Section>
-
       <Section title="Notes">
-        <Field label="How I heard about it">
-          <input name="source" defaultValue={v.source ?? ""} className={inputClass} />
-        </Field>
-        <div className="sm:col-span-2">
-          <Field label="Why I invested">
-            <textarea name="rationale" rows={3} defaultValue={v.rationale ?? ""} className={inputClass} />
-          </Field>
-        </div>
         <div className="sm:col-span-2">
           <Field label="Notes">
-            <textarea name="notes" rows={3} defaultValue={v.notes ?? ""} className={inputClass} />
+            <textarea name="notes" rows={4} defaultValue={mergedNotes(v)} placeholder="e.g. why you invested" className={inputClass} />
           </Field>
         </div>
       </Section>

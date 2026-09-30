@@ -66,16 +66,12 @@ const DetailsSchema = z.object({
   taxScheme: z.enum(["SEIS", "EIS", "NONE", ""]).optional().transform((s) => s || null),
   taxCertificateReceived: z.string().optional().transform((s) => s === "on"),
   shareCertificateReceived: z.string().optional().transform((s) => s === "on"),
-  keyDate: date,
-  keyDateNote: text(200),
-  source: text(300),
-  rationale: text(3000),
-  notes: text(3000),
+  notes: text(6000),
 });
 
 const OutsideSchema = DetailsSchema.extend({
   companyName: z.string().trim().min(1, "Enter the company name").max(200),
-  description: text(300),
+  description: text(600),
   sector: text(120),
   investedVia: text(120),
   round: text(60),
@@ -97,10 +93,9 @@ const detailsData = (d: Details) => ({
   taxScheme: d.taxScheme,
   taxCertificateReceived: d.taxCertificateReceived,
   shareCertificateReceived: d.shareCertificateReceived,
-  keyDate: d.keyDate,
-  keyDateNote: d.keyDateNote,
-  source: d.source,
-  rationale: d.rationale,
+  // One notes box now: earlier "how I heard" and "why I invested" answers were shown in it, so they live there.
+  source: null,
+  rationale: null,
   notes: d.notes,
 });
 
@@ -137,7 +132,7 @@ export async function saveOutsideHolding(holdingId: string | null, _prev: Action
 /** The angel's own details on one of their DXV syndicate investments. */
 export async function saveDxvDetails(finalInvestmentId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const { angel } = await requireAngel();
-  const parsed = DetailsSchema.extend({ description: text(300) }).safeParse(Object.fromEntries(formData));
+  const parsed = DetailsSchema.extend({ description: text(600) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: firstError(parsed.error) };
   if (!(await ownsFinalInvestment(angel.id, finalInvestmentId))) return { error: "That investment isn't on your record." };
   const data = { ...detailsData(parsed.data), description: parsed.data.description };

@@ -947,8 +947,13 @@ export function portfolioSummary(holdings: PortfolioHoldingLike[]) {
     return { currency, investedMinor, valueMinor, proceedsMinor, multiple: investedMinor ? (valueMinor + proceedsMinor) / investedMinor : null };
   });
   const gbp = counted.filter((h) => h.currency === "GBP");
+  // Grouped ignoring case ("HealthTech" and "Healthtech" are one sector); the first spelling seen is shown.
   const group = (key: (h: PortfolioHoldingLike) => string) =>
-    [...Map.groupBy(gbp, key)].map(([label, hs]) => ({ label, investedMinor: sum(hs.map((h) => h.amountMinor ?? 0)), count: hs.length }));
+    [...Map.groupBy(gbp, (h) => key(h).toLowerCase())].map(([, hs]) => ({
+      label: key(hs[0]),
+      investedMinor: sum(hs.map((h) => h.amountMinor ?? 0)),
+      count: hs.length,
+    }));
   return {
     byCurrency,
     companies: counted.length,
@@ -965,17 +970,61 @@ export function portfolioSummary(holdings: PortfolioHoldingLike[]) {
 }
 
 /**
- * Dates to diarise, soonest first (future only): each active S/EIS holding period's end,
- * and the angel's own key dates whatever the status (e.g. a loss relief claim after a write-off).
+ * Founder diversity across a portfolio: how many companies carry each theme (a company
+ * can carry several), most common first, plus how many have no themes recorded.
+ * Themes are matched ignoring case; "not stated"-style entries count as not recorded.
  */
-export function portfolioDates(holdings: PortfolioHoldingLike[], now: Date = new Date()): { date: Date; company: string; what: string }[] {
-  const out: { date: Date; company: string; what: string }[] = [];
-  for (const h of holdings) {
-    if (h.status === "ACTIVE" && h.investedOn && (h.taxScheme === "SEIS" || h.taxScheme === "EIS")) {
-      const ends = reliefHoldingEnds(h.investedOn);
-      if (ends > now) out.push({ date: ends, company: h.company, what: `${h.taxScheme} 3-year holding period ends` });
+export function diversityBreakdown(holdings: { diversityThemes?: string[] | null; pending?: boolean }[]): {
+  themes: { label: string; count: number }[];
+  notRecorded: number;
+} {
+  const counted = holdings.filter((h) => !h.pending);
+  const map = new Map<string, { label: string; count: number }>();
+  let notRecorded = 0;
+  for (const h of counted) {
+    const themes = [...new Set((h.diversityThemes ?? []).map(cleanTheme).filter((t): t is string => !!t))];
+    if (themes.length === 0) notRecorded++;
+    const seen = new Set<string>();
+    for (const t of themes) {
+      const key = t.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const cur = map.get(key) ?? { label: t, count: 0 };
+      cur.count++;
+      map.set(key, cur);
     }
-    if (h.keyDate && h.keyDate > now) out.push({ date: h.keyDate, company: h.company, what: h.keyDateNote || "Key date" });
   }
-  return out.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return { themes: [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)), notRecorded };
+}
+
+function cleanTheme(t: string): string | null {
+  const s = t.replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
+  return !s || /^(not stated|none|n\/a|unknown|not recorded)$/i.test(s) ? null : s;
+}
+
+/** DXV's founder diversity themes (the Playbook's list, without the guidance in brackets). */
+export const FOUNDER_DIVERSITY_THEMES = [
+  "Female Founder",
+  "LGBTQ+",
+  "Disability",
+  "Ethnic Minority",
+  "Immigrant",
+  "Low socio-economic background",
+  "Neurodiversity",
+  "Not university educated",
+  "Global majority",
+  "Experienced homelessness",
+] as const;
+
+/** The first sentence or two of some text, for a short "what they do" (at most `max` characters). */
+export function firstSentences(text: string | null | undefined, n = 2, max = 280): string | null {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  const parts = t.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [t];
+  let out = parts
+    .slice(0, n)
+    .map((p) => p.trim())
+    .join(" ");
+  if (out.length > max) out = `${out.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+  return out;
 }

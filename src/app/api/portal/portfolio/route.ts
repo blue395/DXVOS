@@ -17,15 +17,15 @@ export async function GET() {
   const header = [
     "Company", "What they do", "Via", "Sector", "Status", "Date invested", "Round", "Instrument", "Currency", "Amount invested",
     "Valuation at investment", "Share price", "Shares", "Value today", "Value as of", "Proceeds", "Multiple",
-    "S/EIS", "S/EIS certificate received", "Share certificate received", "Key date", "Key date note", "How I heard", "Rationale", "Notes",
+    "S/EIS", "S/EIS certificate received", "Share certificate received", "Founder diversity", "Notes",
   ];
   const lines = rows.map((r) =>
     [
       r.company, r.description, r.investedVia, r.sector, r.pending ? "Payment pending" : HOLDING_STATUS_LABELS[r.status], day(r.investedOn), r.round,
       r.instrument ? INSTRUMENT_LABELS[r.instrument] : "", r.currency, money(r.amountMinor), r.valuationAtInvestment, r.sharePrice, r.shares,
       money(holdingValueMinor(r)), day(r.currentValueOn), money(r.proceedsMinor), holdingMultiple(r)?.toFixed(2),
-      r.taxScheme, r.taxCertificateReceived ? "Yes" : "No", r.shareCertificateReceived ? "Yes" : "No", day(r.keyDate), r.keyDateNote,
-      r.heardVia, r.rationale, r.notes,
+      r.taxScheme, r.taxCertificateReceived ? "Yes" : "No", r.shareCertificateReceived ? "Yes" : "No", r.diversityThemes.join("; "),
+      [r.rationale, r.notes, r.heardVia ? `How I heard about it: ${r.heardVia}` : null].filter(Boolean).join("\n\n"),
     ].map(cell).join(","),
   );
   const csv = "﻿" + [header.map(cell).join(","), ...lines].join("\r\n");

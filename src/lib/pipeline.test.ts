@@ -11,7 +11,8 @@ import {
   formatMoneyMinor,
   holdingMultiple,
   portfolioSummary,
-  portfolioDates,
+  diversityBreakdown,
+  firstSentences,
   reliefHoldingEnds,
   angelSeesMemo,
   angelVoteKind,
@@ -706,6 +707,7 @@ describe("my portfolio", () => {
       h({ currency: "USD", amountMinor: 50_000 }),
       h({ source: "DXV", pending: true }),
     ]);
+    expect(portfolioSummary([h({ sector: "HealthTech" }), h({ sector: "Healthtech" })]).bySector).toEqual([{ label: "HealthTech", investedMinor: 200_000, count: 2 }]);
     expect(s.byCurrency.map((c) => [c.currency, c.investedMinor, c.valueMinor])).toEqual([
       ["GBP", 300_000, 300_000],
       ["USD", 50_000, 50_000],
@@ -720,22 +722,30 @@ describe("my portfolio", () => {
     expect(s.byYear.map((x) => x.label)).toEqual(["2025", "2026"]);
   });
 
-  it("diarises S/EIS holding periods and key dates, soonest first", () => {
-    expect(reliefHoldingEnds(d(2025, 6, 20))).toEqual(d(2028, 6, 20));
-    const dates = portfolioDates(
-      [
-        h({ company: "A", taxScheme: "EIS", investedOn: d(2025, 6, 20) }),
-        h({ company: "B", keyDate: d(2027, 1, 1), keyDateNote: "ASA longstop" }),
-        h({ company: "C", taxScheme: "SEIS", investedOn: d(2020, 1, 1) }), // already passed
-        h({ company: "D", status: "WRITTEN_OFF", taxScheme: "SEIS", investedOn: d(2025, 1, 1), keyDate: d(2027, 2, 1), keyDateNote: "Loss relief claim" }),
-      ],
-      d(2026, 9, 30),
-    );
-    // D is written off: no holding period to keep, but its own key date still counts.
-    expect(dates.map((x) => [x.company, x.what])).toEqual([
-      ["B", "ASA longstop"],
-      ["D", "Loss relief claim"],
-      ["A", "EIS 3-year holding period ends"],
+  it("knows when an S/EIS holding period ends", () => {
+    expect(reliefHoldingEnds(new Date(Date.UTC(2025, 5, 20)))).toEqual(new Date(Date.UTC(2028, 5, 20)));
+  });
+
+  it("counts founder diversity themes across companies", () => {
+    const b = diversityBreakdown([
+      { diversityThemes: ["Female Founder", "Ethnic Minority"] },
+      { diversityThemes: ["female founder", "Neurodiversity (ADHD)"] },
+      { diversityThemes: ["Not stated"] },
+      { diversityThemes: [] },
+      { diversityThemes: ["Female Founder"], pending: true }, // not invested yet
     ]);
+    expect(b.themes).toEqual([
+      { label: "Female Founder", count: 2 },
+      { label: "Ethnic Minority", count: 1 },
+      { label: "Neurodiversity", count: 1 },
+    ]);
+    expect(b.notRecorded).toBe(2);
+  });
+
+  it("takes the first sentence or two for a short description", () => {
+    expect(firstSentences("Sells repeat-prescription software. To pharmacies. Third sentence.")).toBe("Sells repeat-prescription software. To pharmacies.");
+    expect(firstSentences("No full stop here")).toBe("No full stop here");
+    expect(firstSentences("")).toBeNull();
+    expect(firstSentences("a ".repeat(200), 2, 20)).toMatch(/…$/);
   });
 });
