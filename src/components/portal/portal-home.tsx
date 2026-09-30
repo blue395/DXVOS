@@ -24,6 +24,7 @@ export function PortalHome({
   cert,
   deals,
   dealHref = (id) => `/portal/deals/${id}`,
+  deckHref = (id, download) => `/api/portal/documents/${id}${download ? "?download=1" : ""}`,
   boardRound = null,
   boardHref = "/portal/deals",
   preview = false,
@@ -33,6 +34,8 @@ export function PortalHome({
   /** The deals shared with members (only passed when this angel may see deals). */
   deals: DealListItem[];
   dealHref?: (id: string) => string;
+  /** Where a pitch deck opens (the members' document route; the team's preview uses its own). */
+  deckHref?: (documentId: string, download?: boolean) => string;
   /** The round open on the members' deals board (null: none). */
   boardRound?: number | null;
   /** Where the board link goes (null hides it, e.g. in the team's preview). */
@@ -49,7 +52,7 @@ export function PortalHome({
         <p className="text-sm text-black/60">Your DXV member home.</p>
       </div>
 
-      <DealsPanel access={access} deals={deals} dealHref={dealHref} boardRound={boardRound} boardHref={boardHref} />
+      <DealsPanel access={access} deals={deals} dealHref={dealHref} deckHref={deckHref} boardRound={boardRound} boardHref={boardHref} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-4">
@@ -117,12 +120,14 @@ function DealsPanel({
   access,
   deals,
   dealHref,
+  deckHref,
   boardRound,
   boardHref,
 }: {
   access: boolean;
   deals: DealListItem[];
   dealHref: (id: string) => string;
+  deckHref: (documentId: string, download?: boolean) => string;
   boardRound: number | null;
   boardHref: string | null;
 }) {
@@ -161,23 +166,41 @@ function DealsPanel({
               {deals.map((d) => {
                 const needsVote = !!d.voteKind && !d.myAnswer;
                 return (
-                  <li key={d.id}>
-                    <Link
-                      href={dealHref(d.id)}
-                      className="group flex flex-wrap items-center gap-3 rounded-lg border border-black/10 p-3 transition hover:-translate-y-px hover:border-dxv-green hover:bg-dxv-green/[0.03] hover:shadow-sm"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-dxv-green group-hover:underline">{d.name}</span>
-                        {d.sector && <span className="block text-sm text-black/55">{d.sector}</span>}
-                        <span className="mt-0.5 block text-xs text-black/60">{answerLine(d)}</span>
-                      </span>
-                      <PhaseBadge phase={d.phase} />
-                      <span
-                        className={`rounded-md px-3 py-1.5 text-sm font-medium ${needsVote ? "bg-dxv-yellow text-dxv-green" : "border border-dxv-green/40 text-dxv-green"}`}
-                      >
-                        {needsVote ? "Vote now →" : "View →"}
-                      </span>
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-black/10 p-3 transition hover:border-dxv-green hover:bg-dxv-green/[0.03]"
+                  >
+                    <Link href={dealHref(d.id)} className="group min-w-0 flex-1">
+                      <span className="block font-semibold text-dxv-green group-hover:underline">{d.name}</span>
+                      {d.sector && <span className="block text-sm text-black/55">{d.sector}</span>}
+                      <span className={`mt-0.5 block text-xs ${needsVote ? "font-medium text-black" : "text-black/60"}`}>{answerLine(d)}</span>
                     </Link>
+                    <PhaseBadge phase={d.phase} />
+                    <span className="flex flex-wrap items-center gap-2">
+                      {d.deck && (
+                        <>
+                          <a
+                            href={deckHref(d.deck.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md border border-dxv-green/40 px-3 py-1.5 text-sm font-medium text-dxv-green transition hover:bg-dxv-green/5"
+                            title={`Open ${d.deck.fileName} in a new tab`}
+                          >
+                            View deck
+                          </a>
+                          <a
+                            href={deckHref(d.deck.id, true)}
+                            className="rounded-md px-2 py-1.5 text-sm text-dxv-green underline transition hover:bg-dxv-green/5"
+                            title={`Download ${d.deck.fileName}`}
+                          >
+                            Download
+                          </a>
+                        </>
+                      )}
+                      <Link href={dealHref(d.id)} className={buttonClass()}>
+                        View deal →
+                      </Link>
+                    </span>
                   </li>
                 );
               })}

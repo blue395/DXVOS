@@ -849,3 +849,133 @@ export function memberBoardCards<T extends { round: number | null; currentStage:
     return [{ ...v, column, phase: angelDealVisibility(v) }];
   });
 }
+
+// ── My Portfolio (an angel's own investments; Blue, 2026-09-30) ─────────────
+
+export type HoldingStatusKey = "ACTIVE" | "EXITED" | "WRITTEN_OFF";
+export type TaxSchemeKey = "SEIS" | "EIS" | "NONE";
+
+export const HOLDING_STATUS_LABELS: Record<HoldingStatusKey, string> = { ACTIVE: "Active", EXITED: "Exited", WRITTEN_OFF: "Written off" };
+export const INSTRUMENT_LABELS = {
+  EQUITY: "Equity (shares)",
+  ASA: "ASA (advance subscription)",
+  CLN: "Convertible loan note",
+  SAFE: "SAFE",
+  OTHER: "Other",
+} as const;
+export const TAX_SCHEME_LABELS: Record<TaxSchemeKey, string> = { SEIS: "SEIS", EIS: "EIS", NONE: "No S/EIS" };
+export const PORTFOLIO_CURRENCIES = ["GBP", "EUR", "USD"] as const;
+export const INVESTMENT_ROUNDS = ["Pre-Seed", "Seed", "Series A", "Series B+", "Bridge"] as const;
+
+/** UK income tax relief on the amount invested: SEIS 50%, EIS 30% (within the annual limits; an estimate, not tax advice). */
+export const TAX_RELIEF_RATE: Record<TaxSchemeKey, number> = { SEIS: 0.5, EIS: 0.3, NONE: 0 };
+
+/** S/EIS shares must be held for three years from issue to keep the relief. */
+export function reliefHoldingEnds(investedOn: Date): Date {
+  const d = new Date(investedOn);
+  d.setUTCFullYear(d.getUTCFullYear() + 3);
+  return d;
+}
+
+/**
+ * Money as people type it, in minor units (pence/cents): "£991.83" → 99183, "1,000" →
+ * 100000, "1.5k" → 150000, "2m" → 200000000. Blank → null; anything unreadable → NaN.
+ */
+export function parseMoneyMinor(raw: string | null | undefined): number | null {
+  const t = (raw ?? "").trim().toLowerCase().replace(/[£$€,\s]|gbp|usd|eur/g, "");
+  if (!t) return null;
+  const m = t.match(/^(\d+(?:\.\d+)?)(k|m)?$/);
+  if (!m) return NaN;
+  const n = parseFloat(m[1]) * (m[2] === "k" ? 1_000 : m[2] === "m" ? 1_000_000 : 1);
+  return Math.round(n * 100);
+}
+
+/** "£991.83", "$1,000" (whole amounts without pence). */
+export function formatMoneyMinor(minor: number, currency: string = "GBP"): string {
+  const whole = minor % 100 === 0;
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(minor / 100);
+}
+
+export type PortfolioHoldingLike = {
+  company: string;
+  source: "DXV" | "OUTSIDE";
+  currency: string;
+  amountMinor: number | null;
+  currentValueMinor: number | null;
+  proceedsMinor: number | null;
+  status: HoldingStatusKey;
+  taxScheme: TaxSchemeKey | null;
+  sector: string | null;
+  investedOn: Date | null;
+  keyDate: Date | null;
+  keyDateNote: string | null;
+  /** A DXV ticket not yet marked paid: shown, but not counted as invested. */
+  pending?: boolean;
+};
+
+/**
+ * What a holding is worth today: the angel's latest valuation if they gave one;
+ * otherwise cost while it's active, and nothing once exited (the proceeds count instead)
+ * or written off.
+ */
+export function holdingValueMinor(h: Pick<PortfolioHoldingLike, "status" | "amountMinor" | "currentValueMinor">): number {
+  if (h.status !== "ACTIVE") return 0;
+  return h.currentValueMinor ?? h.amountMinor ?? 0;
+}
+
+/** Multiple on cost: (value today + money received) / amount invested. Null without an amount. */
+export function holdingMultiple(h: Pick<PortfolioHoldingLike, "status" | "amountMinor" | "currentValueMinor" | "proceedsMinor">): number | null {
+  if (!h.amountMinor) return null;
+  return (holdingValueMinor(h) + (h.proceedsMinor ?? 0)) / h.amountMinor;
+}
+
+export type CurrencyTotals = { currency: string; investedMinor: number; valueMinor: number; proceedsMinor: number; multiple: number | null };
+
+/**
+ * The portfolio's headline numbers. Totals are kept per currency (never converted at a
+ * made-up rate), GBP first; the breakdowns and the tax relief estimate are GBP only.
+ * Pending DXV tickets are counted separately, not as invested.
+ */
+export function portfolioSummary(holdings: PortfolioHoldingLike[]) {
+  const counted = holdings.filter((h) => !h.pending);
+  const currencies = [...new Set(counted.map((h) => h.currency))].sort((a, b) => (a === "GBP" ? -1 : b === "GBP" ? 1 : a.localeCompare(b)));
+  const byCurrency: CurrencyTotals[] = currencies.map((currency) => {
+    const hs = counted.filter((h) => h.currency === currency);
+    const investedMinor = sum(hs.map((h) => h.amountMinor ?? 0));
+    const valueMinor = sum(hs.map(holdingValueMinor));
+    const proceedsMinor = sum(hs.map((h) => h.proceedsMinor ?? 0));
+    return { currency, investedMinor, valueMinor, proceedsMinor, multiple: investedMinor ? (valueMinor + proceedsMinor) / investedMinor : null };
+  });
+  const gbp = counted.filter((h) => h.currency === "GBP");
+  const group = (key: (h: PortfolioHoldingLike) => string) =>
+    [...Map.groupBy(gbp, key)].map(([label, hs]) => ({ label, investedMinor: sum(hs.map((h) => h.amountMinor ?? 0)), count: hs.length }));
+  return {
+    byCurrency,
+    companies: counted.length,
+    active: counted.filter((h) => h.status === "ACTIVE").length,
+    exited: counted.filter((h) => h.status === "EXITED").length,
+    writtenOff: counted.filter((h) => h.status === "WRITTEN_OFF").length,
+    viaDxv: counted.filter((h) => h.source === "DXV").length,
+    outside: counted.filter((h) => h.source === "OUTSIDE").length,
+    pending: holdings.filter((h) => h.pending),
+    reliefMinor: Math.round(sum(gbp.map((h) => (h.amountMinor ?? 0) * TAX_RELIEF_RATE[h.taxScheme ?? "NONE"]))),
+    bySector: group((h) => h.sector?.trim() || "Not set").sort((a, b) => b.investedMinor - a.investedMinor),
+    byYear: group((h) => (h.investedOn ? String(h.investedOn.getUTCFullYear()) : "No date")).sort((a, b) => a.label.localeCompare(b.label)),
+  };
+}
+
+/**
+ * Dates to diarise, soonest first (future only): each active S/EIS holding period's end,
+ * and the angel's own key dates whatever the status (e.g. a loss relief claim after a write-off).
+ */
+export function portfolioDates(holdings: PortfolioHoldingLike[], now: Date = new Date()): { date: Date; company: string; what: string }[] {
+  const out: { date: Date; company: string; what: string }[] = [];
+  for (const h of holdings) {
+    if (h.status === "ACTIVE" && h.investedOn && (h.taxScheme === "SEIS" || h.taxScheme === "EIS")) {
+      const ends = reliefHoldingEnds(h.investedOn);
+      if (ends > now) out.push({ date: ends, company: h.company, what: `${h.taxScheme} 3-year holding period ends` });
+    }
+    if (h.keyDate && h.keyDate > now) out.push({ date: h.keyDate, company: h.company, what: h.keyDateNote || "Key date" });
+  }
+  return out.sort((a, b) => a.date.getTime() - b.date.getTime());
+}

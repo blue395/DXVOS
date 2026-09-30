@@ -245,6 +245,14 @@ statement (and have finished onboarding):
   `angelId`); the latest per angel counts, as before.
 - **Member home**: *Deals open to you* leads the page, with each deal's phase ("Investment Votes" at Pitch
   Outcome), the member's own answer or "Vote now →", and a link to the round board.
+- **Deals open to you** also offers **View deck** (opens in the browser) and **Download** for each deal's pitch
+  deck, and a green **View deal** button.
+- **My portfolio** (`/portal/portfolio`): the angel's investments in one table. DXV syndicate investments appear
+  automatically from Final Investment tickets (unpaid ones listed as "in progress", with open EOIs); the angel
+  adds their own details (shares, share price, value today, S/EIS and share certificates, notes) and any
+  investments made outside DXV (modelled on Blue's angel tracker). Tiles: invested, value today, multiple,
+  companies, estimated S/EIS relief; breakdowns by sector and year; *Coming up* (3-year S/EIS holding periods and
+  the angel's key dates); CSV download. Totals per currency, never converted. Private to the angel.
 - **Round board** (`/portal/deals`): a read-only board of the round the team opens to members on the Dashboard
   (*Round open to members*, under Deals by stage; every change kept in `MemberRound`). Cards show only company
   name and sector; declined deals never appear; a card opens into its deal room only once the deal is shared and

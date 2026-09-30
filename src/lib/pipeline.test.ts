@@ -7,6 +7,12 @@ import {
   committedAngelIds,
   teamRevokeBlock,
   memberBoardCards,
+  parseMoneyMinor,
+  formatMoneyMinor,
+  holdingMultiple,
+  portfolioSummary,
+  portfolioDates,
+  reliefHoldingEnds,
   angelSeesMemo,
   angelVoteKind,
   nextOnboardingStep,
@@ -653,5 +659,83 @@ describe("members' round board", () => {
       ["SEIS_CERTIFICATE", "INVESTMENT_COMPLETE", "commitments"],
     ]);
     expect(memberBoardCards([deal(4, "PITCH_SELECTION")], null)).toEqual([]);
+  });
+});
+
+describe("my portfolio", () => {
+  const d = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day));
+  const h = (o: Partial<Parameters<typeof portfolioSummary>[0][number]>) => ({
+    company: "Co",
+    source: "OUTSIDE" as const,
+    currency: "GBP",
+    amountMinor: 100_000,
+    currentValueMinor: null,
+    proceedsMinor: null,
+    status: "ACTIVE" as const,
+    taxScheme: null,
+    sector: null,
+    investedOn: null,
+    keyDate: null,
+    keyDateNote: null,
+    ...o,
+  });
+
+  it("reads money as people type it", () => {
+    expect(parseMoneyMinor("£991.83")).toBe(99_183);
+    expect(parseMoneyMinor("1,000")).toBe(100_000);
+    expect(parseMoneyMinor("1.5k")).toBe(150_000);
+    expect(parseMoneyMinor("")).toBeNull();
+    expect(parseMoneyMinor("about a grand")).toBeNaN();
+    expect(formatMoneyMinor(99_183)).toBe("£991.83");
+    expect(formatMoneyMinor(100_000, "USD")).toBe("US$1,000");
+  });
+
+  it("values holdings at cost until revalued; exits count their proceeds; write-offs are zero", () => {
+    expect(holdingMultiple(h({}))).toBe(1);
+    expect(holdingMultiple(h({ currentValueMinor: 250_000 }))).toBe(2.5);
+    expect(holdingMultiple(h({ status: "EXITED", proceedsMinor: 300_000 }))).toBe(3);
+    expect(holdingMultiple(h({ status: "WRITTEN_OFF" }))).toBe(0);
+    expect(holdingMultiple(h({ amountMinor: null }))).toBeNull();
+  });
+
+  it("totals per currency, estimates S/EIS relief in GBP, and leaves pending tickets out", () => {
+    const s = portfolioSummary([
+      h({ source: "DXV", taxScheme: "SEIS", sector: "Health", investedOn: d(2025, 6, 1) }),
+      h({ taxScheme: "EIS", currentValueMinor: 200_000, sector: "Health", investedOn: d(2026, 1, 1) }),
+      h({ status: "WRITTEN_OFF", sector: "Climate", investedOn: d(2026, 2, 1) }),
+      h({ currency: "USD", amountMinor: 50_000 }),
+      h({ source: "DXV", pending: true }),
+    ]);
+    expect(s.byCurrency.map((c) => [c.currency, c.investedMinor, c.valueMinor])).toEqual([
+      ["GBP", 300_000, 300_000],
+      ["USD", 50_000, 50_000],
+    ]);
+    expect(s.byCurrency[0].multiple).toBe(1);
+    expect([s.companies, s.active, s.writtenOff, s.viaDxv, s.outside, s.pending.length]).toEqual([4, 3, 1, 1, 3, 1]);
+    expect(s.reliefMinor).toBe(50_000 + 30_000);
+    expect(s.bySector.map((x) => [x.label, x.investedMinor])).toEqual([
+      ["Health", 200_000],
+      ["Climate", 100_000],
+    ]);
+    expect(s.byYear.map((x) => x.label)).toEqual(["2025", "2026"]);
+  });
+
+  it("diarises S/EIS holding periods and key dates, soonest first", () => {
+    expect(reliefHoldingEnds(d(2025, 6, 20))).toEqual(d(2028, 6, 20));
+    const dates = portfolioDates(
+      [
+        h({ company: "A", taxScheme: "EIS", investedOn: d(2025, 6, 20) }),
+        h({ company: "B", keyDate: d(2027, 1, 1), keyDateNote: "ASA longstop" }),
+        h({ company: "C", taxScheme: "SEIS", investedOn: d(2020, 1, 1) }), // already passed
+        h({ company: "D", status: "WRITTEN_OFF", taxScheme: "SEIS", investedOn: d(2025, 1, 1), keyDate: d(2027, 2, 1), keyDateNote: "Loss relief claim" }),
+      ],
+      d(2026, 9, 30),
+    );
+    // D is written off: no holding period to keep, but its own key date still counts.
+    expect(dates.map((x) => [x.company, x.what])).toEqual([
+      ["B", "ASA longstop"],
+      ["D", "Loss relief claim"],
+      ["A", "EIS 3-year holding period ends"],
+    ]);
   });
 });
