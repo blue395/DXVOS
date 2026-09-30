@@ -6,6 +6,7 @@ import {
   angelDdOpen,
   committedAngelIds,
   teamRevokeBlock,
+  memberBoardCards,
   angelSeesMemo,
   angelVoteKind,
   nextOnboardingStep,
@@ -621,5 +622,36 @@ describe("team access", () => {
     expect(teamRevokeBlock("me", "me", 3)).toMatch(/own/);
     expect(teamRevokeBlock("me", "anna", 1)).toMatch(/last/);
     expect(teamRevokeBlock("me", "anna", 2)).toBeNull();
+  });
+});
+
+describe("members' round board", () => {
+  const shared = new Date();
+  const deal = (round: number | null, currentStage: Parameters<typeof memberBoardCards>[0][number]["currentStage"], sharedWithAngelsAt: Date | null = shared) => ({
+    round,
+    currentStage,
+    sharedWithAngelsAt,
+  });
+  it("shows the offered round's live deals only, opening from Member Pitch Selection for shared deals", () => {
+    const cards = memberBoardCards(
+      [
+        deal(4, "SUBMITTED"),
+        deal(4, "PARTNER_REVIEW"),
+        deal(4, "PITCH_SELECTION"),
+        deal(4, "PITCH_OUTCOME", null), // not shared: card only
+        deal(4, "PASSED"), // declined: never shown
+        deal(4, "SEIS_CERTIFICATE"),
+        deal(3, "PITCH_SELECTION"), // other round
+      ],
+      4,
+    );
+    expect(cards.map((c) => [c.currentStage, c.column, c.phase])).toEqual([
+      ["SUBMITTED", "SUBMITTED", null],
+      ["PARTNER_REVIEW", "PARTNER_REVIEW", null],
+      ["PITCH_SELECTION", "PITCH_SELECTION", "pitch-selection"],
+      ["PITCH_OUTCOME", "PITCH_OUTCOME", null],
+      ["SEIS_CERTIFICATE", "INVESTMENT_COMPLETE", "commitments"],
+    ]);
+    expect(memberBoardCards([deal(4, "PITCH_SELECTION")], null)).toEqual([]);
   });
 });

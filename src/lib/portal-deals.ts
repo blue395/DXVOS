@@ -16,6 +16,7 @@ import {
   canSeeLiveDeals,
   committedAngelIds,
   latestCertification,
+  memberBoardCards,
   nextOnboardingStep,
   type AngelDealPhase,
 } from "@/lib/pipeline";
@@ -34,19 +35,68 @@ export async function angelHasDealAccess(angel: Pick<Angel, "id" | "status" | "a
   return nextOnboardingStep(angel, cert) === "done" && !angel.restrictedDeclaredAt && canSeeLiveDeals(angel, cert);
 }
 
-export type DealListItem = { id: string; name: string; sector: string | null; phase: AngelDealPhase; sharedAt: Date };
+export type DealListItem = {
+  id: string;
+  name: string;
+  sector: string | null;
+  phase: AngelDealPhase;
+  sharedAt: Date;
+  /** What this angel can record now (pitch selection vote or EOI), if anything. */
+  voteKind: "pre-selection" | "eoi" | null;
+  /** This angel's latest answer for that vote (null: not answered yet, or no angel given). */
+  myAnswer: { interested: boolean; maxTicketGbp: number | null } | null;
+};
 
-/** Every deal members can see now, newest share first. */
-export async function listSharedDeals(): Promise<DealListItem[]> {
+/** Every deal members can see now, newest share first; with `angelId`, that angel's own vote status on each. */
+export async function listSharedDeals(angelId: string | null = null): Promise<DealListItem[]> {
   const rows = await db.venture.findMany({
     where: { sharedWithAngelsAt: { not: null }, currentStage: { in: VISIBLE_STAGES } },
     orderBy: { sharedWithAngelsAt: "desc" },
-    select: { id: true, name: true, sector: true, currentStage: true, sharedWithAngelsAt: true },
+    select: {
+      id: true,
+      name: true,
+      sector: true,
+      currentStage: true,
+      sharedWithAngelsAt: true,
+      preSelectionVotes: angelId ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true } } : false,
+      investmentVotes: angelId
+        ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true } }
+        : false,
+    },
   });
   return rows.flatMap((v) => {
     const phase = angelDealVisibility(v);
-    return phase ? [{ id: v.id, name: v.name, sector: v.sector, phase, sharedAt: v.sharedWithAngelsAt! }] : [];
+    if (!phase) return [];
+    const voteKind = angelVoteKind(v.currentStage);
+    const pre = v.preSelectionVotes?.[0];
+    const eoi = v.investmentVotes?.[0];
+    const myAnswer =
+      voteKind === "pre-selection" && pre ? { interested: pre.interested, maxTicketGbp: null } : voteKind === "eoi" && eoi ? { interested: eoi.interested, maxTicketGbp: eoi.maxTicketGbp } : null;
+    return [{ id: v.id, name: v.name, sector: v.sector, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer }];
   });
+}
+
+/** The round DXV has opened to members' deals board (set on the Dashboard; null = none). */
+export async function currentMemberRound(): Promise<number | null> {
+  const latest = await db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, select: { round: true } });
+  return latest?.round ?? null;
+}
+
+export type MemberBoardCard = { id: string; name: string; sector: string | null; column: Stage; phase: AngelDealPhase | null };
+
+/**
+ * The members' read-only board: the offered round's live deals, name and sector only.
+ * Only cards with a phase open into the deal room (shared, from Member Pitch Selection).
+ */
+export async function loadMemberBoard(): Promise<{ round: number | null; cards: MemberBoardCard[] }> {
+  const round = await currentMemberRound();
+  if (round === null) return { round, cards: [] };
+  const rows = await db.venture.findMany({
+    where: { round, currentStage: { not: "PASSED" } },
+    orderBy: { stageEnteredAt: "asc" },
+    select: { id: true, name: true, sector: true, round: true, currentStage: true, sharedWithAngelsAt: true },
+  });
+  return { round, cards: memberBoardCards(rows, round).map((c) => ({ id: c.id, name: c.name, sector: c.sector, column: c.column, phase: c.phase })) };
 }
 
 export type DealRoomDoc = { id: string; fileName: string; mimeType: string; sizeBytes: number; category: DocumentCategory; uploadedAt: Date | null };

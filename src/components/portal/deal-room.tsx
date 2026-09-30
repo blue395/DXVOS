@@ -14,7 +14,7 @@ const PHASE_HELP: Record<AngelDealPhase, string> = {
 };
 
 export function PhaseBadge({ phase }: { phase: AngelDealPhase }) {
-  return <span className="rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-semibold text-dxv-green">{ANGEL_PHASE_LABELS[phase]}</span>;
+  return <span className="inline-block whitespace-nowrap rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-semibold text-dxv-green">{ANGEL_PHASE_LABELS[phase]}</span>;
 }
 
 export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHref: (id: string, download?: boolean) => string; voting?: React.ReactNode }) {

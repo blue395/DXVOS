@@ -741,7 +741,7 @@ export function angelDealPhase(stage: Stage): AngelDealPhase | null {
 
 export const ANGEL_PHASE_LABELS: Record<AngelDealPhase, string> = {
   "pitch-selection": "Pitch selection",
-  "post-pitch": "After the pitch",
+  "post-pitch": "Investment Votes", // the company has pitched: members record indicative commitments
   commitments: "Investment",
 };
 
@@ -827,4 +827,25 @@ export function teamRevokeBlock(actorId: string, targetId: string, activeTeamLog
   if (actorId === targetId) return "You can't revoke your own access.";
   if (activeTeamLogins <= 1) return "This is the last active team login.";
   return null;
+}
+
+// ── Members' round board (Blue, 2026-09-30) ─────────────────────────────────
+
+/**
+ * The read-only deals board members see: the live deals of the round DXV has opened to
+ * members (chosen on the Dashboard), by board column. Declined deals never appear. A card
+ * opens into the deal room only when members can see that deal (shared, and from Member
+ * Pitch Selection on: `angelDealVisibility()`); otherwise it's just the name and sector.
+ */
+export function memberBoardCards<T extends { round: number | null; currentStage: Stage; sharedWithAngelsAt: Date | null }>(
+  ventures: T[],
+  round: number | null,
+): (T & { column: Stage; phase: AngelDealPhase | null })[] {
+  if (round === null) return [];
+  return ventures.flatMap((v) => {
+    if (v.round !== round || v.currentStage === "PASSED") return [];
+    const column = boardColumn(v.currentStage);
+    if (!BOARD_STAGES.some((s) => s.key === column)) return [];
+    return [{ ...v, column, phase: angelDealVisibility(v) }];
+  });
 }

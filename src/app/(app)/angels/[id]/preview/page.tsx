@@ -33,6 +33,7 @@ export default async function PreviewPage({ params }: PageProps<"/angels/[id]/pr
           cert={latestCertification(angel.certifications)}
           deals={access ? deals : []}
           dealHref={(dealId) => `/deals/${dealId}/angel-view`}
+          boardHref={null}
           preview
         />
       </div>
