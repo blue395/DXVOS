@@ -18,7 +18,7 @@ import {
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
 import { complianceReady } from "@/lib/compliance";
-import { AccessButton, PortalLinkButton } from "./portal-client";
+import { AccessButton, LinkTeamLogin, PortalLinkButton } from "./portal-client";
 import { AngelFields } from "../angel-fields";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
 import { ArchiveAngelButton, CertificationForm, UnlinkAliasButton } from "./angel-client";
@@ -27,7 +27,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
   const { id } = await params;
   const venture = { select: { id: true, name: true, currentStage: true } } as const;
 
-  const [angel, eois, preVotes, finals, ready] = await requireAdminWith(() =>
+  const [angel, eois, preVotes, finals, ready, unlinkedTeam] = await requireAdminWith(() =>
     Promise.all([
       db.angel.findUnique({
         where: { id },
@@ -36,7 +36,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
             orderBy: { signedOn: "desc" },
             include: { recordedBy: { select: { name: true } }, complianceText: { select: { version: true } } },
           },
-          user: { select: { id: true, disabledAt: true, lastSignInAt: true } },
+          user: { select: { id: true, disabledAt: true, lastSignInAt: true, role: true, email: true } },
           invites: { orderBy: { createdAt: "desc" }, take: 1 },
           events: { orderBy: { createdAt: "desc" }, take: 30 },
           notes: { orderBy: { createdAt: "desc" }, include: { author: { select: { name: true } } } },
@@ -49,6 +49,8 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
       db.preSelectionVote.findMany({ where: { OR: [{ angelId: id }, { angelId: null }] }, orderBy: { createdAt: "desc" }, include: { venture } }),
       db.finalInvestment.findMany({ where: { removedAt: null, OR: [{ angelId: id }, { angelId: null }] }, orderBy: { createdAt: "desc" }, include: { venture } }),
       complianceReady(),
+      // Partners' team logins not yet linked to an angel record (one login for team and member portal).
+      db.user.findMany({ where: { role: "ADMIN", angelId: null, disabledAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
     ]),
   );
   if (!angel) notFound();
@@ -206,6 +208,16 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                 </span>
                 {angel.user?.lastSignInAt && <span className="ml-2 text-xs text-black/50">last signed in {formatDate(angel.user.lastSignInAt)}</span>}
               </p>
+              {angel.user?.role === "ADMIN" && (
+                <p className="rounded bg-dxv-green/10 px-2 py-1 text-xs">
+                  On the DXV team: signs in with their team login ({angel.user.email}) and reaches their member portal from the header. Manage that
+                  login on the{" "}
+                  <Link href="/team" className="font-medium underline">
+                    Team page
+                  </Link>
+                  .
+                </p>
+              )}
               {!ready.ready && (
                 <p className="rounded bg-dxv-yellow/30 px-2 py-1 text-xs">
                   Invites are paused until the investor statements and member terms are approved.{" "}
@@ -217,8 +229,9 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
               {!angel.user && ready.ready && (
                 <PortalLinkButton angelId={angel.id} kind="INVITE" label={portal === "invited" ? "Make a new invite link" : "Create invite link"} />
               )}
-              {angel.user && !angel.user.disabledAt && <PortalLinkButton angelId={angel.id} kind="RESET" label="Password reset link" />}
-              {angel.user && <AccessButton angelId={angel.id} enabled={!!angel.user.disabledAt} />}
+              {!angel.user && unlinkedTeam.length > 0 && <LinkTeamLogin angelId={angel.id} team={unlinkedTeam} />}
+              {angel.user?.role === "ANGEL" && !angel.user.disabledAt && <PortalLinkButton angelId={angel.id} kind="RESET" label="Password reset link" />}
+              {angel.user?.role === "ANGEL" && <AccessButton angelId={angel.id} enabled={!!angel.user.disabledAt} />}
               <Link href={`/angels/${angel.id}/preview`} className="block text-xs font-medium text-dxv-green underline">
                 Preview their portal
               </Link>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, formatDate, formatDateTime } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -10,7 +11,11 @@ export default async function TeamPage() {
   const me = await requireAdmin();
   const now = new Date();
   const [team, pending, events] = await Promise.all([
-    db.user.findMany({ where: { role: "ADMIN" }, orderBy: [{ disabledAt: { sort: "asc", nulls: "first" } }, { name: "asc" }] }),
+    db.user.findMany({
+      where: { role: "ADMIN" },
+      orderBy: [{ disabledAt: { sort: "asc", nulls: "first" } }, { name: "asc" }],
+      include: { angel: { select: { id: true, name: true } } },
+    }),
     db.teamInvite.findMany({
       where: { kind: "INVITE", usedAt: null, revokedAt: null, expiresAt: { gt: now } },
       orderBy: { createdAt: "desc" },
@@ -25,7 +30,8 @@ export default async function TeamPage() {
         <h1 className="text-2xl font-semibold text-dxv-green">Team</h1>
         <p className="text-sm text-black/60">
           DXV partners&apos; logins. Everyone on the team has the same access: every deal, angel and document, the Playbook, approving investor
-          statements, and this page. Each person&apos;s DXV Brain chats are private to them, and everything anyone changes is recorded under their name.
+          statements, and this page. Partners who are also angels use one login for both: the team app, plus their own member portal (where
+          deals follow the same investor-statement rules as every member). Each person&apos;s DXV Brain chats are private to them, and everything anyone changes is recorded under their name.
           Technical access (code, hosting, database, AI keys) is separate and isn&apos;t part of DXV OS.
         </p>
       </div>
@@ -41,6 +47,19 @@ export default async function TeamPage() {
                   {u.disabledAt && <span className="ml-2 rounded bg-black px-1.5 text-xs font-medium text-white">Access revoked {formatDate(u.disabledAt)}</span>}
                 </p>
                 <p className="text-black/60">{u.email}</p>
+                <p className="text-xs">
+                  {u.angel ? (
+                    <>
+                      Also a member:{" "}
+                      <Link href={`/angels/${u.angel.id}`} className="font-medium text-dxv-green underline">
+                        {u.angel.name}
+                      </Link>{" "}
+                      (uses the member portal with this login)
+                    </>
+                  ) : (
+                    <span className="text-black/50">Team only. To make them a member too, open their angel page and use Link to a team login.</span>
+                  )}
+                </p>
                 <p className="text-xs text-black/50">
                   {u.lastSignInAt ? `Last signed in ${formatDateTime(u.lastSignInAt)}` : "Not signed in yet"} · on the team since {formatDate(u.createdAt)}
                 </p>
@@ -107,4 +126,6 @@ const EVENT_LABELS: Record<string, string> = {
   "link-cancelled": "cancelled a link",
   "access-revoked": "revoked access",
   "access-restored": "restored access",
+  "member-given-team-access": "gave a member login team access",
+  "member-linked": "linked a team login to an angel record",
 };

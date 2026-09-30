@@ -35,15 +35,21 @@ export async function requireAdmin() {
 /**
  * The angel portal's check: a signed-in angel with an active Angel record. Every portal
  * page and action calls it, and only ever reads or writes that angel's own data.
+ * DXV partners are team members AND angels: a team login linked to an Angel record
+ * (`angelId`) uses the portal as that angel, under the same rules as every member.
  */
 export async function requireAngel() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "ANGEL" || !user.angelId) redirect(homeFor(user.role));
+  if (!user.angelId) redirect(homeFor(user.role));
   const angel = await db.angel.findUnique({ where: { id: user.angelId } });
-  if (!angel || angel.archivedAt) redirect("/login");
+  // An archived angel record: angel-only logins are signed out; a partner keeps the team app.
+  if (!angel || angel.archivedAt) redirect(user.role === "ANGEL" ? "/login" : "/");
   return { user, angel };
 }
+
+/** A login that may use the member portal: an angel's, or a partner's team login linked to their Angel record. */
+export const hasMemberAccess = (user: { role: string; angelId: string | null } | null) => !!user?.angelId && (user.role === "ANGEL" || user.role === "ADMIN");
 
 /**
  * Pages: check the admin and load the page's data at the same time (saves one

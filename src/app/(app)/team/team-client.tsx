@@ -7,25 +7,30 @@ import { ActionButton } from "@/components/action-button";
 import { OneTimeLink, shortDate } from "@/components/one-time-link";
 import { buttonClass, Field, inputClass, Spinner } from "@/components/ui";
 import { actionErrorMessage } from "@/lib/stale-version";
-import { cancelTeamInvite, inviteTeamMember, setTeamAccess, teamResetLink, type TeamLinkResult } from "./actions";
+import { cancelTeamInvite, grantTeamAccess, inviteTeamMember, setTeamAccess, teamResetLink, type TeamLinkResult } from "./actions";
 
 function useLink() {
   const [pending, start] = useTransition();
   const [link, setLink] = useState<{ url: string; expires: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [memberLogin, setMemberLogin] = useState<{ userId: string; name: string } | null>(null);
   const run = (fn: () => Promise<TeamLinkResult>) =>
     start(async () => {
       setError(null);
       setLink(null);
+      setMemberLogin(null);
       try {
         const res = await fn();
-        if ("error" in res) setError(res.error);
+        if ("error" in res) {
+          setError(res.error);
+          setMemberLogin(res.memberLogin ?? null);
+        }
         else setLink({ url: res.link, expires: shortDate(res.expiresAt) });
       } catch (e) {
         setError(actionErrorMessage(e));
       }
     });
-  return { pending, link, error, run };
+  return { pending, link, error, run, memberLogin, setMemberLogin, setError };
 }
 
 function Feedback({ error, link }: { error: string | null; link: { url: string; expires: string } | null }) {
@@ -42,7 +47,7 @@ function Feedback({ error, link }: { error: string | null; link: { url: string; 
 }
 
 export function InviteForm() {
-  const { pending, link, error, run } = useLink();
+  const { pending, link, error, run, memberLogin, setMemberLogin, setError } = useLink();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   return (
@@ -71,6 +76,30 @@ export function InviteForm() {
         )}
       </button>
       <Feedback error={error} link={link} />
+      {memberLogin && (
+        <div className="space-y-2 rounded-md border border-dxv-green/30 bg-dxv-green/[0.04] p-3 text-sm">
+          <p>
+            Partners are angels too, so they use one login for both. Give {memberLogin.name}&apos;s member login team access? They keep their email and
+            password, see the team app when they sign in, and reach their member portal from the header.
+          </p>
+          <ActionButton
+            run={async () => {
+              const res = await grantTeamAccess(memberLogin.userId);
+              if (!res.error) {
+                setMemberLogin(null);
+                setError(null);
+                setName("");
+                setEmail("");
+              }
+              return res;
+            }}
+            pendingLabel="Giving access…"
+            confirm={`Give ${memberLogin.name} full team access to DXV OS?`}
+          >
+            Give {memberLogin.name.split(" ")[0]} team access
+          </ActionButton>
+        </div>
+      )}
     </form>
   );
 }
@@ -98,7 +127,7 @@ export function AccessButton({ userId, name, enabled }: { userId: string; name: 
       run={() => setTeamAccess(userId, false)}
       variant="secondary"
       pendingLabel="Revoking…"
-      confirm={`Revoke ${name}'s access? They're signed out straight away and can't sign in until someone restores it. Nothing they did is removed.`}
+      confirm={`Revoke ${name}'s access? They're signed out straight away (team app and member portal) and can't sign in until someone restores it. Nothing they did is removed.`}
     >
       Revoke access
     </ActionButton>

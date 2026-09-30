@@ -107,11 +107,12 @@ export async function updateAngel(angelId: string, _prev: ActionResult, formData
   if (await emailTaken(r.data.email, angelId)) return { error: "Another angel already has that email." };
   const current = await db.angel.findUnique({
     where: { id: angelId },
-    select: { joinedAt: true, email: true, user: { select: { id: true } } },
+    select: { joinedAt: true, email: true, user: { select: { id: true, role: true } } },
   });
   if (!current) return { error: "Angel not found." };
-  // Their email is also their portal login: keep the two in step.
-  const loginEmailChange = current.user && r.data.email !== current.email;
+  // Their email is also their portal login: keep the two in step. (A partner's team login
+  // is linked to their angel record but keeps its own login email.)
+  const loginEmailChange = current.user?.role === "ANGEL" && r.data.email !== current.email;
   if (loginEmailChange) {
     if (!r.data.email) return { error: "They have a portal login, so they need an email." };
     const other = await db.user.findUnique({ where: { email: r.data.email }, select: { id: true } });

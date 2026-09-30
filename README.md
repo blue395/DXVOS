@@ -255,6 +255,11 @@ the Playbook, approving statements, and the Team page itself. Brain chats stay p
 - **Password reset** links work the same way (there's no email service yet).
 - **Revoke / restore**: a revoked login is signed out everywhere and kept on record. Nobody can revoke themselves
   or the last active login (`teamRevokeBlock()` in `pipeline.ts`).
+- **Partners are angels too, with one login.** Inviting an email that already has a member login offers *Give
+  them team access* (same email and password; they now get the team app). A partner who only has a team login is
+  linked to their angel record from that angel's page (*Link to a team login*). Linked logins get a **Member
+  portal** link in the header (and **Team app** back); in the portal they're just a member: own record only,
+  their own investor statement, same deal-room rules.
 - Every step is logged in `TeamEvent` (append-only) and shown as the page's access history.
 
 ## Historical declined deals (`/deals/import`)

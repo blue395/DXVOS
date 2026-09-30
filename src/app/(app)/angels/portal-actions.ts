@@ -20,7 +20,7 @@ export type InviteLinkResult = { error: string } | { ok: true; link: string; exp
 export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET"): Promise<InviteLinkResult> {
   const admin = await requireAdmin();
   const [angel, ready] = await Promise.all([
-    db.angel.findUnique({ where: { id: angelId }, include: { user: { select: { id: true, disabledAt: true } } } }),
+    db.angel.findUnique({ where: { id: angelId }, include: { user: { select: { id: true, disabledAt: true, role: true } } } }),
     complianceReady(),
   ]);
   if (!angel || angel.archivedAt) return { error: "Angel not found." };
@@ -33,12 +33,13 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
       return {
         error:
           clash.role === "ADMIN"
-            ? "That email already has a DXV team login. Team members don't need a separate angel login: use Preview as angel to see the portal."
+            ? "That email is a DXV team login. Use Link to a team login below: one login for the team app and their member portal."
             : "That email already has a portal login.",
       };
     }
   } else {
     if (!angel.user) return { error: "They haven't signed up yet. Send an invite link instead." };
+    if (angel.user.role === "ADMIN") return { error: "They sign in with their team login: make a password reset link on the Team page." };
     if (angel.user.disabledAt) return { error: "Their access is revoked. Restore it first." };
   }
 
@@ -58,13 +59,40 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
 /** Switch off an angel's login (they're treated as signed out everywhere). Kept, not deleted. */
 export async function setAngelAccess(angelId: string, enabled: boolean): Promise<{ ok?: boolean; error?: string }> {
   const admin = await requireAdmin();
-  const user = await db.user.findUnique({ where: { angelId }, select: { id: true } });
+  const user = await db.user.findUnique({ where: { angelId }, select: { id: true, role: true } });
   if (!user) return { error: "They don't have a login." };
+  if (user.role === "ADMIN") return { error: "They sign in with their team login: manage it on the Team page." };
   await db.$transaction([
     db.user.update({ where: { id: user.id }, data: { disabledAt: enabled ? null : new Date() } }),
     ...(enabled ? [] : [db.angelInvite.updateMany({ where: { angelId, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } })]),
     db.angelEvent.create({ data: { angelId, kind: enabled ? "access-restored" : "access-revoked", actorId: admin.id } }),
   ]);
   revalidatePath(`/angels/${angelId}`);
+  return { ok: true };
+}
+
+/**
+ * A partner's team login becomes their member login too: link it to this angel record,
+ * so they reach the member portal (as this angel, under the same rules as every member)
+ * without a second login.
+ */
+export async function linkTeamLogin(angelId: string, userId: string): Promise<{ ok?: boolean; error?: string }> {
+  const admin = await requireAdmin();
+  const [angel, user] = await Promise.all([
+    db.angel.findUnique({ where: { id: angelId }, select: { id: true, name: true, archivedAt: true, user: { select: { id: true } } } }),
+    db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, role: true, angelId: true, disabledAt: true } }),
+  ]);
+  if (!angel || angel.archivedAt) return { error: "Angel not found." };
+  if (angel.user) return { error: "This angel already has a login." };
+  if (!user || user.role !== "ADMIN" || user.disabledAt) return { error: "Choose an active team member." };
+  if (user.angelId) return { error: `${user.name}'s login is already linked to another angel record.` };
+  await db.$transaction([
+    db.user.update({ where: { id: user.id }, data: { angelId: angel.id } }),
+    db.angelInvite.updateMany({ where: { angelId, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
+    db.angelEvent.create({ data: { angelId, kind: "linked-team-login", detail: `${user.name}'s team login (${user.email})`, actorId: admin.id } }),
+    db.teamEvent.create({ data: { subjectId: user.id, email: user.email, kind: "member-linked", detail: `Angel record: ${angel.name}`, actorId: admin.id } }),
+  ]);
+  revalidatePath(`/angels/${angelId}`);
+  revalidatePath("/team");
   return { ok: true };
 }

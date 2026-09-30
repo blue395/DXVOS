@@ -3,10 +3,11 @@ import { requireAngel } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 import { SignOutButton } from "@/components/sign-out-button";
 
-// The angel portal's shell: no team navigation, no DXV Brain, no job tray. Pages and
-// actions still check requireAngel() themselves.
+// The angel portal's shell: no team navigation, no DXV Brain, no job tray (partners, who are
+// also angels, get a "Team app" link back). Pages and actions still check requireAngel()
+// themselves.
 export default async function PortalLayout({ children }: LayoutProps<"/portal">) {
-  const { angel } = await requireAngel();
+  const { user, angel } = await requireAngel();
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="bg-dxv-green text-white">
@@ -27,6 +28,11 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
               </>
             )}
           </nav>
+          {user.role === "ADMIN" && (
+            <Link href="/" className="rounded bg-dxv-yellow px-2 py-1 text-sm font-medium text-dxv-green transition hover:bg-white" title="Back to DXV OS">
+              Team app
+            </Link>
+          )}
           <span className="hidden text-sm text-white/70 sm:inline">{angel.name}</span>
           <SignOutButton action={logout} />
         </div>
