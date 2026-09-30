@@ -257,7 +257,9 @@ the Playbook, approving statements, and the Team page itself. Brain chats stay p
   or the last active login (`teamRevokeBlock()` in `pipeline.ts`).
 - **Partners are angels too, with one login.** Inviting an email that already has a member login offers *Give
   them team access* (same email and password; they now get the team app). A partner who only has a team login is
-  linked to their angel record from that angel's page (*Link to a team login*). Linked logins get a **Member
+  linked to their angel record from that angel's page (*Link to a team login*), or links themselves: every team
+  member has a yellow **Member portal** button, which the first time opens `/member-access` (*Yes, that's me*,
+  choose their record, or *Create my member record*) and from then on goes straight to the portal. Linked logins get a **Member
   portal** link in the header (and **Team app** back); in the portal they're just a member: own record only,
   their own investor statement, same deal-room rules.
 - Every step is logged in `TeamEvent` (append-only) and shown as the page's access history.
