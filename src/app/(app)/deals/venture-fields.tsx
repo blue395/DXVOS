@@ -1,6 +1,7 @@
 import { Field, inputClass } from "@/components/ui";
 import { CompanyStageField } from "./company-stage-field";
 import { LeadAngelField } from "./lead-angel-field";
+import { FounderDiversityField } from "@/components/founder-diversity-field";
 
 type VentureValues = {
   name?: string | null;
@@ -13,6 +14,7 @@ type VentureValues = {
   round?: number | null;
   leadAngel?: string | null;
   description?: string | null;
+  founderDiversity?: string[];
 };
 
 // Shared by "New venture" and the edit form on the deal page.
@@ -66,6 +68,10 @@ export function VentureFields({
         <Field aiSuggested={tag("description")} label="Description / eligibility notes" hint="Stage, sector, team and thesis-fit against DXV's underestimated-founder criteria">
           <textarea name="description" rows={4} defaultValue={v.description ?? ""} className={inputClass} />
         </Field>
+      </div>
+      <div className="sm:col-span-2">
+        {/* The single source of truth for founder diversity: both portfolio views read it. */}
+        <FounderDiversityField value={v.founderDiversity} hint="Used by the team and members' portfolios. Issuing a memo fills it if it's empty." />
       </div>
     </div>
   );

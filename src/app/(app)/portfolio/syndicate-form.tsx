@@ -2,7 +2,8 @@
 // tracked deal, only the team's details (the company, amounts and angels come from the deal).
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, inputClass } from "@/components/ui";
-import { COMPANY_STAGES, FOUNDER_DIVERSITY_THEMES, HOLDING_STATUS_LABELS, INSTRUMENT_LABELS, PORTFOLIO_CURRENCIES, TAX_SCHEME_LABELS } from "@/lib/pipeline";
+import { FounderDiversityField } from "@/components/founder-diversity-field";
+import { COMPANY_STAGES, HOLDING_STATUS_LABELS, INSTRUMENT_LABELS, PORTFOLIO_CURRENCIES, TAX_SCHEME_LABELS } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 
 export type SyndicateDefaults = {
@@ -35,16 +36,16 @@ export function SyndicateForm({
   added,
   v = {},
   submitLabel,
+  dealHref,
 }: {
   action: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
+  /** Tracked deals: where founder diversity is edited (the deal page's Details). */
+  dealHref?: string;
   /** Added by hand: the company, amount and angels are the team's to enter. */
   added: boolean;
   v?: SyndicateDefaults;
   submitLabel: string;
 }) {
-  const themes = v.diversityThemes ?? [];
-  const known = new Set<string>(FOUNDER_DIVERSITY_THEMES.map((t) => t.toLowerCase()));
-  const other = themes.filter((t) => !known.has(t.toLowerCase()));
   return (
     <ActionForm action={action} resetOnSuccess={false} className="space-y-5">
       <Section title="The company">
@@ -148,23 +149,19 @@ export function SyndicateForm({
 
       <Section title="Founder diversity">
         <div className="sm:col-span-2">
-          <p className="mb-2 text-xs text-black/55">
-            As DXV records them in memos: only themes the founders have stated themselves, never inferred.
-            {!added && " Leave all unticked to use the memo's themes."}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {FOUNDER_DIVERSITY_THEMES.map((t) => (
-              <label key={t} className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black/15 px-2.5 py-1 text-sm has-[:checked]:border-dxv-green has-[:checked]:bg-dxv-green/10">
-                <input type="checkbox" name="theme" value={t} defaultChecked={themes.some((x) => x.toLowerCase() === t.toLowerCase())} />
-                {t}
-              </label>
-            ))}
-          </div>
-          <div className="mt-2">
-            <Field label="Other (comma-separated)">
-              <input name="otherThemes" defaultValue={other.join(", ")} className={inputClass} />
-            </Field>
-          </div>
+          {added ? (
+            <FounderDiversityField value={v.diversityThemes ?? []} />
+          ) : (
+            <p className="text-sm text-black/65">
+              {v.diversityThemes?.length ? `Recorded: ${v.diversityThemes.join(", ")}. ` : "Not recorded yet. "}
+              Founder diversity is kept in one place, the deal&apos;s Details, so the team and members&apos; portfolios always agree.{" "}
+              {dealHref && (
+                <a href={dealHref} className="font-medium text-dxv-green underline">
+                  Edit it on the deal page
+                </a>
+              )}
+            </p>
+          )}
         </div>
       </Section>
 

@@ -652,8 +652,8 @@ describe("members' round board", () => {
       ],
       4,
     );
+    // Intake (Submitted, Eligibility Screen) isn't on the members' board.
     expect(cards.map((c) => [c.currentStage, c.column, c.phase])).toEqual([
-      ["SUBMITTED", "SUBMITTED", null],
       ["PARTNER_REVIEW", "PARTNER_REVIEW", null],
       ["PITCH_SELECTION", "PITCH_SELECTION", "pitch-selection"],
       ["PITCH_OUTCOME", "PITCH_OUTCOME", null],

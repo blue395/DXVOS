@@ -440,7 +440,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
         {/* ── Sidebar ── */}
         <div className="min-w-0 space-y-6">
-          <Card title="Details">
+          <Card title="Details" id="details">
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
               <ActionForm action={updateVenture.bind(null, v.id)} resetOnSuccess={false} className="mt-4 space-y-4">
@@ -449,6 +449,20 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               </ActionForm>
             </details>
             {v.description && <p className="mt-3 whitespace-pre-wrap text-sm text-black/75">{v.description}</p>}
+            <div className="mt-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-black/55">Founder diversity</p>
+              {v.founderDiversity.length ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {v.founderDiversity.map((t) => (
+                    <span key={t} className="rounded-full bg-dxv-yellow/50 px-2 py-0.5 text-xs text-dxv-green">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-0.5 text-xs text-black/50">Not recorded. Add it under Edit venture details (used by both portfolios).</p>
+              )}
+            </div>
             {v.founderEmail && (
               <p className="mt-3 text-sm">
                 <a href={`mailto:${v.founderEmail}`} className="text-dxv-green hover:underline">
