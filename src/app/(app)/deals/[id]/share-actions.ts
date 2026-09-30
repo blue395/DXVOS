@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ANGEL_DOC_PHASE_LABELS } from "@/lib/pipeline";
+import { ANGEL_DOC_PHASE_LABELS, type AngelDocVisibility } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 
 function revalidateRoom(ventureId: string) {
@@ -42,12 +42,12 @@ export async function setAngelSummary(ventureId: string, _prev: ActionResult, fo
   return { ok: true };
 }
 
-export async function setDocumentAngelVisibility(documentId: string, phase: "" | "POST_PITCH" | "COMMITMENTS"): Promise<ActionResult> {
+export async function setDocumentAngelVisibility(documentId: string, phase: "" | AngelDocVisibility): Promise<ActionResult> {
   const user = await requireAdmin();
-  const value = z.enum(["", "POST_PITCH", "COMMITMENTS"]).parse(phase) || null;
+  const value = z.enum(["", "POST_PITCH", "COMMITMENTS", "DUE_DILIGENCE"]).parse(phase) || null;
   const doc = await db.document.findUnique({ where: { id: documentId }, select: { ventureId: true, fileName: true, archivedAt: true, ddReportJob: { select: { id: true } } } });
   if (!doc || doc.archivedAt) return { error: "This document no longer exists." };
-  if (value && doc.ddReportJob) return { error: "AI-generated DD reports stay with the team." };
+  if (value && doc.ddReportJob) return { error: "AI-drafted DD reports stay with the team. Download it, review and edit it, then upload the final version: that can be shared." };
   await db.$transaction([
     db.document.update({ where: { id: documentId }, data: { angelVisibleFrom: value } }),
     db.dealShareLog.create({

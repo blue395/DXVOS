@@ -40,6 +40,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <NavLink href="/activity">Activity</NavLink>
           </nav>
           <div className="flex items-center gap-3 text-sm">
+            <Link href="/team" className="rounded px-2 py-1 text-white/80 transition hover:bg-white/10 hover:text-white" title="Team logins">
+              Team
+            </Link>
             <span className="hidden text-white/70 sm:inline">{user.name}</span>
             <SignOutButton action={logout} />
           </div>

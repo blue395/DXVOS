@@ -6,15 +6,18 @@ import { db } from "@/lib/db";
 import { loadDealRoom } from "@/lib/portal-deals";
 
 /** "Preview as a member": this deal exactly as certified members see it now. Admin only. */
-export default async function AngelViewPage({ params }: PageProps<"/deals/[id]/angel-view">) {
-  const { id } = await params;
-  const [deal, v] = await requireAdminWith(() => Promise.all([loadDealRoom(id, null), db.venture.findUnique({ where: { id }, select: { name: true } })]));
+export default async function AngelViewPage({ params, searchParams }: PageProps<"/deals/[id]/angel-view">) {
+  const [{ id }, { as }] = await Promise.all([params, searchParams]);
+  const asCommitted = as === "committed";
+  const [deal, v] = await requireAdminWith(() =>
+    Promise.all([loadDealRoom(id, null, { previewCommitted: asCommitted }), db.venture.findUnique({ where: { id }, select: { name: true } })]),
+  );
   if (!v) notFound();
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-dxv-yellow px-3 py-2 text-sm">
         <span>
-          <strong>Preview:</strong> {v.name} as certified members see it now.
+          <strong>Preview:</strong> {v.name} as {asCommitted ? "members who committed to invest" : "certified members"} see it now.
         </span>
         <Link href={`/deals/${id}#deal-room`} className="font-medium underline">
           Back to the deal

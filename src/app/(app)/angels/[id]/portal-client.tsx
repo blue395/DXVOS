@@ -7,12 +7,12 @@ import { useState, useTransition } from "react";
 import { buttonClass, Spinner } from "@/components/ui";
 import { actionErrorMessage } from "@/lib/stale-version";
 import { createAngelLink, setAngelAccess } from "../portal-actions";
+import { OneTimeLink } from "@/components/one-time-link";
 
 export function PortalLinkButton({ angelId, kind, label }: { angelId: string; kind: "INVITE" | "RESET"; label: string }) {
   const [pending, start] = useTransition();
   const [link, setLink] = useState<{ url: string; expires: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-2">
       <button
@@ -22,7 +22,6 @@ export function PortalLinkButton({ angelId, kind, label }: { angelId: string; ki
         onClick={() =>
           start(async () => {
             setError(null);
-            setCopied(false);
             try {
               const res = await createAngelLink(angelId, kind);
               if ("error" in res) setError(res.error);
@@ -46,26 +45,7 @@ export function PortalLinkButton({ angelId, kind, label }: { angelId: string; ki
           {error}
         </p>
       )}
-      {link && (
-        <div className="space-y-1.5 rounded-md border border-dxv-green/30 bg-dxv-green/[0.04] p-2 text-xs">
-          <p className="text-black/70">
-            Send this to them by WhatsApp or email. It works once, until {link.expires}, and is only shown now (make a new one if it&apos;s lost).
-          </p>
-          <div className="flex gap-2">
-            <input readOnly value={link.url} onFocus={(e) => e.target.select()} className="min-w-0 flex-1 rounded border border-black/15 bg-white px-2 py-1 font-mono" />
-            <button
-              type="button"
-              className={buttonClass("secondary")}
-              onClick={async () => {
-                await navigator.clipboard.writeText(link.url);
-                setCopied(true);
-              }}
-            >
-              {copied ? "✓ Copied" : "Copy"}
-            </button>
-          </div>
-        </div>
-      )}
+      {link && <OneTimeLink url={link.url} expires={link.expires} />}
     </div>
   );
 }

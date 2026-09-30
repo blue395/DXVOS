@@ -28,7 +28,8 @@ npm run db:seed                  # DEV ONLY: sample ventures + admin@dxv.local /
 npm run dev                      # http://localhost:3000
 ```
 
-Create a real admin (prints a generated password once):
+Create the first admin (prints a generated password once). After that, partners invite each other from the
+**Team** page (header, top right) with one-time links, so this script is only for bootstrapping:
 
 ```bash
 npm run admin:create -- anna@diversityxventures.com "Anna"
@@ -235,10 +236,39 @@ statement (and have finished onboarding):
   the post-pitch vote", and an EOI (interest + maximum ticket); Investment Commitments onwards → plus documents
   set "from Investment Commitments" (EOIs close after Investment Commitments). Earlier stages and declined deals:
   nothing, even if shared.
+- **Due diligence** (Blue, 2026-09-30): documents set "from Due Diligence: committed members only" open once the
+  deal reaches Due Diligence, and only to members who committed to it: their latest EOI says interested, or they
+  have a Final Investment ticket (`committedAngelIds()`; team-typed names count through confirmed aliases). They
+  appear in a *Due diligence* section of the deal room; the card counts who sees them, and **…as a committed
+  member** previews it. AI-drafted DD reports can't be shared: download, review, then upload the final version.
 - **Votes** from the portal land in the deal's Pre-Selection votes and Commitments as the angel (linked by
   `angelId`); the latest per angel counts, as before.
 - **Never shown**: eligibility screens, AI drafts and working drafts, AI-generated DD reports, notes, other
   members' votes. Files are served by `/api/portal/documents/[id]`, which re-checks access on every request.
+
+## Team logins (`/team`)
+
+DXV's partners (Blue, Anna, Kevin) all have the same access (Blue, 2026-09-30): every deal, angel and document,
+the Playbook, approving statements, and the Team page itself. Brain chats stay private per person.
+- **Invite**: *Invite a partner* makes a one-time link (`/join/team/<token>`, 14 days, only its SHA-256 hash
+  stored in `TeamInvite`); they choose their own password and land on the Dashboard.
+- **Password reset** links work the same way (there's no email service yet).
+- **Revoke / restore**: a revoked login is signed out everywhere and kept on record. Nobody can revoke themselves
+  or the last active login (`teamRevokeBlock()` in `pipeline.ts`).
+- Every step is logged in `TeamEvent` (append-only) and shown as the page's access history.
+
+## Historical declined deals (`/deals/import`)
+
+From the Declined view, **Import past declined deals** reads a CSV of DXV's older deals (one row per company) in
+the browser: match the columns (shared `ColumnMapper`, remembered per header row), choose the stage and reason to
+assume when a row doesn't say, check the preview, import. Rules in `src/lib/deal-import.ts` (unit-tested):
+amounts like "£250k", UK dates, stages ("Pitched", "DD") and reasons ("valuation too high") are read from text;
+a reason that matches none is kept as the note under Other. `importHistoricalDeclinedVentures()` (in
+`ventures.ts`) adds them straight to Declined with their original dates, a stage history (received, then
+declined), and `Venture.importedAt` set ("Imported from past records" on the deal page). Unlike a live decline, no
+founder update is flagged as owed and no AI lesson is suggested. Companies already in DXV OS (ignoring case,
+punctuation and "Ltd") or repeated in the file are skipped, so it's safe to re-run. DXV Brain's deal list
+includes each decline's reason and dates, for questions like "why have we declined deals, by year?".
 
 ## DXV Brain (floating AI assistant, every page)
 

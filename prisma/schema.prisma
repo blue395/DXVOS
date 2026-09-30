@@ -72,6 +72,10 @@ model User {
   angelAliases            AngelAlias[]
   angelInvitesCreated     AngelInvite[]
   dealShareLogs           DealShareLog[]
+  teamInvitesCreated      TeamInvite[]         @relation("TeamInviteCreatedBy")
+  teamInvites             TeamInvite[]         @relation("TeamInviteUser")
+  teamEventsDone          TeamEvent[]          @relation("TeamEventActor")
+  teamEvents              TeamEvent[]          @relation("TeamEventSubject")
   complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
   complianceTextsApproved ComplianceText[]     @relation("ComplianceTextApprovedBy")
 }
@@ -131,6 +135,8 @@ model Venture {
   // Deal room: angels see nothing unless DXV shares the deal (and then by stage).
   sharedWithAngelsAt DateTime? // null = not shared
   angelSummary       String? // what angels read about the company (written by DXV for members)
+
+  importedAt DateTime? // added by the historical deals import (not entered live); dates are the original ones
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -902,6 +908,7 @@ model AngelEvent {
 enum AngelDocPhase {
   POST_PITCH // from the post-pitch vote (Pitch Outcome): with the deck and memo
   COMMITMENTS // from Investment Commitments: the rest of the applicable documents
+  DUE_DILIGENCE // from Due Diligence: only members who committed to invest in this deal
 }
 
 // Append-only: sharing and unsharing a deal with angels, and document visibility changes.
@@ -916,4 +923,41 @@ model DealShareLog {
   createdAt DateTime @default(now())
 
   @@index([ventureId, createdAt])
+}
+
+// ── Team logins ─────────────────────────────────────────────────────────────
+
+// One-time links for DXV team logins (partners): an invite (new login) or a password
+// reset. Like angels' links: only the token's SHA-256 hash is stored, 14 days, used once.
+model TeamInvite {
+  id          String     @id @default(cuid())
+  kind        InviteKind @default(INVITE)
+  email       String
+  name        String
+  userId      String? // RESET: whose password; INVITE: the login it created (once used)
+  user        User?      @relation("TeamInviteUser", fields: [userId], references: [id])
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdBy   User       @relation("TeamInviteCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Append-only: who gave, used, reset, revoked or restored team access.
+model TeamEvent {
+  id        String   @id @default(cuid())
+  subjectId String? // the team member (null for an invite not yet used)
+  subject   User?    @relation("TeamEventSubject", fields: [subjectId], references: [id])
+  email     String
+  kind      String // "invited", "joined", "reset-link", "password-reset", "access-revoked", "access-restored"
+  detail    String?
+  actorId   String
+  actor     User     @relation("TeamEventActor", fields: [actorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

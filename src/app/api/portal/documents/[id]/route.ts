@@ -13,7 +13,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/portal/documents
   const { id } = await ctx.params;
   const [angel, allowed, doc] = await Promise.all([
     db.angel.findUnique({ where: { id: user.angelId } }),
-    angelMayOpenDocument(id),
+    angelMayOpenDocument(id, user.angelId),
     db.document.findUnique({ where: { id }, select: { bucket: true, storagePath: true, fileName: true, mimeType: true } }),
   ]);
   if (!angel || !doc || !allowed || !(await angelHasDealAccess(angel))) return new Response("Not found", { status: 404 });

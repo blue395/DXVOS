@@ -5,7 +5,7 @@
 import { useState, useTransition } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Spinner } from "@/components/ui";
-import { ANGEL_DOC_PHASE_LABELS } from "@/lib/pipeline";
+import { ANGEL_DOC_PHASE_LABELS, type AngelDocVisibility } from "@/lib/pipeline";
 import { actionErrorMessage } from "@/lib/stale-version";
 import { setDealShared, setDocumentAngelVisibility } from "./share-actions";
 
@@ -30,7 +30,7 @@ export function ShareToggle({ ventureId, shared, name }: { ventureId: string; sh
   );
 }
 
-export function DocVisibilitySelect({ documentId, value, fileName }: { documentId: string; value: "" | "POST_PITCH" | "COMMITMENTS"; fileName: string }) {
+export function DocVisibilitySelect({ documentId, value, fileName }: { documentId: string; value: "" | AngelDocVisibility; fileName: string }) {
   const [pending, start] = useTransition();
   const [current, setCurrent] = useState(value);
   const [msg, setMsg] = useState<string | null>(null);
@@ -63,6 +63,7 @@ export function DocVisibilitySelect({ documentId, value, fileName }: { documentI
         <option value="">Hidden from members</option>
         <option value="POST_PITCH">{ANGEL_DOC_PHASE_LABELS.POST_PITCH}</option>
         <option value="COMMITMENTS">{ANGEL_DOC_PHASE_LABELS.COMMITMENTS}</option>
+        <option value="DUE_DILIGENCE">{ANGEL_DOC_PHASE_LABELS.DUE_DILIGENCE}</option>
       </select>
       {pending && <Spinner className="h-3 w-3" />}
       {msg && <span className={`text-xs ${msg.startsWith("✓") ? "text-dxv-green" : "rounded bg-dxv-yellow/30 px-1"}`}>{msg}</span>}
