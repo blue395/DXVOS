@@ -19,7 +19,8 @@ import { DomainError, moveVentureStage } from "@/lib/ventures";
 import { recordDeckDocument } from "@/lib/deck-documents";
 import type { ActionResult } from "@/lib/action-result";
 import type { EntrySnapshot } from "@/lib/audit";
-import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel } from "@/lib/pipeline";
+import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel, teamCardOneLiner } from "@/lib/pipeline";
+import { Prisma } from "@/generated/prisma/client";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { angelIdForName } from "@/lib/angels";
 import { founderDiversityFrom } from "@/components/founder-diversity-field";
@@ -86,6 +87,12 @@ const VentureSchema = z.object({
     .refine((n) => n === null || (Number.isInteger(n) && n > 0), "Choose a round")
     .optional(),
   description: optionalText,
+  oneLiner: z
+    .string()
+    .trim()
+    .max(200, "Keep the one-line description under 200 characters")
+    .transform((s) => (s === "" ? null : s))
+    .optional(),
 });
 
 export async function createVenture(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -470,5 +477,25 @@ export async function updateFounderComm(commId: string, _prev: ActionResult, for
     },
   });
   revalidateDeal(existing.ventureId);
+  return { ok: true };
+}
+
+/**
+ * Adopt the suggested one-liner (the AI screen's summary, else the first sentence of the
+ * internal description) as the deal's one-line description: a person decides, and from
+ * then on it's the line members see too. Worked out here, never taken from the page.
+ */
+export async function adoptSuggestedOneLiner(ventureId: string): Promise<ActionResult> {
+  await requireAdmin();
+  const [v, screen] = await Promise.all([
+    db.venture.findUnique({ where: { id: ventureId }, select: { oneLiner: true, description: true } }),
+    db.deckAnalysis.findFirst({ where: { ventureId, screen: { not: Prisma.AnyNull } }, orderBy: { createdAt: "desc" }, select: { screen: true } }),
+  ]);
+  if (!v) return { error: "Deal not found." };
+  if (v.oneLiner) return { ok: true };
+  const line = teamCardOneLiner({ oneLiner: null, aiSummary: (screen?.screen as { oneLineSummary?: string } | null)?.oneLineSummary, description: v.description });
+  if (!line) return { error: "There's nothing to suggest yet: write one under Edit venture details." };
+  await db.venture.update({ where: { id: ventureId }, data: { oneLiner: line.text.slice(0, 200) } });
+  revalidateDeal(ventureId);
   return { ok: true };
 }

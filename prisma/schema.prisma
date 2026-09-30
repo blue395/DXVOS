@@ -141,6 +141,11 @@ model Venture {
 
   importedAt DateTime? // added by the historical deals import (not entered live); dates are the original ones
 
+  // The deal's one-line description: written or confirmed by the team, and the ONE line both
+  // the team and members see (boards, deal pages, portfolios). Never filled by AI directly:
+  // the AI screen's summary is only offered as a suggestion.
+  oneLiner String?
+
   // Founder diversity themes (DXV's Playbook list; only what founders have stated). The single
   // source of truth: both portfolio views read it. Seeded from a memo's themes when one is
   // issued while this is empty; edited in the deal page's Details.

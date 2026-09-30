@@ -3,7 +3,7 @@ import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   boardHref,
-  cardOneLiner,
+  teamCardOneLiner,
   daysSince,
   deckCardState,
   dealWarnings,
@@ -39,6 +39,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
         select: {
           id: true,
           name: true,
+          oneLiner: true,
           sector: true,
           round: true,
           companyStage: true,
@@ -88,7 +89,11 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
     round: v.round,
     companyStage: v.companyStage,
     raiseAmountGbp: v.raiseAmountGbp,
-    oneLiner: cardOneLiner(aiSummary.get(v.id), v.description),
+    ...(() => {
+      // The deal's own one-liner (what members see too); else a suggestion for the team only.
+      const line = teamCardOneLiner({ oneLiner: v.oneLiner, aiSummary: aiSummary.get(v.id), description: v.description });
+      return { oneLiner: line?.text ?? null, oneLinerSuggested: line?.suggestion ?? false };
+    })(),
     deckDaysAgo: deckSince.get(v.id) ? daysSince(deckSince.get(v.id)!, now) : null,
     currentStage: v.currentStage,
     daysInStage: daysSince(v.stageEnteredAt, now),

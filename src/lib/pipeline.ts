@@ -832,14 +832,20 @@ export function teamRevokeBlock(actorId: string, targetId: string, activeTeamLog
 // ── Members' round board (Blue, 2026-09-30) ─────────────────────────────────
 
 /**
- * A members' board card's one-liner: from the summary DXV writes for members; failing
- * that, the memo's opening only once members can read the memo (an open deal, after the
- * pitch). Never the AI screen's summary or the internal description (the team card's).
+ * A deal's description on the team's cards. The deal's own one-liner (`Venture.oneLiner`,
+ * written or confirmed by the team) is the ONE line both the team and members see. Until
+ * there is one, the team (only) gets a suggestion: the AI screen's summary, else the first
+ * sentence of the internal description, marked as a suggestion. Members see nothing then.
  */
-export function memberCardOneLiner(v: { angelSummary: string | null; memoSummary: string | null; phase: AngelDealPhase | null }): string | null {
-  const fromSummary = cardOneLiner(null, v.angelSummary);
-  if (fromSummary) return fromSummary;
-  return v.phase && angelSeesMemo(v.phase) ? cardOneLiner(null, v.memoSummary) : null;
+export function teamCardOneLiner(v: {
+  oneLiner: string | null;
+  aiSummary?: string | null;
+  description?: string | null;
+}): { text: string; suggestion: boolean } | null {
+  const own = v.oneLiner?.trim();
+  if (own) return { text: own, suggestion: false };
+  const suggested = cardOneLiner(v.aiSummary, v.description);
+  return suggested ? { text: suggested, suggestion: true } : null;
 }
 
 /** The members' board columns: the team board's, without intake (Submitted, Eligibility Screen: members needn't see those; Blue, 2026-09-30). */
