@@ -5,6 +5,7 @@
 // Every step is logged in AngelEvent.
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { complianceReady } from "@/lib/compliance";
@@ -28,15 +29,8 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
     if (!ready.ready) return { error: "Approve the investor statements and member terms first (Angels → Statements & terms)." };
     if (!angel.email) return { error: "Add their email first: it becomes their login." };
     if (angel.user) return { error: "They already have a login. Use a password reset link instead." };
-    const clash = await db.user.findUnique({ where: { email: angel.email }, select: { role: true } });
-    if (clash) {
-      return {
-        error:
-          clash.role === "ADMIN"
-            ? "That email is a DXV team login. Use Link to a team login below: one login for the team app and their member portal."
-            : "That email already has a portal login.",
-      };
-    }
+    const clash = await loginClash(angel.email, "Use Link to a team login below: one login for the team app and their member portal.");
+    if (clash) return { error: clash };
   } else {
     if (!angel.user) return { error: "They haven't signed up yet. Send an invite link instead." };
     if (angel.user.role === "ADMIN") return { error: "They sign in with their team login: make a password reset link on the Team page." };
@@ -54,6 +48,49 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
   ]);
   revalidatePath(`/angels/${angelId}`);
   return { ok: true, link: `${await requestOrigin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
+}
+
+/** Why this email can't be given a new portal login (null: it can). */
+async function loginClash(email: string, teamHint: string): Promise<string | null> {
+  const clash = await db.user.findUnique({ where: { email }, select: { role: true } });
+  if (!clash) return null;
+  return clash.role === "ADMIN" ? `That email is a DXV team login. ${teamHint}` : "That email already has a portal login.";
+}
+
+export type NewInviteResult = { error: string; existingAngelId?: string } | { ok: true; angelId: string; link: string; expiresAt: string };
+
+const NewInviteSchema = z.object({
+  name: z.string().trim().min(1, "Add their name").max(120),
+  email: z.string().trim().toLowerCase().pipe(z.email("That email isn't valid")),
+});
+
+/**
+ * Invite someone new in one step: adds them as a Prospect (onboarding makes them a Member)
+ * and returns their one-time sign-up link. Someone already in the directory is invited
+ * from their own page instead, so nobody gets two records.
+ */
+export async function inviteNewAngel(input: { name: string; email: string }): Promise<NewInviteResult> {
+  const admin = await requireAdmin();
+  const parsed = NewInviteSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  const { name, email } = parsed.data;
+  const [ready, existing] = await Promise.all([complianceReady(), db.angel.findUnique({ where: { email }, select: { id: true, name: true } })]);
+  if (!ready.ready) return { error: "Approve the investor statements and member terms first (Angels → Statements & terms)." };
+  if (existing) return { error: `${existing.name} is already in the directory with that email: invite them from their page.`, existingAngelId: existing.id };
+  const clash = await loginClash(email, "Partners get member access from the Member portal button in the team app.");
+  if (clash) return { error: clash };
+
+  const { token, tokenHash } = newInviteToken();
+  const expiresAt = new Date(Date.now() + INVITE_DAYS * 86_400_000);
+  const angel = await db.$transaction(async (tx) => {
+    const a = await tx.angel.create({ data: { name, email, status: "PROSPECT", source: "Invited", createdById: admin.id } });
+    await tx.angelInvite.create({ data: { angelId: a.id, kind: "INVITE", tokenHash, expiresAt, createdById: admin.id } });
+    await tx.angelEvent.create({ data: { angelId: a.id, kind: "invited", detail: `Link valid for ${INVITE_DAYS} days`, actorId: admin.id } });
+    return a;
+  });
+  revalidatePath("/angels");
+  revalidatePath("/");
+  return { ok: true, angelId: angel.id, link: `${await requestOrigin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
 }
 
 /** Switch off an angel's login (they're treated as signed out everywhere). Kept, not deleted. */

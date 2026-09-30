@@ -206,6 +206,8 @@ DXV's members and prospects (spec §8), admin-only for now.
 
 Syndicate members get their own login and a separate, minimal portal. Nothing from the team's app is visible to
 them; deals appear only when DXV shares one (next build: the deal room, with stage-based documents).
+- **Invite someone new**: **Angels → Invite an angel** takes a name and email, adds them as a Prospect and gives the
+  one-time sign-up link in one step (`inviteNewAngel()`); someone already in the directory is sent to their own page.
 - **Invite**: on an angel's page, **Portal access → Create invite link** makes a one-time link (14 days) to send by
   WhatsApp or email. Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
