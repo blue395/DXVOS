@@ -14,7 +14,6 @@ import {
   latestCertification,
   nextOnboardingStep,
   portfolioSummary,
-  reliefHoldingEnds,
   stageLabel,
 } from "@/lib/pipeline";
 import { loadPortfolio, type PortfolioRow } from "@/lib/portfolio";
@@ -101,31 +100,29 @@ export default async function PortfolioPage() {
           )}
 
           {counted.length > 0 && (
-            // Wider than the portal's reading column so every column fits.
-            <div className="relative left-1/2 w-screen -translate-x-1/2 px-4">
-              <div className="mx-auto max-w-6xl overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
-                <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="bg-dxv-green text-xs uppercase tracking-wide text-white/85">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">Company</th>
-                      <th className="px-3 py-2 font-medium">Invested</th>
-                      <th className="px-3 py-2 font-medium">Round</th>
-                      <th className="px-3 py-2 text-right font-medium">Amount</th>
-                      <th className="px-3 py-2 text-right font-medium">Shares</th>
-                      <th className="px-3 py-2 text-right font-medium">Value today</th>
-                      <th className="px-3 py-2 text-right font-medium">Multiple</th>
-                      <th className="px-3 py-2 font-medium">S/EIS</th>
-                      <th className="px-3 py-2 font-medium">Share cert</th>
-                      <th className="px-3 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/10">
-                    {counted.map((r) => (
-                      <HoldingRow key={r.key} r={r} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            // Same width as the boxes above and below; scrolls sideways only on narrow screens.
+            <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
+              <table className="w-full min-w-[820px] text-left text-sm">
+                <thead className="bg-dxv-green text-xs uppercase tracking-wide text-white/85">
+                  <tr>
+                    <th className="w-[28%] px-3 py-2 font-medium">Company</th>
+                    <th className="px-3 py-2 font-medium">Invested</th>
+                    <th className="px-3 py-2 font-medium">Round</th>
+                    <th className="px-3 py-2 text-right font-medium">Amount</th>
+                    <th className="px-3 py-2 text-right font-medium">Shares</th>
+                    <th className="px-3 py-2 text-right font-medium">Value today</th>
+                    <th className="px-3 py-2 text-right font-medium">Multiple</th>
+                    <th className="px-3 py-2 font-medium">S/EIS</th>
+                    <th className="px-3 py-2 font-medium">Share cert</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/10">
+                  {counted.map((r) => (
+                    <HoldingRow key={r.key} r={r} />
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
@@ -198,7 +195,6 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
           <>
             {r.taxScheme}
             <span className="block text-xs text-black/55">{r.taxCertificateReceived ? "✓ certificate" : r.dxvCertificatesStage ? "Certificates being issued" : "Certificate awaited"}</span>
-            {r.status === "ACTIVE" && r.investedOn && <span className="block text-xs text-black/55">Hold until {formatDate(reliefHoldingEnds(r.investedOn))}</span>}
           </>
         ) : (
           (r.taxScheme === "NONE" ? "None" : "–")
