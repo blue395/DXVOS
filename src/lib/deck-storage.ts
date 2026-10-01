@@ -8,7 +8,7 @@
 // Used by both the Next.js server and the Netlify background worker, so no
 // Next-only imports here. Never import this from client components: it reads secrets.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const DECK_BUCKET = "decks";
@@ -121,4 +121,15 @@ export async function uploadObject(bucket: string, storagePath: string, bytes: B
     return;
   }
   await saveLocalObject(bucket, storagePath, bytes);
+}
+
+/** Remove a stored file (used when an angel's personal details are erased). A file that's already gone is fine. */
+export async function removeObject(bucket: string, storagePath: string): Promise<void> {
+  const sb = supabase();
+  if (sb) {
+    const { error } = await sb.storage.from(bucket).remove([storagePath]);
+    if (error) throw new Error(`Couldn't remove the file: ${error.message}`);
+    return;
+  }
+  await rm(localFile(bucket, storagePath), { force: true });
 }

@@ -84,7 +84,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 pt-6 pb-24">{children}</main>
       <JobTray />
       <BrainPanel />
       <StaleVersionBanner />

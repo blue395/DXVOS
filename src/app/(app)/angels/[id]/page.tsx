@@ -16,10 +16,13 @@ import {
   PORTAL_STATE_LABELS,
   portalState,
   usesWelcomeEmail,
+  angelDeleteMode,
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
 import { complianceReady } from "@/lib/compliance";
 import { mailConfigured } from "@/lib/mail";
+import { angelHistory } from "@/lib/angel-erasure";
+import { DeleteAngelForm } from "./delete-angel";
 import { AccessButton, LinkTeamLogin, PortalLinkButton } from "./portal-client";
 import { AngelFields } from "../angel-fields";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
@@ -29,7 +32,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
   const { id } = await params;
   const venture = { select: { id: true, name: true, currentStage: true } } as const;
 
-  const [angel, eois, preVotes, finals, ready, unlinkedTeam] = await requireAdminWith(() =>
+  const [angel, eois, preVotes, finals, ready, unlinkedTeam, history] = await requireAdminWith(() =>
     Promise.all([
       db.angel.findUnique({
         where: { id },
@@ -53,6 +56,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
       complianceReady(),
       // Partners' team logins not yet linked to an angel record (one login for team and member portal).
       db.user.findMany({ where: { role: "ADMIN", angelId: null, disabledAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
+      angelHistory(id),
     ]),
   );
   const canEmail = mailConfigured();
@@ -82,7 +86,11 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold text-dxv-green">
             {angel.name}
             <AngelStatusBadge status={angel.status} />
-            {angel.archivedAt && <span className="rounded-full bg-black px-2 py-0.5 text-[11px] font-medium text-white">Archived</span>}
+            {angel.erasedAt ? (
+              <span className="rounded-full bg-black px-2 py-0.5 text-[11px] font-medium text-white">Personal details erased {formatDate(angel.erasedAt)}</span>
+            ) : (
+              angel.archivedAt && <span className="rounded-full bg-black px-2 py-0.5 text-[11px] font-medium text-white">Archived</span>
+            )}
           </h1>
           <p className="text-sm text-black/60">
             {[angel.email, angel.phone, angel.location].filter(Boolean).join(" · ") || "No contact details yet"}
@@ -316,6 +324,21 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
           </Card>
         </div>
       </div>
+      {!angel.erasedAt && (
+        <Card title="Delete angel" collapse={{ open: false }}>
+          {history.teamLogin ? (
+            <p className="text-sm text-black/70">
+              This record is linked to a DXV team login, so it can&apos;t be deleted here. Revoke the team login on the{" "}
+              <Link href="/team" className="font-medium text-dxv-green underline">
+                Team page
+              </Link>{" "}
+              first, or archive the record instead.
+            </p>
+          ) : (
+            <DeleteAngelForm angelId={angel.id} name={angel.name} mode={angelDeleteMode(history)} />
+          )}
+        </Card>
+      )}
     </div>
   );
 }

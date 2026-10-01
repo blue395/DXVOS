@@ -130,6 +130,8 @@ const EVENT_LABELS: Record<string, string> = {
   "sign-in-disconnected": "disconnected a sign-in account",
   "signed-in-with-provider": "signed in with Google or Microsoft",
   "login-email-changed": "changed their login email",
+  "angel-removed": "removed an angel record with no history",
+  "angel-erased": "erased an angel's personal details",
   "sign-in-link-sent": "asked for an emailed sign-in link",
   "reset-link-emailed": "asked for an emailed password reset link",
   "signed-in-by-link": "signed in with an emailed link",

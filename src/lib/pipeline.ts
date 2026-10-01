@@ -370,6 +370,35 @@ export function dashboardMetrics(
   };
 }
 
+// ── Dashboard bands (Blue, 2026-10-01) ──────────────────────────────────────
+
+/** The stages each dashboard band counts, in board order. */
+export const DASHBOARD_BANDS = {
+  pipeline: ["SUBMITTED", "ELIGIBILITY_SCREEN", "PARTNER_REVIEW"],
+  syndicate: ["PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT_COMMITMENTS"],
+  dd: ["DUE_DILIGENCE"],
+} as const satisfies Record<string, readonly Stage[]>;
+
+export type DashboardBand = { total: number; stages: { key: Stage; label: string; count: number }[] };
+
+/** Deals per band and per stage (as the board counts them), plus declined deals. Invested deals are in the Investments row. */
+export function dashboardBands(stages: Stage[]): Record<keyof typeof DASHBOARD_BANDS, DashboardBand> & { declined: number } {
+  const counts = dealsByStage(stages);
+  const band = (keys: readonly Stage[]): DashboardBand => {
+    const rows = keys.map((k) => {
+      const c = counts.find((s) => s.key === k);
+      return { key: k, label: c?.label ?? stageLabel(k), count: c?.count ?? 0 };
+    });
+    return { total: rows.reduce((n, r) => n + r.count, 0), stages: rows };
+  };
+  return {
+    pipeline: band(DASHBOARD_BANDS.pipeline),
+    syndicate: band(DASHBOARD_BANDS.syndicate),
+    dd: band(DASHBOARD_BANDS.dd),
+    declined: counts.find((s) => s.key === "PASSED")?.count ?? 0,
+  };
+}
+
 // ── Board presentation rules ────────────────────────────────────────────────
 
 /** Broad phases the board colours columns by (brand tints, not extra colours). */
@@ -726,6 +755,34 @@ export type LoginLinkState = "ok" | "used" | "expired";
 export function loginLinkState(link: { usedAt: Date | null; revokedAt: Date | null; expiresAt: Date }, now = new Date()): LoginLinkState {
   if (link.usedAt || link.revokedAt) return "used";
   return link.expiresAt <= now ? "expired" : "ok";
+}
+
+// ── Deleting an angel (Blue, 2026-10-01: "smart delete") ─────────────────────
+
+/** What erased angels are called wherever their votes and investments still count. */
+export const ERASED_ANGEL_NAME = "Deleted angel";
+
+export type AngelHistory = { login: boolean; votes: number; investments: number; certifications: number; holdings: number; aliases: number; emails: number };
+
+/**
+ * A record with no history (a duplicate, a test, someone never invited further) is removed
+ * outright; anything else keeps its place in deal totals and statement records but has its
+ * personal details erased.
+ */
+export function angelDeleteMode(h: AngelHistory): "remove" | "erase" {
+  return h.login || h.votes + h.investments + h.certifications + h.holdings + h.aliases + h.emails > 0 ? "erase" : "remove";
+}
+
+/** The person's typed name must match the record (any case, spacing) before a delete goes ahead. */
+export const deleteConfirmed = (recordName: string, typed: string) => normaliseAngelName(recordName) === normaliseAngelName(typed) && typed.trim() !== "";
+
+/** An audit snapshot of a vote or ticket with the angel's name and free-text note taken out. */
+export function scrubAuditSnapshot(snapshot: unknown): unknown {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return snapshot;
+  const copy: Record<string, unknown> = { ...(snapshot as Record<string, unknown>) };
+  if ("angelName" in copy) copy.angelName = ERASED_ANGEL_NAME;
+  if ("note" in copy) copy.note = null;
+  return copy;
 }
 
 // ── Emails to angels (Blue, 2026-10-01) ─────────────────────────────────────

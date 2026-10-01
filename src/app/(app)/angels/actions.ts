@@ -8,13 +8,14 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { deleteAngelRecord } from "@/lib/angel-erasure";
 import { z } from "zod";
 import { AngelStatus, CertificationType } from "@/generated/prisma/enums";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createUploadTargetIn, objectExists, objectPath, type UploadTarget } from "@/lib/deck-storage";
 import { checkUpload, DOCUMENTS_BUCKET } from "@/lib/documents";
-import { certificationExpiry, normaliseAngelName, parseList } from "@/lib/pipeline";
+import { certificationExpiry, deleteConfirmed, normaliseAngelName, parseList } from "@/lib/pipeline";
 import type { ImportRow } from "@/lib/angel-import";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -477,4 +478,19 @@ export async function confirmAngelAliases(pairs: { typedName: string; angelId: s
   revalidateAngels();
   revalidatePath("/angels/link");
   return { ok: true };
+}
+
+/**
+ * Delete an angel (Blue: smart delete). No history: removed outright. With history: their
+ * personal details are erased and deal records kept. The name must be typed to confirm.
+ */
+export async function deleteAngel(angelId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const me = await requireAdmin();
+  const angel = await db.angel.findUnique({ where: { id: angelId }, select: { name: true } });
+  if (!angel) return { error: "Angel not found." };
+  if (!deleteConfirmed(angel.name, String(formData.get("confirm") ?? ""))) return { error: `To confirm, type their name exactly: ${angel.name}` };
+  const r = await deleteAngelRecord(angelId, me);
+  if ("error" in r) return { error: r.error };
+  revalidateAngels(angelId);
+  redirect(`/angels?deleted=${r.mode}`);
 }
