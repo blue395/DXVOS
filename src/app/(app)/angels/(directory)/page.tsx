@@ -147,12 +147,12 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
             <tr>
               <th className="px-3 py-2 font-medium">Angel</th>
               <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Sectors</th>
+              <th className="hidden px-3 py-2 font-medium md:table-cell">Sectors</th>
               <th className="px-3 py-2 font-medium">Certification</th>
-              <th className="px-3 py-2 text-right font-medium" title="Latest EOI per deal, where interested">
+              <th className="hidden px-3 py-2 text-right font-medium md:table-cell" title="Latest EOI per deal, where interested">
                 Committed
               </th>
-              <th className="px-3 py-2 text-right font-medium" title="Paid final investment tickets">
+              <th className="hidden px-3 py-2 text-right font-medium md:table-cell" title="Paid final investment tickets">
                 Invested
               </th>
             </tr>
@@ -175,14 +175,14 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
                   <AngelStatusBadge status={r.status} />
                   {r.joinedAt && r.status === "MEMBER" && <span className="block text-[11px] text-black/45">since {formatDate(r.joinedAt)}</span>}
                 </td>
-                <td className="max-w-56 px-3 py-2 align-top">
+                <td className="hidden max-w-56 px-3 py-2 align-top md:table-cell">
                   <Chips items={r.sectors} />
                 </td>
                 <td className="px-3 py-2 align-top">
                   <CertBadge state={r.certState} expiresOn={r.cert?.expiresOn} member={r.status === "MEMBER"} />
                 </td>
-                <td className="px-3 py-2 text-right align-top font-mono text-xs tabular-nums">{r.committedGbp ? formatGbpCompact(r.committedGbp) : "–"}</td>
-                <td className="px-3 py-2 text-right align-top font-mono text-xs font-semibold tabular-nums text-dxv-green">
+                <td className="hidden px-3 py-2 text-right align-top font-mono text-xs tabular-nums md:table-cell">{r.committedGbp ? formatGbpCompact(r.committedGbp) : "–"}</td>
+                <td className="hidden px-3 py-2 text-right align-top font-mono text-xs font-semibold tabular-nums text-dxv-green md:table-cell">
                   {r.investedGbp ? formatGbpCompact(r.investedGbp) : "–"}
                 </td>
               </tr>

@@ -185,10 +185,12 @@ export function BrainPanel() {
         type="button"
         onClick={() => setOpen(true)}
         title="Ask the DXV Brain (Ctrl+J)"
-        className="fixed right-4 bottom-4 z-[60] flex items-center gap-2 rounded-full bg-dxv-green py-2.5 pr-4 pl-3 text-sm font-semibold text-white shadow-lg ring-2 ring-dxv-yellow/70 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 print:hidden"
+        aria-label="Ask the DXV Brain"
+        className="fixed right-4 bottom-4 z-[60] flex items-center gap-2 rounded-full bg-dxv-green p-2.5 text-sm font-semibold text-white shadow-lg ring-2 ring-dxv-yellow/70 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 sm:py-2.5 sm:pr-4 sm:pl-3 print:hidden"
       >
         <BrainIcon />
-        DXV Brain
+        {/* Phones: just the round icon, so it covers less of the page. */}
+        <span className="hidden sm:inline">DXV Brain</span>
         {answering && <Spinner className="h-3 w-3 text-dxv-yellow" />}
       </button>
     );
