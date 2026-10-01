@@ -212,6 +212,10 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
   angels@diversityx.vc (or *Create invite link to copy instead*, to send by WhatsApp). Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
+- **Google / Microsoft sign-in** (everyone): *Continue with Google / Microsoft* on the sign-in and invite pages,
+  and *Connect* on My profile (members) or Your account (team: click your name). Only existing logins and
+  invitees; a connected account's verified email can become their DXV email (the old address is told). Set up
+  in `docs/DEPLOY.md` §10.
 - **Forgot password / sign-in links** (everyone, team and members): the sign-in page's *Forgot your password?*
   and *Email me a sign-in link* email a one-time link from angels@diversityx.vc (reset: 30 minutes; magic
   sign-in: 15 minutes). The page never says whether an email has a login. Set up in `docs/DEPLOY.md` §9; until

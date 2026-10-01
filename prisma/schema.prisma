@@ -28,17 +28,18 @@ enum Role {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
+  id           String          @id @default(cuid())
+  email        String          @unique
   name         String
   passwordHash String
-  role         Role        @default(ADMIN)
-  createdAt    DateTime    @default(now())
-  angelId      String?     @unique // ANGEL users: their Angel record
-  angel        Angel?      @relation("AngelUser", fields: [angelId], references: [id])
+  role         Role            @default(ADMIN)
+  createdAt    DateTime        @default(now())
+  angelId      String?         @unique // ANGEL users: their Angel record
+  angel        Angel?          @relation("AngelUser", fields: [angelId], references: [id])
   disabledAt   DateTime? // access revoked: treated as signed out everywhere
   lastSignInAt DateTime?
   loginLinks   LoginLink[]
+  identities   LoginIdentity[]
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -1128,4 +1129,29 @@ model LoginLink {
   createdAt   DateTime      @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ── Google / Microsoft sign-in ─────────────────────────────────────────────
+// A Google or Microsoft account connected to a DXV login. Matched by the provider's stable
+// id for the person (OIDC "sub"), never by email alone. Disconnecting sets removedAt (kept).
+enum OAuthProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+model LoginIdentity {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  provider      OAuthProvider
+  subject       String // the provider's id for this person
+  email         String? // the account's email when last used
+  emailVerified Boolean       @default(false) // the provider vouches for the email
+  emailChoiceAt DateTime? // they chose to switch to this email, or keep their DXV one
+  createdAt     DateTime      @default(now())
+  lastUsedAt    DateTime?
+  removedAt     DateTime?
+
+  @@unique([provider, subject])
+  @@index([userId])
 }

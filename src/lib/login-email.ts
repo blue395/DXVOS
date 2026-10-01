@@ -78,3 +78,15 @@ export function sentLinkEmail(kind: TeamSentLinkKind, opts: { name: string; link
     small: `${until} If you weren't expecting this, you can ignore this email.`,
   });
 }
+
+/** Sent to the OLD address when someone switches their DXV email, so a hijack wouldn't go unnoticed. */
+export function emailChangedEmail(opts: { name: string; oldEmail: string; newEmail: string; via: string; signInUrl: string }) {
+  return linkEmail({
+    subject: "Your DXV email has changed",
+    name: opts.name,
+    lead: `Your DXV OS login email was changed from ${opts.oldEmail} to ${opts.newEmail}, using your connected ${opts.via} account. From now on, sign in with ${opts.newEmail}.`,
+    action: "Sign in to DXV",
+    link: opts.signInUrl,
+    small: "If this wasn't you, reply to this email straight away and the DXV team will lock the account.",
+  });
+}

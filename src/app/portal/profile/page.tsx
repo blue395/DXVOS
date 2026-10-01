@@ -2,13 +2,15 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { OnboardingStepper } from "@/components/portal/stepper";
 import { Field, inputClass } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
+import { EmailSwitchOffer, SignInMethods, loadSignInMethods } from "@/components/sign-in-methods";
 import { ANGEL_TAG_SUGGESTIONS, EXPERIENCE_LEVELS, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
 import { updateMyProfile } from "../actions";
 
 export const metadata = { title: "Your details · DXV Members" };
 
-export default async function ProfilePage() {
-  const { angel } = await requireAngel();
+export default async function ProfilePage({ searchParams }: PageProps<"/portal/profile">) {
+  const [{ user, angel }, sp] = await Promise.all([requireAngel(), searchParams]);
+  const identities = await loadSignInMethods(user.id);
   const onboarding = !angel.profileConfirmedAt;
   // Someone DXV already knows: "is this you?"; someone new: questions.
   const known = !!(angel.phone || angel.location || angel.sectors.length || angel.source);
@@ -19,6 +21,7 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-4">
       {onboarding && <OnboardingStepper current="profile" />}
+      <EmailSwitchOffer email={user.email} identities={identities} />
       <div>
         <h1 className="text-2xl font-semibold text-dxv-green">{onboarding ? (known ? "Is this you? Check your details" : "Tell us about yourself") : "Your details"}</h1>
         <p className="text-sm text-black/60">
@@ -32,7 +35,7 @@ export default async function ProfilePage() {
           <Field label="Full name">
             <input name="name" required defaultValue={angel.name} autoComplete="name" className={inputClass} />
           </Field>
-          <Field label="Email" hint="Your login. To change it, contact the DXV team.">
+          <Field label="Email" hint="Your login. To change it, connect a Google or Microsoft account below, or ask the DXV team.">
             <input value={angel.email ?? ""} readOnly className={`${inputClass} bg-black/[0.03]`} />
           </Field>
           <Field label="Mobile">
@@ -106,6 +109,7 @@ export default async function ProfilePage() {
 
         <SubmitButton pendingLabel="Saving…">{onboarding ? "Save and continue" : "Save"}</SubmitButton>
       </ActionForm>
+      <SignInMethods email={user.email} identities={identities} returnTo="/portal/profile" connectStatus={typeof sp.connect === "string" ? sp.connect : undefined} />
     </div>
   );
 }

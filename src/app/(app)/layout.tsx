@@ -49,7 +49,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <Link href="/team" className="rounded px-2 py-1 text-white/80 transition hover:bg-white/10 hover:text-white" title="Team logins">
               Team
             </Link>
-            <span className="hidden text-white/70 sm:inline">{user.name}</span>
+            <Link href="/account" className="hidden rounded px-2 py-1 text-white/70 transition hover:bg-white/10 hover:text-white sm:inline" title="Your account and sign-in methods">
+              {user.name}
+            </Link>
             <SignOutButton action={logout} />
           </div>
         </div>
