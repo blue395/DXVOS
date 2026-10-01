@@ -66,9 +66,9 @@ export default async function DashboardPage() {
       </Link>
 
       {/* 2-4. Where live deals are, in the order they move. */}
-      <Band step={1} title="Pipeline" note="New deals being screened and reviewed by the partners" band={bands.pipeline} />
-      <Band step={2} title="Syndicate decision" note="With members: pitch selection, investment votes and commitments" band={bands.syndicate} />
-      <Band step={3} title="In DD" note="Due diligence before the final investment" band={bands.dd} />
+      <Band title="Pipeline" note="New deals being screened and reviewed by the partners" band={bands.pipeline} />
+      <Band title="Syndicate decision" note="With members: pitch selection, investment votes and commitments" band={bands.syndicate} />
+      <Band title="In DD" note="Due diligence before the final investment" band={bands.dd} />
 
       {/* 5. The people, and the deals kept for learning. */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
 /** One figure in the green investments band. */
 function HeroFigure({ label, value, note, divider }: { label: string; value: number | string; note: string; divider?: boolean }) {
   return (
-    <div className={`px-5 py-6 sm:px-8 sm:py-8 ${divider ? "border-l border-white/15" : ""}`}>
+    <div className={`flex flex-col items-center justify-center px-5 py-6 text-center sm:px-8 sm:py-8 ${divider ? "border-l border-white/15" : ""}`}>
       <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{label}</p>
       <p className="mt-2 text-4xl font-semibold tabular-nums text-dxv-yellow sm:text-6xl">{value}</p>
       <p className="mt-1 text-xs text-white/60">{note}</p>
@@ -146,25 +146,18 @@ function HeroFigure({ label, value, note, divider }: { label: string; value: num
 }
 
 /** A dealflow band: its total, then a tile per stage in the board's phase colours. */
-function Band({ step, title, note, band }: { step: number; title: string; note: string; band: DashboardBand }) {
+function Band({ title, note, band }: { title: string; note: string; band: DashboardBand }) {
   const single = band.stages.length === 1;
   return (
     <section className="rounded-xl border border-black/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dxv-yellow text-sm font-bold text-dxv-green" aria-hidden>
-            {step}
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold text-dxv-green">{title}</h2>
-            <p className="text-sm text-black/55">{note}</p>
-          </div>
-        </div>
-        <Link href="/deals" className="text-right" title={`${band.total} deals in ${title}`}>
-          <span className="block text-4xl font-semibold tabular-nums leading-none text-dxv-green">{band.total}</span>
-          <span className="text-xs text-black/50">{band.total === 1 ? "deal" : "deals"}</span>
-        </Link>
-      </div>
+      <Link href="/deals" className="group block" title={`${band.total} ${band.total === 1 ? "deal" : "deals"} in ${title}`}>
+        <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-lg font-semibold text-dxv-green group-hover:underline">{title}</span>
+          <span className="text-3xl font-semibold tabular-nums leading-none text-dxv-green">{band.total}</span>
+          <span className="text-sm text-black/50">{band.total === 1 ? "deal" : "deals"}</span>
+        </h2>
+        <p className="mt-1 text-sm text-black/55">{note}</p>
+      </Link>
       {!single && (
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {band.stages.map((s) => {
@@ -210,17 +203,17 @@ function Metric({
   return (
     <Link
       href={href}
-      className={`flex items-center justify-between gap-4 rounded-xl border px-5 py-5 transition hover:shadow-sm ${
+      className={`block rounded-xl border px-5 py-5 transition hover:shadow-sm ${
         muted ? "border-black/10 bg-black/[0.03] hover:border-black/30" : "border-black/10 bg-white hover:border-dxv-green/40"
       }`}
     >
-      <span>
-        <span className="block text-xs font-semibold uppercase tracking-widest text-black/55">{label}</span>
-        <span className="mt-1.5 block text-xs">
-          {alarm ? <span className="rounded-full bg-dxv-yellow px-2 py-0.5 font-semibold text-black ring-1 ring-black/20">! {note}</span> : <span className="text-black/50">{note}</span>}
-        </span>
+      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-xs font-semibold uppercase tracking-widest text-black/55">{label}</span>
+        <span className={`text-3xl font-semibold tabular-nums leading-none ${muted ? "text-black/70" : "text-dxv-green"}`}>{value}</span>
       </span>
-      <span className={`text-4xl font-semibold tabular-nums sm:text-5xl ${muted ? "text-black/70" : "text-dxv-green"}`}>{value}</span>
+      <span className="mt-2 block text-xs">
+        {alarm ? <span className="rounded-full bg-dxv-yellow px-2 py-0.5 font-semibold text-black ring-1 ring-black/20">! {note}</span> : <span className="text-black/50">{note}</span>}
+      </span>
     </Link>
   );
 }
