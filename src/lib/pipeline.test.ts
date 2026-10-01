@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MICROSOFT_PERSONAL_TENANT,
+  emailSwitchOffer,
+  microsoftVerifiedEmail,
   canSignIn,
   loginLinkState,
   angelDealPhase,
@@ -777,5 +780,23 @@ describe("self-service sign-in links", () => {
     expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: { archivedAt: null } })).toBe(true);
     expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: { archivedAt: now } })).toBe(false);
     expect(canSignIn({ role: "ANGEL", disabledAt: null, angel: null })).toBe(false);
+  });
+});
+
+describe("Google / Microsoft sign-in", () => {
+  it("trusts Microsoft emails only from personal accounts or domain-verified tokens", () => {
+    expect(microsoftVerifiedEmail({ tid: MICROSOFT_PERSONAL_TENANT, preferred_username: "Ada@Outlook.com" })).toBe("ada@outlook.com");
+    expect(microsoftVerifiedEmail({ tid: "some-company", email: "ceo@bank.com" })).toBeNull();
+    expect(microsoftVerifiedEmail({ tid: "some-company", email: "ada@firm.com", xms_edov: true })).toBe("ada@firm.com");
+    expect(microsoftVerifiedEmail({ tid: MICROSOFT_PERSONAL_TENANT })).toBeNull();
+  });
+  it("offers a connected account's verified email until they decide", () => {
+    const base = { emailVerified: true, emailChoiceAt: null, removedAt: null, createdAt: new Date("2026-10-01") };
+    const g = { ...base, email: "ada@gmail.com" };
+    expect(emailSwitchOffer("ada@firm.com", [g])).toBe(g);
+    expect(emailSwitchOffer("ADA@gmail.com", [g])).toBeNull(); // already their email
+    expect(emailSwitchOffer("ada@firm.com", [{ ...g, emailChoiceAt: new Date() }])).toBeNull();
+    expect(emailSwitchOffer("ada@firm.com", [{ ...g, emailVerified: false }])).toBeNull();
+    expect(emailSwitchOffer("ada@firm.com", [{ ...g, removedAt: new Date() }])).toBeNull();
   });
 });

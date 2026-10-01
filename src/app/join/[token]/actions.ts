@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { createSession } from "@/lib/session";
 import { MIN_PASSWORD_LENGTH } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
-import { findUsableInvite } from "./invite";
+import { createLoginFromInvite, findUsableInvite } from "./invite";
 
 const PasswordSchema = z
   .object({
@@ -35,37 +35,9 @@ export async function acceptInvite(token: string, _prev: ActionResult, formData:
 
   if (invite.kind === "INVITE") {
     if (parsed.data.terms !== "on") return { error: "Please read and accept the member terms to continue." };
-    if (!angel.email) return { error: "Your invite is missing an email address. Ask the DXV team for a new link." };
-    if (angel.user) return { error: "You already have a login. Sign in instead." };
-    const terms = await db.complianceText.findFirst({ where: { kind: "MEMBER_TERMS", status: "APPROVED" }, select: { id: true, version: true } });
-    if (!terms) return { error: "Sign-up is paused just now. Please try again later." };
-    const email = angel.email;
-    try {
-      userId = await db.$transaction(async (tx) => {
-        const claimed = await tx.angelInvite.updateMany({ where: { id: invite.id, usedAt: null, revokedAt: null }, data: { usedAt: new Date() } });
-        if (claimed.count !== 1) throw new Error("claimed");
-        const user = await tx.user.create({ data: { email, name: angel.name, passwordHash, role: "ANGEL", angelId: angel.id, lastSignInAt: new Date() } });
-        await tx.angel.update({
-          where: { id: angel.id },
-          data: {
-            termsAcceptedAt: new Date(),
-            termsVersionId: terms.id,
-            // Accepting an invite makes a prospect a member.
-            ...(angel.status === "PROSPECT" ? { status: "MEMBER" as const, joinedAt: angel.joinedAt ?? new Date() } : {}),
-          },
-        });
-        await tx.angelEvent.createMany({
-          data: [
-            { angelId: angel.id, kind: "joined", detail: `Set up their login${ip ? ` from ${ip}` : ""}`, actorId: user.id },
-            { angelId: angel.id, kind: "terms-accepted", detail: `Member terms version ${terms.version}`, actorId: user.id },
-          ],
-        });
-        return user.id;
-      });
-    } catch (e) {
-      if (e instanceof Error && e.message === "claimed") return { error: EXPIRED };
-      throw e;
-    }
+    const made = await createLoginFromInvite(invite, passwordHash, ip, "Set up their login");
+    if ("error" in made) return { error: made.error };
+    userId = made.userId;
   } else {
     if (!angel.user || angel.user.disabledAt) return { error: EXPIRED };
     const target = angel.user.id;

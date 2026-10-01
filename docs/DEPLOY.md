@@ -177,6 +177,61 @@ Limits: Google Workspace sends up to about 2,000 emails a day per account, far a
 To move to a dedicated email service later (e.g. Resend, Postmark), change the five `SMTP_`/`MAIL_`
 values to theirs: no code change.
 
+## 10. Google and Microsoft sign-in
+
+Adds **Continue with Google** / **Continue with Microsoft** to the sign-in page and the invite page,
+and **Connect Google / Microsoft** to My profile (members) and Your account (team, click your name in
+the header). Each provider switches on by itself once its two settings exist; `APP_URL` (§9) is
+needed too. Nobody can sign up this way: it only signs in people who already have a DXV login or an
+invite. Google accounts match a login by their verified email; Microsoft *personal* accounts
+(Outlook, Hotmail) likewise; Microsoft *work/school* accounts only once connected from My profile /
+Your account, because their email isn't guaranteed to be verified.
+
+### 10.1 Google
+
+1. Go to <https://console.cloud.google.com>, signed in as `angels@diversityx.vc` (so the setup belongs
+   to a shared DXV account). Top bar → project picker → **New project** → name `DXV OS` → **Create**,
+   and make sure it's selected.
+2. Menu → **Google Auth Platform** (search for it if needed) → **Get started**:
+   App name `DXV OS`; User support email `angels@diversityx.vc`; Audience **External** (so members'
+   own Gmail accounts work); Contact email `angels@diversityx.vc`; agree → **Create**.
+3. **Audience** → **Publish app** → confirm. (In "Testing", only listed test users could sign in.
+   DXV only asks for name and email, so Google doesn't need to review the app.)
+4. **Clients** → **Create client** → Application type **Web application**, name `DXV OS`.
+   Under **Authorised redirect URIs** → **Add URI** → `APP_URL` followed by
+   `/api/auth/callback/google`, e.g. `https://app.diversityxventures.com/api/auth/callback/google`
+   (exact: https, no trailing slash). **Create**.
+5. Copy the **Client ID** and **Client secret** straight into Netlify (§10.3). The secret is only shown
+   in full once (download the JSON if offered, and keep it somewhere safe).
+
+### 10.2 Microsoft (optional)
+
+Needs a Microsoft Entra directory. DXV uses Google Workspace, so if there's no Microsoft 365, create a
+free Azure account at <https://azure.microsoft.com/free> first (it asks for a card to check identity;
+registering an app is free). Skip this section to offer Google only.
+
+1. Go to <https://entra.microsoft.com> → **Applications** → **App registrations** → **New registration**.
+2. Name `DXV OS`. Supported account types: **Accounts in any organizational directory and personal
+   Microsoft accounts**. Redirect URI: platform **Web**, `APP_URL` followed by
+   `/api/auth/callback/microsoft`. **Register**.
+3. On the app's Overview, copy the **Application (client) ID**.
+4. **Certificates & secrets** → **Client secrets** → **New client secret** → description `DXV OS`,
+   expires **24 months** → **Add**. Copy the **Value** column (not the Secret ID) straight into
+   Netlify: it's only shown once. **Put the expiry date in the diary**: Microsoft sign-in stops working
+   on that date until you make a new secret and update Netlify.
+
+### 10.3 Netlify settings
+
+| Key | Value | Secret? |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | Google's Client ID (ends `.apps.googleusercontent.com`) | |
+| `GOOGLE_CLIENT_SECRET` | Google's Client secret | ☑ Yes |
+| `MICROSOFT_CLIENT_ID` | Microsoft's Application (client) ID | |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft's client secret **Value** | ☑ Yes |
+
+Redeploy, then test in a private window: sign in with Google using the email you sign in to DXV with.
+`OAUTH_DEV_SERVER` is for local testing only; never add it to Netlify (production ignores it anyway).
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.
@@ -199,6 +254,9 @@ values to theirs: no code change.
 | Upload fails with "Bucket not found" | The `decks` bucket wasn't created — see §5.4 |
 | Screen fails: "ANTHROPIC_API_KEY isn't set" | Add the key (§5.3) and redeploy |
 | Sign-in page has no "Forgot your password?" link | Email isn't set up: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` and `APP_URL` (or Netlify's `URL`) are all needed (§9) |
+| No "Continue with Google/Microsoft" buttons | That provider's two settings, or `APP_URL`, are missing; redeploy after adding them (§10) |
+| Google says "Error 400: redirect_uri_mismatch" | The redirect URI in Google (§10.1.4) doesn't exactly match `APP_URL` + `/api/auth/callback/google` |
+| "Google/Microsoft sign-in didn't work just now" | Check the function log: `invalid_client` means a wrong or expired client secret (Microsoft's expire, §10.2.4) |
 | "We couldn't send the email just now" | Check the function log: `Invalid login` / `535` means the app password is wrong or was revoked (§9.2) |
 | Screen fails: "Claude API error (401)" / "(403)" | Key wrong or revoked, or no billing set up on the Anthropic account |
 | Screen stays "Reading…" then times out | Check Netlify → Logs → Functions → `analyze-deck-background` for the error |

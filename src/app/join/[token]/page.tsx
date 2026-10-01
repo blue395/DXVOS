@@ -6,11 +6,13 @@ import { db } from "@/lib/db";
 import { MIN_PASSWORD_LENGTH } from "@/lib/pipeline";
 import { acceptInvite } from "./actions";
 import { findUsableInvite } from "./invite";
+import { JoinForm } from "./join-form";
+import { enabledProviders } from "@/lib/oauth";
 
 export const metadata = { title: "Join DXV", robots: { index: false } };
 
-export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
-  const { token } = await params;
+export default async function JoinPage({ params, searchParams }: PageProps<"/join/[token]">) {
+  const [{ token }, sp] = await Promise.all([params, searchParams]);
   const [invite, terms] = await Promise.all([
     findUsableInvite(token),
     db.complianceText.findFirst({ where: { kind: "MEMBER_TERMS", status: "APPROVED" } }),
@@ -43,31 +45,37 @@ export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
                   : "Diversity X Ventures invests in underestimated founders. First, set up your member login. Next you'll check your details and complete your investor statement, which takes about five minutes."}
               </p>
             </div>
-            <ActionForm action={acceptInvite.bind(null, token)} className="space-y-4" resetOnSuccess={false}>
-              <Field label="Your email (your login)">
-                <input value={invite.angel.email ?? ""} readOnly className={`${inputClass} bg-black/[0.03]`} />
-              </Field>
-              <Field label="Choose a password" hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}>
-                <input name="password" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} className={inputClass} />
-              </Field>
-              <Field label="Type it again">
-                <input name="confirm" type="password" autoComplete="new-password" required className={inputClass} />
-              </Field>
-              {!reset && terms && (
-                <div className="space-y-2">
-                  <div className="max-h-64 overflow-y-auto rounded-md border border-black/15 bg-black/[0.02] p-3 text-sm">
-                    <ComplianceTextView title={terms.title} body={terms.body} criteria={[]} />
-                  </div>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="terms" required className="mt-1" />
-                    <span>I have read and accept the DXV member terms and privacy notice.</span>
-                  </label>
-                </div>
-              )}
-              <SubmitButton pendingLabel="Setting up…" doneLabel="Done">
-                {reset ? "Save new password" : "Create my login"}
-              </SubmitButton>
-            </ActionForm>
+            {sp.signin === "taken" && (
+              <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-2 text-sm">
+                That account is already connected to another DXV login. Choose a different account, or set a password below.
+              </p>
+            )}
+            {reset ? (
+              <ActionForm action={acceptInvite.bind(null, token)} className="space-y-4" resetOnSuccess={false}>
+                <Field label="Your email (your login)">
+                  <input value={invite.angel.email ?? ""} readOnly autoComplete="username" className={`${inputClass} bg-black/[0.03]`} />
+                </Field>
+                <Field label="Choose a password" hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}>
+                  <input name="password" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} className={inputClass} />
+                </Field>
+                <Field label="Type it again">
+                  <input name="confirm" type="password" autoComplete="new-password" required className={inputClass} />
+                </Field>
+                <SubmitButton pendingLabel="Saving…" doneLabel="Done">
+                  Save new password
+                </SubmitButton>
+              </ActionForm>
+            ) : (
+              terms && (
+                <JoinForm
+                  token={token}
+                  email={invite.angel.email ?? ""}
+                  providers={enabledProviders()}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  terms={<ComplianceTextView title={terms.title} body={terms.body} criteria={[]} />}
+                />
+              )
+            )}
           </div>
         )}
       </div>

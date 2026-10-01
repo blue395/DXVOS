@@ -728,6 +728,39 @@ export function loginLinkState(link: { usedAt: Date | null; revokedAt: Date | nu
   return link.expiresAt <= now ? "expired" : "ok";
 }
 
+// ── Google / Microsoft sign-in ──────────────────────────────────────────────
+
+/** Microsoft's tenant for personal accounts (Outlook.com, Hotmail, Live): Microsoft verifies their email. */
+export const MICROSOFT_PERSONAL_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
+
+/**
+ * The email a Microsoft sign-in vouches for, if any. Work/school accounts can carry an email
+ * their organisation never verified (the "nOAuth" flaw), so only personal accounts, or a
+ * token marked domain-verified (`xms_edov`), count.
+ */
+export function microsoftVerifiedEmail(claims: { tid?: unknown; email?: unknown; preferred_username?: unknown; xms_edov?: unknown }): string | null {
+  const personal = claims.tid === MICROSOFT_PERSONAL_TENANT;
+  const email = typeof claims.email === "string" ? claims.email : personal && typeof claims.preferred_username === "string" ? claims.preferred_username : null;
+  if (!email || !email.includes("@")) return null;
+  return personal || claims.xms_edov === true || claims.xms_edov === "1" ? email.toLowerCase() : null;
+}
+
+/**
+ * The connected account whose email to offer as the person's DXV email: connected,
+ * provider-verified, different from the current email, and not yet decided on. Newest first.
+ */
+export function emailSwitchOffer<T extends { email: string | null; emailVerified: boolean; emailChoiceAt: Date | null; removedAt: Date | null; createdAt: Date }>(
+  currentEmail: string,
+  identities: T[],
+): T | null {
+  const current = currentEmail.trim().toLowerCase();
+  return (
+    identities
+      .filter((i) => !i.removedAt && !i.emailChoiceAt && i.emailVerified && i.email && i.email.toLowerCase() !== current)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
+  );
+}
+
 /** Whether a login may use self-service sign-in: not revoked, and an angel's record still active. */
 export function canSignIn(user: { role: string; disabledAt: Date | null; angel: { archivedAt: Date | null } | null }): boolean {
   if (user.disabledAt) return false;
