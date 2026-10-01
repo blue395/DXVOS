@@ -208,8 +208,8 @@ Syndicate members get their own login and a separate, minimal portal. Nothing fr
 them; deals appear only when DXV shares one (next build: the deal room, with stage-based documents).
 - **Invite someone new**: **Angels → Invite an angel** takes a name and email, adds them as a Prospect and gives the
   one-time sign-up link in one step (`inviteNewAngel()`); someone already in the directory is sent to their own page.
-- **Invite**: on an angel's page, **Portal access → Create invite link** makes a one-time link (14 days) to send by
-  WhatsApp or email. Only its hash is stored. The same card makes **password reset links**, revokes or restores
+- **Invite**: on an angel's page, **Portal access → Email invite** emails a one-time link (14 days) from
+  angels@diversityx.vc (or *Create invite link to copy instead*, to send by WhatsApp). Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
 - **Forgot password / sign-in links** (everyone, team and members): the sign-in page's *Forgot your password?*
@@ -296,9 +296,10 @@ Entries are archived, never deleted; who added or last edited each is shown.
 
 DXV's partners (Blue, Anna, Kevin) all have the same access (Blue, 2026-09-30): every deal, angel and document,
 the Playbook, approving statements, and the Team page itself. Brain chats stay private per person.
-- **Invite**: *Invite a partner* makes a one-time link (`/join/team/<token>`, 14 days, only its SHA-256 hash
+- **Invite**: *Invite a partner* emails (or gives you to copy) a one-time link (`/join/team/<token>`, 14 days, only its SHA-256 hash
   stored in `TeamInvite`); they choose their own password and land on the Dashboard.
-- **Password reset** links work the same way (there's no email service yet).
+- **Password reset** links work the same way (emailed or copied); everyone can also use *Forgot your password?*
+  on the sign-in page.
 - **Revoke / restore**: a revoked login is signed out everywhere and kept on record. Nobody can revoke themselves
   or the last active login (`teamRevokeBlock()` in `pipeline.ts`).
 - **Partners are angels too, with one login.** Inviting an email that already has a member login offers *Give

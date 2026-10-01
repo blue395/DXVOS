@@ -10,18 +10,18 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { complianceReady } from "@/lib/compliance";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
-import { requestOrigin } from "@/lib/request-origin";
+import { emailSentLink, linkOrigin, type EmailOutcome } from "@/lib/send-link";
 
-export type InviteLinkResult = { error: string } | { ok: true; link: string; expiresAt: string };
+export type InviteLinkResult = { error: string } | ({ ok: true; link: string; expiresAt: string } & EmailOutcome);
 
 /**
  * A new one-time link for this angel: an invite (first sign-up) or a password reset.
  * Any earlier unused link of the same kind stops working.
  */
-export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET"): Promise<InviteLinkResult> {
+export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET", send = false): Promise<InviteLinkResult> {
   const admin = await requireAdmin();
   const [angel, ready] = await Promise.all([
-    db.angel.findUnique({ where: { id: angelId }, include: { user: { select: { id: true, disabledAt: true, role: true } } } }),
+    db.angel.findUnique({ where: { id: angelId }, include: { user: { select: { id: true, email: true, disabledAt: true, role: true } } } }),
     complianceReady(),
   ]);
   if (!angel || angel.archivedAt) return { error: "Angel not found." };
@@ -46,8 +46,30 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET")
       data: { angelId, kind: kind === "INVITE" ? "invited" : "reset-link", detail: `Link valid for ${INVITE_DAYS} days`, actorId: admin.id },
     }),
   ]);
+  const link = `${await linkOrigin()}/join/${token}`;
+  // An invite goes to the angel's email (their future login); a reset to their login's email.
+  const to = kind === "INVITE" ? angel.email : angel.user?.email;
+  const emailed = send && to ? await emailAndLog(kind === "INVITE" ? "MEMBER_INVITE" : "RESET", to, angel, link, expiresAt, admin) : {};
   revalidatePath(`/angels/${angelId}`);
-  return { ok: true, link: `${await requestOrigin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
+  return { ok: true, link, expiresAt: expiresAt.toISOString(), ...emailed };
+}
+
+/** Email a link the team just made, and note it in the angel's activity when it goes. */
+async function emailAndLog(
+  kind: "MEMBER_INVITE" | "RESET",
+  to: string,
+  angel: { id: string; name: string },
+  link: string,
+  expiresAt: Date,
+  admin: { id: string; name: string },
+): Promise<EmailOutcome> {
+  const out = await emailSentLink(kind, to, { name: angel.name, link, expiresAt, sentBy: admin.name });
+  if (out.emailedTo) {
+    await db.angelEvent.create({
+      data: { angelId: angel.id, kind: "link-emailed", detail: `${kind === "RESET" ? "Password reset link" : "Invite"} emailed to ${to}`, actorId: admin.id },
+    });
+  }
+  return out;
 }
 
 /** Why this email can't be given a new portal login (null: it can). */
@@ -57,7 +79,7 @@ async function loginClash(email: string, teamHint: string): Promise<string | nul
   return clash.role === "ADMIN" ? `That email is a DXV team login. ${teamHint}` : "That email already has a portal login.";
 }
 
-export type NewInviteResult = { error: string; existingAngelId?: string } | { ok: true; angelId: string; link: string; expiresAt: string };
+export type NewInviteResult = { error: string; existingAngelId?: string } | ({ ok: true; angelId: string; link: string; expiresAt: string } & EmailOutcome);
 
 const NewInviteSchema = z.object({
   name: z.string().trim().min(1, "Add their name").max(120),
@@ -69,7 +91,7 @@ const NewInviteSchema = z.object({
  * and returns their one-time sign-up link. Someone already in the directory is invited
  * from their own page instead, so nobody gets two records.
  */
-export async function inviteNewAngel(input: { name: string; email: string }): Promise<NewInviteResult> {
+export async function inviteNewAngel(input: { name: string; email: string }, send = false): Promise<NewInviteResult> {
   const admin = await requireAdmin();
   const parsed = NewInviteSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -88,9 +110,11 @@ export async function inviteNewAngel(input: { name: string; email: string }): Pr
     await tx.angelEvent.create({ data: { angelId: a.id, kind: "invited", detail: `Link valid for ${INVITE_DAYS} days`, actorId: admin.id } });
     return a;
   });
+  const link = `${await linkOrigin()}/join/${token}`;
+  const emailed = send ? await emailAndLog("MEMBER_INVITE", email, angel, link, expiresAt, admin) : {};
   revalidatePath("/angels");
   revalidatePath("/");
-  return { ok: true, angelId: angel.id, link: `${await requestOrigin()}/join/${token}`, expiresAt: expiresAt.toISOString() };
+  return { ok: true, angelId: angel.id, link, expiresAt: expiresAt.toISOString(), ...emailed };
 }
 
 /** Switch off an angel's login (they're treated as signed out everywhere). Kept, not deleted. */

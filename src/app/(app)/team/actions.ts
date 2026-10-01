@@ -1,7 +1,7 @@
 "use server";
 
 // Team logins (DXV partners). Everyone on the team has the same access, including this
-// page. Logins are handed out as one-time links (no email service yet); access is
+// page. Logins are handed out as one-time links (emailed, or copied and sent by hand); access is
 // revoked, never deleted. Every step is logged in TeamEvent (append-only).
 
 import { revalidatePath } from "next/cache";
@@ -10,19 +10,24 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
 import { teamRevokeBlock } from "@/lib/pipeline";
-import { requestOrigin } from "@/lib/request-origin";
+import { emailSentLink, linkOrigin, type EmailOutcome } from "@/lib/send-link";
 import type { ActionResult } from "@/lib/action-result";
 
 export type TeamLinkResult =
   | { error: string; /** The email is a member (angel) login: offer to give that same login team access. */ memberLogin?: { userId: string; name: string } }
-  | { ok: true; link: string; expiresAt: string };
+  | ({ ok: true; link: string; expiresAt: string } & EmailOutcome);
 
 const InviteSchema = z.object({
   name: z.string().trim().min(2, "Enter their name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
 });
 
-async function newLink(data: { kind: "INVITE" | "RESET"; email: string; name: string; userId: string | null }, actorId: string): Promise<TeamLinkResult> {
+async function newLink(
+  data: { kind: "INVITE" | "RESET"; email: string; name: string; userId: string | null },
+  actor: { id: string; name: string },
+  send: boolean,
+): Promise<TeamLinkResult> {
+  const actorId = actor.id;
   const { token, tokenHash } = newInviteToken();
   const expiresAt = new Date(Date.now() + INVITE_DAYS * 86_400_000);
   await db.$transaction([
@@ -39,12 +44,22 @@ async function newLink(data: { kind: "INVITE" | "RESET"; email: string; name: st
       },
     }),
   ]);
+  const link = `${await linkOrigin()}/join/team/${token}`;
+  let emailed: EmailOutcome = {};
+  if (send) {
+    emailed = await emailSentLink(data.kind === "INVITE" ? "TEAM_INVITE" : "RESET", data.email, { name: data.name, link, expiresAt, sentBy: actor.name });
+    if (emailed.emailedTo) {
+      await db.teamEvent.create({
+        data: { subjectId: data.userId, email: data.email, kind: "link-emailed", detail: `${data.kind === "INVITE" ? "Invite" : "Password reset link"} emailed`, actorId },
+      });
+    }
+  }
   revalidatePath("/team");
-  return { ok: true, link: `${await requestOrigin()}/join/team/${token}`, expiresAt: expiresAt.toISOString() };
+  return { ok: true, link, expiresAt: expiresAt.toISOString(), ...emailed };
 }
 
 /** A one-time link for a new team login. */
-export async function inviteTeamMember(input: { name: string; email: string }): Promise<TeamLinkResult> {
+export async function inviteTeamMember(input: { name: string; email: string }, send = false): Promise<TeamLinkResult> {
   const admin = await requireAdmin();
   const parsed = InviteSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
@@ -62,7 +77,7 @@ export async function inviteTeamMember(input: { name: string; email: string }): 
         : "That email already has a team login. Use a password reset link if they're locked out.",
     };
   }
-  return newLink({ kind: "INVITE", ...parsed.data, userId: null }, admin.id);
+  return newLink({ kind: "INVITE", ...parsed.data, userId: null }, admin, send);
 }
 
 /**
@@ -85,13 +100,13 @@ export async function grantTeamAccess(userId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** A one-time link to set a new password (while there's no email service). */
-export async function teamResetLink(userId: string): Promise<TeamLinkResult> {
+/** A one-time link to set a new password (emailed, or copied). */
+export async function teamResetLink(userId: string, send = false): Promise<TeamLinkResult> {
   const admin = await requireAdmin();
   const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true, role: true, disabledAt: true } });
   if (!user || user.role !== "ADMIN") return { error: "Team member not found." };
   if (user.disabledAt) return { error: "Their access is revoked. Restore it first." };
-  return newLink({ kind: "RESET", email: user.email, name: user.name, userId: user.id }, admin.id);
+  return newLink({ kind: "RESET", email: user.email, name: user.name, userId: user.id }, admin, send);
 }
 
 /** Cancel an invite link that hasn't been used. */

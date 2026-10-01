@@ -9,12 +9,16 @@ import { buttonClass, Field, inputClass, Spinner } from "@/components/ui";
 import { actionErrorMessage } from "@/lib/stale-version";
 import { cancelTeamInvite, grantTeamAccess, inviteTeamMember, setTeamAccess, teamResetLink, type TeamLinkResult } from "./actions";
 
+type Made = { url: string; expires: string; emailedTo?: string; emailError?: string };
+
 function useLink() {
   const [pending, start] = useTransition();
-  const [link, setLink] = useState<{ url: string; expires: string } | null>(null);
+  const [link, setLink] = useState<Made | null>(null);
+  const [working, setWorking] = useState<"email" | "copy">("copy");
   const [error, setError] = useState<string | null>(null);
   const [memberLogin, setMemberLogin] = useState<{ userId: string; name: string } | null>(null);
-  const run = (fn: () => Promise<TeamLinkResult>) =>
+  const run = (fn: () => Promise<TeamLinkResult>, which: "email" | "copy" = "copy") => {
+    setWorking(which);
     start(async () => {
       setError(null);
       setLink(null);
@@ -25,15 +29,16 @@ function useLink() {
           setError(res.error);
           setMemberLogin(res.memberLogin ?? null);
         }
-        else setLink({ url: res.link, expires: shortDate(res.expiresAt) });
+        else setLink({ url: res.link, expires: shortDate(res.expiresAt), emailedTo: res.emailedTo, emailError: res.emailError });
       } catch (e) {
         setError(actionErrorMessage(e));
       }
     });
-  return { pending, link, error, run, memberLogin, setMemberLogin, setError };
+  };
+  return { pending, working, link, error, run, memberLogin, setMemberLogin, setError };
 }
 
-function Feedback({ error, link }: { error: string | null; link: { url: string; expires: string } | null }) {
+function Feedback({ error, link }: { error: string | null; link: Made | null }) {
   return (
     <>
       {error && (
@@ -41,13 +46,61 @@ function Feedback({ error, link }: { error: string | null; link: { url: string; 
           {error}
         </p>
       )}
-      {link && <OneTimeLink url={link.url} expires={link.expires} />}
+      {link && <OneTimeLink url={link.url} expires={link.expires} emailedTo={link.emailedTo} emailError={link.emailError} />}
     </>
   );
 }
 
-export function InviteForm() {
-  const { pending, link, error, run, memberLogin, setMemberLogin, setError } = useLink();
+/** Email + copy buttons for a link: the email one only when DXV OS can send email. */
+function LinkButtons({
+  canEmail,
+  pending,
+  working,
+  emailLabel,
+  copyLabel,
+  onEmail,
+  onCopy,
+  primary = true,
+}: {
+  canEmail: boolean;
+  pending: boolean;
+  working: "email" | "copy";
+  emailLabel: string;
+  copyLabel: string;
+  onEmail?: () => void;
+  onCopy?: () => void;
+  primary?: boolean;
+}) {
+  const label = (which: "email" | "copy", text: string) =>
+    pending && working === which ? (
+      <>
+        <Spinner /> {which === "email" ? "Sending…" : "Creating…"}
+      </>
+    ) : (
+      text
+    );
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {canEmail && (
+        <button type={onEmail ? "button" : "submit"} value="email" disabled={pending} className={buttonClass(primary ? "primary" : "secondary")} onClick={onEmail}>
+          {label("email", emailLabel)}
+        </button>
+      )}
+      <button
+        type={onCopy ? "button" : "submit"}
+        value="copy"
+        disabled={pending}
+        className={canEmail ? "rounded-md px-2 py-1.5 text-sm text-dxv-green underline hover:bg-dxv-green/5" : buttonClass(primary ? "primary" : "secondary")}
+        onClick={onCopy}
+      >
+        {label("copy", canEmail ? `${copyLabel} to copy instead` : copyLabel)}
+      </button>
+    </span>
+  );
+}
+
+export function InviteForm({ canEmail }: { canEmail: boolean }) {
+  const { pending, working, link, error, run, memberLogin, setMemberLogin, setError } = useLink();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   return (
@@ -55,7 +108,8 @@ export function InviteForm() {
       className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => inviteTeamMember({ name, email }));
+        const send = canEmail && (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "email";
+        run(() => inviteTeamMember({ name, email }, send), send ? "email" : "copy");
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
@@ -66,15 +120,7 @@ export function InviteForm() {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
         </Field>
       </div>
-      <button type="submit" disabled={pending} className={buttonClass()}>
-        {pending ? (
-          <>
-            <Spinner /> Creating…
-          </>
-        ) : (
-          "Create invite link"
-        )}
-      </button>
+      <LinkButtons canEmail={canEmail} pending={pending} working={working} emailLabel="Email invite" copyLabel="Create invite link" />
       <Feedback error={error} link={link} />
       {memberLogin && (
         <div className="space-y-2 rounded-md border border-dxv-green/30 bg-dxv-green/[0.04] p-3 text-sm">
@@ -104,14 +150,22 @@ export function InviteForm() {
   );
 }
 
-export function ResetLinkButton({ userId }: { userId: string }) {
-  const { pending, link, error, run } = useLink();
+export function ResetLinkButton({ userId, email, canEmail }: { userId: string; email: string; canEmail: boolean }) {
+  const { pending, working, link, error, run } = useLink();
   return (
     <div className="space-y-2">
-      <button type="button" disabled={pending} className={buttonClass("secondary")} onClick={() => run(() => teamResetLink(userId))}>
-        {pending && <Spinner />}
-        {pending ? "Creating…" : "Password reset link"}
-      </button>
+      <LinkButtons
+        canEmail={canEmail}
+        pending={pending}
+        working={working}
+        primary={false}
+        emailLabel="Email password reset link"
+        copyLabel="Password reset link"
+        onEmail={() => {
+          if (window.confirm(`Email a password reset link to ${email}?`)) run(() => teamResetLink(userId, true), "email");
+        }}
+        onCopy={() => run(() => teamResetLink(userId), "copy")}
+      />
       <Feedback error={error} link={link} />
     </div>
   );
