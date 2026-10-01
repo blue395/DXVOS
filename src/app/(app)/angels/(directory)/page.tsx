@@ -50,6 +50,13 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
 
   return (
     <div className="space-y-5">
+      {(params.deleted === "remove" || params.deleted === "erase") && (
+        <p role="status" className="rounded-md bg-dxv-green/[0.06] px-3 py-2 text-sm text-dxv-green">
+          {params.deleted === "remove"
+            ? "✓ The angel record was removed."
+            : "✓ Their personal details were erased. Their votes and investments still count in deal totals, as \u201cDeleted angel\u201d."}
+        </p>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-dxv-green">Angels{archived && " (archived)"}</h1>

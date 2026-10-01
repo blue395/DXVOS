@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  dashboardBands,
+  angelDeleteMode,
+  deleteConfirmed,
+  scrubAuditSnapshot,
   memberEmailAudience,
   usesWelcomeEmail,
   MICROSOFT_PERSONAL_TENANT,
@@ -824,5 +828,40 @@ describe("bulk email audiences", () => {
   it("sends new applicants the welcome email", () => {
     expect(usesWelcomeEmail("PROSPECT")).toBe(true);
     expect(usesWelcomeEmail("MEMBER")).toBe(false);
+  });
+});
+
+describe("deleting an angel", () => {
+  const none = { login: false, votes: 0, investments: 0, certifications: 0, holdings: 0, aliases: 0, emails: 0 };
+  it("removes records with no history and erases the rest", () => {
+    expect(angelDeleteMode(none)).toBe("remove");
+    expect(angelDeleteMode({ ...none, login: true })).toBe("erase");
+    expect(angelDeleteMode({ ...none, votes: 1 })).toBe("erase");
+    expect(angelDeleteMode({ ...none, certifications: 1 })).toBe("erase");
+    expect(angelDeleteMode({ ...none, aliases: 1 })).toBe("erase");
+  });
+  it("needs the name typed to confirm", () => {
+    expect(deleteConfirmed("Ada Lovelace", "  ada  lovelace ")).toBe(true);
+    expect(deleteConfirmed("Ada Lovelace", "Ada")).toBe(false);
+    expect(deleteConfirmed("Ada Lovelace", "")).toBe(false);
+  });
+  it("takes the name and note out of audit snapshots", () => {
+    expect(scrubAuditSnapshot({ angelName: "Ada", note: "keen", amountGbp: 5000 })).toEqual({ angelName: "Deleted angel", note: null, amountGbp: 5000 });
+    expect(scrubAuditSnapshot(null)).toBeNull();
+  });
+});
+
+describe("dashboard bands", () => {
+  it("groups deals into pipeline, syndicate decision and DD, and counts declined", () => {
+    const b = dashboardBands(["SUBMITTED", "ELIGIBILITY_SCREEN", "PARTNER_REVIEW", "PARTNER_REVIEW", "PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT_COMMITMENTS", "DUE_DILIGENCE", "INVESTMENT_COMPLETE", "PASSED", "PASSED"]);
+    expect(b.pipeline.total).toBe(4);
+    expect(b.pipeline.stages.map((s) => s.count)).toEqual([1, 1, 2]);
+    expect(b.syndicate.total).toBe(3);
+    expect(b.dd.total).toBe(1);
+    expect(b.declined).toBe(2);
+  });
+  it("leaves invested deals (including S/EIS) out of the bands", () => {
+    const b = dashboardBands(["INVESTMENT_COMPLETE", "SEIS_CERTIFICATE"]);
+    expect(b.pipeline.total + b.syndicate.total + b.dd.total + b.declined).toBe(0);
   });
 });

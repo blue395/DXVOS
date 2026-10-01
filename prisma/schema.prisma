@@ -779,6 +779,7 @@ model Angel {
   restrictedDeclaredAt DateTime? // said no FCA exemption applies: portal without deal content
   onboardedAt          DateTime? // finished onboarding (saw the welcome)
   emailOptOutAt        DateTime? // unsubscribed from bulk member emails (invites and resets still go)
+  erasedAt             DateTime? // personal details erased ("Delete angel" on a record with history)
   createdById          String
   createdBy            User      @relation("AngelCreatedBy", fields: [createdById], references: [id])
   updatedById          String?
