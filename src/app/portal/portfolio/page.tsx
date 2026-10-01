@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { buttonClass, formatDate } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
+import { trackPortalView } from "@/lib/portal-analytics";
 import { db } from "@/lib/db";
 import {
   HOLDING_STATUS_LABELS,
@@ -23,10 +24,13 @@ export const metadata = { title: "My portfolio · DXV Members" };
 
 /** The angel's investments in one place: DXV syndicate investments (automatic) and their own. */
 export default async function PortfolioPage() {
-  const { angel } = await requireAngel();
+  const who = await requireAngel();
+  const { angel } = who;
+  // Counted only as "active that day" (OTHER): what's in My Portfolio stays private.
   const [certs, { rows, pendingInterest }] = await Promise.all([
     db.angelCertification.findMany({ where: { angelId: angel.id }, select: { signedOn: true, expiresOn: true } }),
     loadPortfolio(angel.id),
+    trackPortalView(who, "OTHER"),
   ]);
   const step = nextOnboardingStep(angel, latestCertification(certs));
   if (step !== "done") redirect(`/portal/${step}`);

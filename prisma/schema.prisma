@@ -798,6 +798,7 @@ model Angel {
   events            AngelEvent[]
   portfolio         PortfolioHolding[]
   memberEmails      MemberEmailRecipient[]
+  portalViews       PortalView[]
 
   @@index([status])
 }
@@ -1216,4 +1217,31 @@ model MemberEmailRecipient {
 
   @@unique([memberEmailId, angelId])
   @@index([memberEmailId, status])
+}
+
+// ── Member engagement (Insights page) ─────────────────────────────────────
+// One row each time a member opens part of the portal: which part, which deal (for deal
+// rooms and documents), when. No IP or device details. My Portfolio and My profile are
+// recorded only as OTHER (active that day), never what was looked at. Partners using the
+// portal are flagged (team) so Insights can leave them out. Team-only reading.
+enum PortalViewKind {
+  HOME
+  BOARD
+  DEAL
+  DOCUMENT
+  OTHER
+}
+
+model PortalView {
+  id        String         @id @default(cuid())
+  angelId   String
+  angel     Angel          @relation(fields: [angelId], references: [id], onDelete: Cascade)
+  kind      PortalViewKind
+  ventureId String?
+  team      Boolean        @default(false)
+  createdAt DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([angelId, createdAt])
+  @@index([ventureId])
 }

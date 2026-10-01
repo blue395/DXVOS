@@ -212,6 +212,11 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
   angels@diversityx.vc (or *Create invite link to copy instead*, to send by WhatsApp). Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
+- **Insights** (`/insights`, team): what to act on next, then Growth (members over time, sources, the sign-up
+  funnel), Engagement (weekly active members, deal rooms and documents opened, most engaged, gone quiet), Investment
+  (member-to-investor funnel, per-deal views/votes/EOIs/tickets, ticket sizes, repeat investors) and Dealflow (deals in,
+  how far they get, days per stage, decline reasons, founder diversity). Portal visits are recorded from 1 Oct 2026
+  (part of the portal and time only; partners left out; My Portfolio never counted).
 - **Email angels** (`/angels/emails`, team): editable templates (the **welcome email** new applicants get with their
   invite, and starting points like the platform launch email) and **bulk emails** to a group (members not yet on
   the platform, members on it, all members, prospects, lapsed), with a live preview, a test to yourself, per-person

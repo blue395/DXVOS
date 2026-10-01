@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAngel } from "@/lib/auth";
+import { trackPortalView } from "@/lib/portal-analytics";
 import { PHASE_STYLE } from "@/lib/board-style";
 import { MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
 import { angelHasDealAccess, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
@@ -16,8 +17,9 @@ const PITCH_SELECTION_INDEX = MEMBER_BOARD_STAGES.findIndex((b) => b.key === "PI
  * shared it.
  */
 export default async function MemberBoardPage() {
-  const { angel } = await requireAngel();
-  const [access, { round, cards }] = await Promise.all([angelHasDealAccess(angel), loadMemberBoard()]);
+  const who = await requireAngel();
+  const { angel } = who;
+  const [access, { round, cards }] = await Promise.all([angelHasDealAccess(angel), loadMemberBoard(), trackPortalView(who, "BOARD")]);
   if (!access) redirect("/portal");
   const open = cards.filter((c) => c.phase).length;
   // The first open card in board order, for the "open to you" jump link.

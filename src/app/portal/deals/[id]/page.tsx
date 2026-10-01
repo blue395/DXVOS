@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { DealRoomView } from "@/components/portal/deal-room";
 import { requireAngel } from "@/lib/auth";
+import { trackPortalView } from "@/lib/portal-analytics";
 import { angelHasDealAccess, loadDealRoom } from "@/lib/portal-deals";
 import { VotePanel } from "./vote-panel";
 
@@ -10,8 +11,9 @@ export const metadata = { title: "Deal · DXV Members" };
 // A deal the team has shared, as the signed-in angel sees it. Anything not shared, not
 // yet at a members' stage, or declined is "not found" (its existence isn't revealed).
 export default async function PortalDealPage({ params }: PageProps<"/portal/deals/[id]">) {
-  const [{ id }, { angel }] = await Promise.all([params, requireAngel()]);
-  const [access, deal] = await Promise.all([angelHasDealAccess(angel), loadDealRoom(id, angel.id)]);
+  const [{ id }, who] = await Promise.all([params, requireAngel()]);
+  const { angel } = who;
+  const [access, deal] = await Promise.all([angelHasDealAccess(angel), loadDealRoom(id, angel.id), trackPortalView(who, "DEAL", id)]);
   if (!access) redirect("/portal");
   if (!deal) notFound();
   return (

@@ -2,6 +2,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { OnboardingStepper } from "@/components/portal/stepper";
 import { Field, inputClass } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
+import { trackPortalView } from "@/lib/portal-analytics";
 import { EmailSwitchOffer, SignInMethods, loadSignInMethods } from "@/components/sign-in-methods";
 import { ANGEL_TAG_SUGGESTIONS, EXPERIENCE_LEVELS, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
 import { updateMyProfile } from "../actions";
@@ -9,8 +10,9 @@ import { updateMyProfile } from "../actions";
 export const metadata = { title: "Your details · DXV Members" };
 
 export default async function ProfilePage({ searchParams }: PageProps<"/portal/profile">) {
-  const [{ user, angel }, sp] = await Promise.all([requireAngel(), searchParams]);
-  const identities = await loadSignInMethods(user.id);
+  const [who, sp] = await Promise.all([requireAngel(), searchParams]);
+  const { user, angel } = who;
+  const [identities] = await Promise.all([loadSignInMethods(user.id), trackPortalView(who, "OTHER")]);
   const onboarding = !angel.profileConfirmedAt;
   // Someone DXV already knows: "is this you?"; someone new: questions.
   const known = !!(angel.phone || angel.location || angel.sectors.length || angel.source);

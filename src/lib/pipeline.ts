@@ -757,6 +757,195 @@ export function loginLinkState(link: { usedAt: Date | null; revokedAt: Date | nu
   return link.expiresAt <= now ? "expired" : "ok";
 }
 
+// ── Insights (Blue, 2026-10-01): growth, engagement, investment ──────────────
+
+export const INSIGHT_PERIODS = [
+  { days: 30, label: "30 days" },
+  { days: 90, label: "90 days" },
+  { days: 365, label: "12 months" },
+] as const;
+export const parseInsightPeriod = (v: unknown): number => INSIGHT_PERIODS.find((p) => String(p.days) === v)?.days ?? 90;
+
+export const daysAgo = (days: number, now = new Date()) => new Date(now.getTime() - days * DAY_MS);
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export type SeriesPoint = { key: string; label: string; value: number };
+
+/** How many dates fall in each of the last `months` calendar months (oldest first, this month last). */
+export function monthlyCounts(dates: Date[], months: number, now = new Date()): SeriesPoint[] {
+  const out: SeriesPoint[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    out.push({ key, label: `${MONTHS_SHORT[d.getUTCMonth()]}${d.getUTCMonth() === 0 ? ` ${String(d.getUTCFullYear()).slice(2)}` : ""}`, value: 0 });
+  }
+  for (const date of dates) {
+    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+    const p = out.find((x) => x.key === key);
+    if (p) p.value++;
+  }
+  return out;
+}
+
+/** Monday 00:00 UTC of the week a date falls in. */
+function weekStart(d: Date): Date {
+  const day = (d.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+}
+
+/** Distinct members active in each of the last `weeks` weeks (Monday-start; oldest first). */
+export function weeklyActive(views: { angelId: string; createdAt: Date }[], weeks: number, now = new Date()): SeriesPoint[] {
+  const thisWeek = weekStart(now);
+  const out = Array.from({ length: weeks }, (_, i) => {
+    const start = new Date(thisWeek.getTime() - (weeks - 1 - i) * 7 * DAY_MS);
+    return { key: start.toISOString().slice(0, 10), label: `${start.getUTCDate()} ${MONTHS_SHORT[start.getUTCMonth()]}`, value: 0, ids: new Set<string>() };
+  });
+  for (const v of views) {
+    const p = out.find((x) => x.key === weekStart(v.createdAt).toISOString().slice(0, 10));
+    p?.ids.add(v.angelId);
+  }
+  return out.map(({ ids, ...p }) => ({ ...p, value: ids.size }));
+}
+
+/** Where members came from (Angel.source), tidied: biggest first, a long tail folded into "Other". */
+export function sourceBreakdown(sources: (string | null)[], keep = 7): { label: string; value: number }[] {
+  const counts = new Map<string, { label: string; value: number }>();
+  for (const raw of sources) {
+    const label = raw?.trim() ? raw.trim().replace(/^\w/, (c) => c.toUpperCase()) : "Not recorded";
+    const key = label.toLowerCase();
+    const c = counts.get(key) ?? { label, value: 0 };
+    c.value++;
+    counts.set(key, c);
+  }
+  const sorted = [...counts.values()].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+  if (sorted.length <= keep) return sorted;
+  const head = sorted.slice(0, keep - 1);
+  return [...head, { label: "Other", value: sorted.slice(keep - 1).reduce((n, c) => n + c.value, 0) }];
+}
+
+export type FunnelAngel = { invited: boolean; hasLogin: boolean; profileConfirmed: boolean; onboarded: boolean; canSeeDeals: boolean };
+
+/** Getting members onto the platform, step by step (each step counts only those who passed the one before). */
+export function platformFunnel(angels: FunnelAngel[]): { label: string; value: number }[] {
+  const steps: [string, (a: FunnelAngel) => boolean][] = [
+    ["Invited", (a) => a.invited || a.hasLogin],
+    ["Signed up", (a) => a.hasLogin],
+    ["Confirmed their details", (a) => a.profileConfirmed],
+    ["Finished onboarding", (a) => a.onboarded],
+    ["Can see deals (current statement)", (a) => a.canSeeDeals],
+  ];
+  let pool = angels;
+  const out = [{ label: "In the directory", value: angels.length }];
+  for (const [label, test] of steps) {
+    pool = pool.filter(test);
+    out.push({ label, value: pool.length });
+  }
+  return out;
+}
+
+export const TICKET_BUCKETS = [
+  { label: "Under £1k", max: 999 },
+  { label: "£1k–£2.5k", max: 2_499 },
+  { label: "£2.5k–£5k", max: 4_999 },
+  { label: "£5k–£10k", max: 9_999 },
+  { label: "£10k–£25k", max: 24_999 },
+  { label: "£25k+", max: Infinity },
+] as const;
+
+/** Paid tickets: totals, typical size, how many members invest, and how many come back. */
+export function ticketStats(tickets: { investor: string; ventureId: string; ticketGbp: number }[]) {
+  const amounts = tickets.map((t) => t.ticketGbp).sort((a, b) => a - b);
+  const total = amounts.reduce((n, a) => n + a, 0);
+  const mid = Math.floor(amounts.length / 2);
+  const median = amounts.length === 0 ? 0 : amounts.length % 2 ? amounts[mid] : Math.round((amounts[mid - 1] + amounts[mid]) / 2);
+  const dealsBy = new Map<string, Set<string>>();
+  for (const t of tickets) dealsBy.set(t.investor, (dealsBy.get(t.investor) ?? new Set()).add(t.ventureId));
+  return {
+    count: amounts.length,
+    total,
+    average: amounts.length ? Math.round(total / amounts.length) : 0,
+    median,
+    investors: dealsBy.size,
+    repeatInvestors: [...dealsBy.values()].filter((d) => d.size >= 2).length,
+    buckets: TICKET_BUCKETS.map((b, i) => ({
+      label: b.label,
+      value: amounts.filter((a) => a <= b.max && (i === 0 || a > TICKET_BUCKETS[i - 1].max)).length,
+    })),
+  };
+}
+
+const PIPELINE_ORDER: Stage[] = ["SUBMITTED", "ELIGIBILITY_SCREEN", "PARTNER_REVIEW", "PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT_COMMITMENTS", "DUE_DILIGENCE", "INVESTMENT_COMPLETE"];
+const orderOf = (s: Stage) => PIPELINE_ORDER.indexOf(s === "SEIS_CERTIFICATE" ? "INVESTMENT_COMPLETE" : s);
+
+/** Of the deals that came in, how many got at least as far as each stage (furthest stage reached, declined deals included). */
+export function stageReach(deals: { stagesReached: Stage[] }[]): { key: Stage; label: string; value: number }[] {
+  const furthest = deals.map((d) => Math.max(0, ...d.stagesReached.map(orderOf)));
+  return PIPELINE_ORDER.map((key, i) => ({ key, label: stageLabel(key), value: furthest.filter((f) => f >= i).length }));
+}
+
+/** Median whole days deals spent in each stage they left (from their stage history). */
+export function medianDaysInStage(changes: { ventureId: string; toStage: Stage; changedAt: Date }[]): { key: Stage; label: string; days: number | null; deals: number }[] {
+  const byVenture = Map.groupBy(changes, (c) => c.ventureId);
+  const spans = new Map<Stage, number[]>();
+  for (const list of byVenture.values()) {
+    const sorted = [...list].sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime());
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const stage = sorted[i].toStage;
+      if (orderOf(stage) < 0) continue;
+      spans.set(stage, [...(spans.get(stage) ?? []), (sorted[i + 1].changedAt.getTime() - sorted[i].changedAt.getTime()) / DAY_MS]);
+    }
+  }
+  return PIPELINE_ORDER.slice(0, -1).map((key) => {
+    const d = (spans.get(key) ?? []).sort((a, b) => a - b);
+    const m = d.length === 0 ? null : d.length % 2 ? d[(d.length - 1) / 2] : (d[d.length / 2 - 1] + d[d.length / 2]) / 2;
+    return { key, label: stageLabel(key), days: m === null ? null : Math.round(m), deals: d.length };
+  });
+}
+
+/** Why deals were declined, biggest reason first. */
+export function declineReasons(reasons: (PassReason | null)[]): { label: string; value: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of reasons) {
+    const label = r ? PASS_REASON_LABELS[r] : "Not recorded";
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
+/** A share as a whole percentage (0 when there's nothing to share out). */
+export const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+
+export type Nudge = { text: string; detail?: string; href: string; action: string };
+
+/** The few things worth doing next, from the numbers. Only shown when they apply. */
+export function insightNudges(n: {
+  membersNotOnPlatform: number;
+  invitesUnusedOver7Days: number;
+  membersNeedingStatement: number;
+  quietMembers: number;
+  prospectsNotInvited: number;
+  lowTurnoutDeals: { id: string; name: string; turnoutPct: number }[];
+  welcomeNeedsFinishing: boolean;
+}): Nudge[] {
+  const out: Nudge[] = [];
+  const s = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (n.welcomeNeedsFinishing) out.push({ text: "The welcome email for new applicants isn't finished", detail: "Add the WhatsApp link so invites can go out with it.", href: "/angels/emails", action: "Finish it" });
+  if (n.membersNotOnPlatform > 0)
+    out.push({ text: `${s(n.membersNotOnPlatform, "member isn't", "members aren't")} on the platform yet`, detail: "They can't see or vote on deals until they sign up.", href: "/angels/emails/new", action: "Email them a sign-up link" });
+  if (n.invitesUnusedOver7Days > 0)
+    out.push({ text: `${s(n.invitesUnusedOver7Days, "invite has", "invites have")} gone unused for over a week`, detail: "A personal nudge often helps; links last 14 days.", href: "/angels?filter=members", action: "Review members" });
+  if (n.membersNeedingStatement > 0)
+    out.push({ text: `${s(n.membersNeedingStatement, "member needs", "members need")} a current investor statement`, detail: "Without one they can't see live deals.", href: "/angels?filter=action", action: "See who" });
+  if (n.quietMembers > 0)
+    out.push({ text: `${s(n.quietMembers, "member who can see deals hasn't", "members who can see deals haven't")} visited in 30 days`, detail: "Listed under Engagement below.", href: "#quiet", action: "See who" });
+  for (const d of n.lowTurnoutDeals)
+    out.push({ text: `Only ${d.turnoutPct}% of eligible members have voted on ${d.name}`, detail: "A reminder before the vote closes can lift turnout.", href: `/deals/${d.id}`, action: "Open the deal" });
+  if (n.prospectsNotInvited > 0)
+    out.push({ text: `${s(n.prospectsNotInvited, "prospect hasn't", "prospects haven't")} been invited yet`, detail: "Prospects join as members when they sign up.", href: "/angels?filter=prospects", action: "Invite them" });
+  return out;
+}
+
 // ── Deleting an angel (Blue, 2026-10-01: "smart delete") ─────────────────────
 
 /** What erased angels are called wherever their votes and investments still count. */

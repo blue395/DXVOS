@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { PortalHome } from "@/components/portal/portal-home";
 import { requireAngel } from "@/lib/auth";
+import { trackPortalView } from "@/lib/portal-analytics";
 import { db } from "@/lib/db";
 import { latestCertification, nextOnboardingStep } from "@/lib/pipeline";
 import { angelHasDealAccess, currentMemberRound, listSharedDeals } from "@/lib/portal-deals";
@@ -8,12 +9,14 @@ import { angelHasDealAccess, currentMemberRound, listSharedDeals } from "@/lib/p
 export const metadata = { title: "DXV Members" };
 
 export default async function PortalHomePage() {
-  const { angel } = await requireAngel();
+  const who = await requireAngel();
+  const { angel } = who;
   const [certs, access, deals, boardRound] = await Promise.all([
     db.angelCertification.findMany({ where: { angelId: angel.id }, select: { type: true, signedOn: true, expiresOn: true } }),
     angelHasDealAccess(angel),
     listSharedDeals(angel.id),
     currentMemberRound(),
+    trackPortalView(who, "HOME"),
   ]);
   const cert = latestCertification(certs);
   const step = nextOnboardingStep(angel, cert);
