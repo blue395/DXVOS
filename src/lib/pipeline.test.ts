@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  declineReasons,
+  insightNudges,
+  medianDaysInStage,
+  monthlyCounts,
+  pct,
+  platformFunnel,
+  sourceBreakdown,
+  stageReach,
+  ticketStats,
+  weeklyActive,
   dashboardBands,
   angelDeleteMode,
   deleteConfirmed,
@@ -863,5 +873,76 @@ describe("dashboard bands", () => {
   it("leaves invested deals (including S/EIS) out of the bands", () => {
     const b = dashboardBands(["INVESTMENT_COMPLETE", "SEIS_CERTIFICATE"]);
     expect(b.pipeline.total + b.syndicate.total + b.dd.total + b.declined).toBe(0);
+  });
+});
+
+describe("insights", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+  it("counts per month, oldest first, this month last", () => {
+    const m = monthlyCounts([new Date("2026-10-02"), new Date("2026-10-09"), new Date("2026-09-30"), new Date("2025-01-01")], 3, now);
+    expect(m.map((p) => [p.label, p.value])).toEqual([["Aug", 0], ["Sep", 1], ["Oct", 2]]);
+  });
+  it("counts distinct active members per week", () => {
+    const w = weeklyActive(
+      [
+        { angelId: "a", createdAt: new Date("2026-10-13T09:00:00Z") },
+        { angelId: "a", createdAt: new Date("2026-10-14T09:00:00Z") },
+        { angelId: "b", createdAt: new Date("2026-10-14T09:00:00Z") },
+        { angelId: "a", createdAt: new Date("2026-10-07T09:00:00Z") },
+      ],
+      2,
+      now,
+    );
+    expect(w.map((p) => p.value)).toEqual([1, 2]);
+    expect(w[1].label).toBe("12 Oct");
+  });
+  it("tidies sources and folds the tail", () => {
+    expect(sourceBreakdown(["event", "Event ", null, "LinkedIn", "", "website"], 3)).toEqual([
+      { label: "Event", value: 2 },
+      { label: "Not recorded", value: 2 },
+      { label: "Other", value: 2 },
+    ]);
+  });
+  it("only counts each funnel step for people who passed the one before", () => {
+    const f = platformFunnel([
+      { invited: true, hasLogin: true, profileConfirmed: true, onboarded: true, canSeeDeals: true },
+      { invited: true, hasLogin: false, profileConfirmed: false, onboarded: false, canSeeDeals: true }, // paper statement, no login
+      { invited: false, hasLogin: false, profileConfirmed: false, onboarded: false, canSeeDeals: false },
+    ]);
+    expect(f.map((s) => s.value)).toEqual([3, 2, 1, 1, 1, 1]);
+  });
+  it("summarises tickets and repeat investors", () => {
+    const t = ticketStats([
+      { investor: "a", ventureId: "v1", ticketGbp: 1000 },
+      { investor: "a", ventureId: "v2", ticketGbp: 5000 },
+      { investor: "b", ventureId: "v1", ticketGbp: 3000 },
+    ]);
+    expect(t).toMatchObject({ count: 3, total: 9000, average: 3000, median: 3000, investors: 2, repeatInvestors: 1 });
+    expect(t.buckets.map((b) => b.value)).toEqual([0, 1, 1, 1, 0, 0]);
+  });
+  it("measures how far deals got and how long stages took", () => {
+    const reach = stageReach([{ stagesReached: ["SUBMITTED", "PARTNER_REVIEW", "PASSED"] }, { stagesReached: ["SUBMITTED"] }, { stagesReached: ["SEIS_CERTIFICATE"] }]);
+    expect(reach.find((r) => r.key === "SUBMITTED")?.value).toBe(3);
+    expect(reach.find((r) => r.key === "PARTNER_REVIEW")?.value).toBe(2);
+    expect(reach.find((r) => r.key === "INVESTMENT_COMPLETE")?.value).toBe(1);
+    const days = medianDaysInStage([
+      { ventureId: "v", toStage: "SUBMITTED", changedAt: new Date("2026-10-01") },
+      { ventureId: "v", toStage: "ELIGIBILITY_SCREEN", changedAt: new Date("2026-10-05") },
+      { ventureId: "w", toStage: "SUBMITTED", changedAt: new Date("2026-10-01") },
+      { ventureId: "w", toStage: "ELIGIBILITY_SCREEN", changedAt: new Date("2026-10-03") },
+    ]);
+    expect(days.find((d) => d.key === "SUBMITTED")).toMatchObject({ days: 3, deals: 2 });
+    expect(days.find((d) => d.key === "ELIGIBILITY_SCREEN")?.days).toBeNull();
+  });
+  it("ranks decline reasons and computes shares", () => {
+    expect(declineReasons(["VALUATION_GAP", "INELIGIBLE", "VALUATION_GAP", null])[0]).toEqual({ label: "Valuation gap", value: 2 });
+    expect(pct(1, 3)).toBe(33);
+    expect(pct(1, 0)).toBe(0);
+  });
+  it("only nudges about what applies", () => {
+    const none = { membersNotOnPlatform: 0, invitesUnusedOver7Days: 0, membersNeedingStatement: 0, quietMembers: 0, prospectsNotInvited: 0, lowTurnoutDeals: [], welcomeNeedsFinishing: false };
+    expect(insightNudges(none)).toEqual([]);
+    const n = insightNudges({ ...none, membersNotOnPlatform: 1, lowTurnoutDeals: [{ id: "v", name: "Acme", turnoutPct: 20 }] });
+    expect(n.map((x) => x.text)).toEqual(["1 member isn't on the platform yet", "Only 20% of eligible members have voted on Acme"]);
   });
 });
