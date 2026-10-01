@@ -11,6 +11,9 @@ import { db } from "@/lib/db";
 import { complianceReady } from "@/lib/compliance";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
 import { emailSentLink, linkOrigin, type EmailOutcome } from "@/lib/send-link";
+import { sendWelcomeEmail } from "@/lib/member-emails";
+import { usesWelcomeEmail } from "@/lib/pipeline";
+import type { AngelStatus } from "@/generated/prisma/enums";
 
 export type InviteLinkResult = { error: string } | ({ ok: true; link: string; expiresAt: string } & EmailOutcome);
 
@@ -58,11 +61,13 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET",
 async function emailAndLog(
   kind: "MEMBER_INVITE" | "RESET",
   to: string,
-  angel: { id: string; name: string },
+  angel: { id: string; name: string; status: AngelStatus },
   link: string,
   expiresAt: Date,
   admin: { id: string; name: string },
 ): Promise<EmailOutcome> {
+  // New applicants (Prospects) get the team's welcome email; everyone else the standard invite.
+  if (kind === "MEMBER_INVITE" && usesWelcomeEmail(angel.status)) return sendWelcomeEmail(angel, to, link, admin.id);
   const out = await emailSentLink(kind, to, { name: angel.name, link, expiresAt, sentBy: admin.name });
   if (out.emailedTo) {
     await db.angelEvent.create({
