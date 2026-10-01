@@ -18,6 +18,7 @@ import {
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
 import { complianceReady } from "@/lib/compliance";
+import { mailConfigured } from "@/lib/mail";
 import { AccessButton, LinkTeamLogin, PortalLinkButton } from "./portal-client";
 import { AngelFields } from "../angel-fields";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
@@ -53,6 +54,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
       db.user.findMany({ where: { role: "ADMIN", angelId: null, disabledAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
     ]),
   );
+  const canEmail = mailConfigured();
   if (!angel) notFound();
 
   const names = new Set(angel.aliases.map((a) => a.normalized));
@@ -227,10 +229,24 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                 </p>
               )}
               {!angel.user && ready.ready && (
-                <PortalLinkButton angelId={angel.id} kind="INVITE" label={portal === "invited" ? "Make a new invite link" : "Create invite link"} />
+                <PortalLinkButton
+                  angelId={angel.id}
+                  kind="INVITE"
+                  label={portal === "invited" ? "Make a new invite link" : "Create invite link"}
+                  emailLabel={canEmail ? (portal === "invited" ? "Email a new invite" : "Email invite") : undefined}
+                  emailTo={angel.email}
+                />
               )}
               {!angel.user && unlinkedTeam.length > 0 && <LinkTeamLogin angelId={angel.id} team={unlinkedTeam} />}
-              {angel.user?.role === "ANGEL" && !angel.user.disabledAt && <PortalLinkButton angelId={angel.id} kind="RESET" label="Password reset link" />}
+              {angel.user?.role === "ANGEL" && !angel.user.disabledAt && (
+                <PortalLinkButton
+                  angelId={angel.id}
+                  kind="RESET"
+                  label="Password reset link"
+                  emailLabel={canEmail ? "Email password reset link" : undefined}
+                  emailTo={angel.user.email}
+                />
+              )}
               {angel.user?.role === "ANGEL" && <AccessButton angelId={angel.id} enabled={!!angel.user.disabledAt} />}
               <Link href={`/angels/${angel.id}/preview`} className="block text-xs font-medium text-dxv-green underline">
                 Preview their portal

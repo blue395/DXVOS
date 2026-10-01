@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, formatDate, formatDateTime } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { mailConfigured } from "@/lib/mail";
 import { AccessButton, CancelInviteButton, InviteForm, ResetLinkButton } from "./team-client";
 
 export const metadata = { title: "Team · DXV OS" };
@@ -10,6 +11,7 @@ export const metadata = { title: "Team · DXV OS" };
 export default async function TeamPage() {
   const me = await requireAdmin();
   const now = new Date();
+  const canEmail = mailConfigured();
   const [team, pending, events] = await Promise.all([
     db.user.findMany({
       where: { role: "ADMIN" },
@@ -66,7 +68,7 @@ export default async function TeamPage() {
               </div>
               {u.id !== me.id && (
                 <div className="flex flex-wrap items-start gap-2">
-                  {!u.disabledAt && <ResetLinkButton userId={u.id} />}
+                  {!u.disabledAt && <ResetLinkButton userId={u.id} email={u.email} canEmail={canEmail} />}
                   <AccessButton userId={u.id} name={u.name} enabled={!!u.disabledAt} />
                 </div>
               )}
@@ -77,9 +79,9 @@ export default async function TeamPage() {
 
       <Card title="Invite a partner">
         <p className="mb-3 text-sm text-black/65">
-          Creates a one-time link (valid 14 days) for you to send them. They choose their own password; nobody else ever sees it.
+          Emails them a one-time link (valid 14 days) from angels@diversityx.vc, or gives you the link to send yourself. They choose their own password; nobody else ever sees it.
         </p>
-        <InviteForm />
+        <InviteForm canEmail={canEmail} />
         {pending.length > 0 && (
           <div className="mt-4 border-t border-black/10 pt-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-black/55">Waiting to be used</p>
@@ -123,6 +125,7 @@ const EVENT_LABELS: Record<string, string> = {
   joined: "set up their login",
   "reset-link": "created a password reset link",
   "password-reset": "set a new password",
+  "link-emailed": "emailed a link",
   "sign-in-link-sent": "asked for an emailed sign-in link",
   "reset-link-emailed": "asked for an emailed password reset link",
   "signed-in-by-link": "signed in with an emailed link",
