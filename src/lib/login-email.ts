@@ -4,27 +4,32 @@
 
 export type LoginLinkEmailKind = "RESET" | "MAGIC";
 
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
+
+/** The DXV frame every email shares: green header with the yellow DXV tag, white card, footer. `inner` is trusted HTML. */
+export function emailShell(inner: string, footer = "DXV (Diversity X Ventures)") {
+  return `<!doctype html><html><body style="margin:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#000000">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;border:1px solid rgba(0,0,0,0.1);border-radius:10px">
+<tr><td style="background:#1a3c35;padding:16px 24px;border-radius:10px 10px 0 0"><span style="background:#fbe45b;color:#1a3c35;font-weight:bold;letter-spacing:2px;font-size:12px;padding:2px 8px;border-radius:4px">DXV</span></td></tr>
+<tr><td style="padding:24px;line-height:1.5">
+${inner}
+</td></tr></table>
+<p style="font-size:12px;color:#777777;max-width:560px">${footer}</p>
+</td></tr></table></body></html>`;
+}
 
 /** A DXV email: greeting, a short lead, one button, small print, and the link written out. */
 function linkEmail(opts: { subject: string; name: string; lead: string; action: string; link: string; small: string }) {
   const first = firstName(opts.name);
   const text = [`Hello ${first},`, "", opts.lead, "", `${opts.action}: ${opts.link}`, "", opts.small, "", "DXV (Diversity X Ventures)"].join("\n");
-  const html = `<!doctype html><html><body style="margin:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#000000">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;border:1px solid rgba(0,0,0,0.1);border-radius:10px">
-<tr><td style="background:#1a3c35;padding:16px 24px;border-radius:10px 10px 0 0"><span style="background:#fbe45b;color:#1a3c35;font-weight:bold;letter-spacing:2px;font-size:12px;padding:2px 8px;border-radius:4px">DXV</span></td></tr>
-<tr><td style="padding:24px">
-<p style="margin:0 0 12px">Hello ${escapeHtml(first)},</p>
+  const html = emailShell(`<p style="margin:0 0 12px">Hello ${escapeHtml(first)},</p>
 <p style="margin:0 0 20px">${escapeHtml(opts.lead)}</p>
 <p style="margin:0 0 20px"><a href="${escapeHtml(opts.link)}" style="display:inline-block;background:#1a3c35;color:#ffffff;text-decoration:none;font-weight:bold;padding:10px 18px;border-radius:6px">${escapeHtml(opts.action)}</a></p>
 <p style="margin:0 0 12px;font-size:13px;color:#555555">${escapeHtml(opts.small)}</p>
-<p style="margin:0;font-size:12px;color:#777777;word-break:break-all">Or paste this into your browser: ${escapeHtml(opts.link)}</p>
-</td></tr></table>
-<p style="font-size:12px;color:#777777">DXV (Diversity X Ventures)</p>
-</td></tr></table></body></html>`;
+<p style="margin:0;font-size:12px;color:#777777;word-break:break-all">Or paste this into your browser: ${escapeHtml(opts.link)}</p>`);
   return { subject: opts.subject, text, html };
 }
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  memberEmailAudience,
+  usesWelcomeEmail,
   MICROSOFT_PERSONAL_TENANT,
   emailSwitchOffer,
   microsoftVerifiedEmail,
@@ -798,5 +800,29 @@ describe("Google / Microsoft sign-in", () => {
     expect(emailSwitchOffer("ada@firm.com", [{ ...g, emailChoiceAt: new Date() }])).toBeNull();
     expect(emailSwitchOffer("ada@firm.com", [{ ...g, emailVerified: false }])).toBeNull();
     expect(emailSwitchOffer("ada@firm.com", [{ ...g, removedAt: new Date() }])).toBeNull();
+  });
+});
+
+describe("bulk email audiences", () => {
+  const a = (status: "MEMBER" | "PROSPECT" | "LAPSED", hasLogin: boolean, extra: Partial<{ email: string | null; emailOptOutAt: Date | null; archivedAt: Date | null }> = {}) => ({
+    status,
+    hasLogin,
+    email: "x@example.com",
+    emailOptOutAt: null,
+    archivedAt: null,
+    ...extra,
+  });
+  const angels = [a("MEMBER", false), a("MEMBER", true), a("MEMBER", false, { email: null }), a("MEMBER", false, { emailOptOutAt: new Date() }), a("MEMBER", false, { archivedAt: new Date() }), a("PROSPECT", false), a("LAPSED", false)];
+  it("picks the group and leaves out no-email, unsubscribed and archived angels", () => {
+    expect(memberEmailAudience(angels, "members-not-on-platform")).toMatchObject({ noEmail: 1, optedOut: 1 });
+    expect(memberEmailAudience(angels, "members-not-on-platform").included).toHaveLength(1);
+    expect(memberEmailAudience(angels, "members-on-platform").included).toHaveLength(1);
+    expect(memberEmailAudience(angels, "all-members").included).toHaveLength(2);
+    expect(memberEmailAudience(angels, "prospects").included).toHaveLength(1);
+    expect(memberEmailAudience(angels, "lapsed").included).toHaveLength(1);
+  });
+  it("sends new applicants the welcome email", () => {
+    expect(usesWelcomeEmail("PROSPECT")).toBe(true);
+    expect(usesWelcomeEmail("MEMBER")).toBe(false);
   });
 });

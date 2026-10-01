@@ -15,6 +15,7 @@ import {
   normaliseAngelName,
   PORTAL_STATE_LABELS,
   portalState,
+  usesWelcomeEmail,
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
 import { complianceReady } from "@/lib/compliance";
@@ -233,7 +234,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                   angelId={angel.id}
                   kind="INVITE"
                   label={portal === "invited" ? "Make a new invite link" : "Create invite link"}
-                  emailLabel={canEmail ? (portal === "invited" ? "Email a new invite" : "Email invite") : undefined}
+                  emailLabel={canEmail ? (usesWelcomeEmail(angel.status) ? "Email welcome + invite" : portal === "invited" ? "Email a new invite" : "Email invite") : undefined}
                   emailTo={angel.email}
                 />
               )}
@@ -248,6 +249,11 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                 />
               )}
               {angel.user?.role === "ANGEL" && <AccessButton angelId={angel.id} enabled={!!angel.user.disabledAt} />}
+              {angel.emailOptOutAt && (
+                <p className="rounded bg-dxv-yellow/30 px-2 py-1 text-xs">
+                  Unsubscribed from emails to angels on {formatDate(angel.emailOptOutAt)}. Invites and sign-in links still reach them.
+                </p>
+              )}
               <Link href={`/angels/${angel.id}/preview`} className="block text-xs font-medium text-dxv-green underline">
                 Preview their portal
               </Link>

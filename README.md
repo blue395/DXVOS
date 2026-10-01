@@ -212,6 +212,10 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
   angels@diversityx.vc (or *Create invite link to copy instead*, to send by WhatsApp). Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
+- **Email angels** (`/angels/emails`, team): editable templates (the **welcome email** new applicants get with their
+  invite, and starting points like the platform launch email) and **bulk emails** to a group (members not yet on
+  the platform, members on it, all members, prospects, lapsed), with a live preview, a test to yourself, per-person
+  sign-up links, batch sending with progress, a record of who got what, and an unsubscribe link.
 - **Google / Microsoft sign-in** (everyone): *Continue with Google / Microsoft* on the sign-in and invite pages,
   and *Connect* on My profile (members) or Your account (team: click your name). Only existing logins and
   invitees; a connected account's verified email can become their DXV email (the old address is told). Set up

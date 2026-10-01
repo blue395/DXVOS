@@ -28,18 +28,21 @@ enum Role {
 }
 
 model User {
-  id           String          @id @default(cuid())
-  email        String          @unique
-  name         String
-  passwordHash String
-  role         Role            @default(ADMIN)
-  createdAt    DateTime        @default(now())
-  angelId      String?         @unique // ANGEL users: their Angel record
-  angel        Angel?          @relation("AngelUser", fields: [angelId], references: [id])
-  disabledAt   DateTime? // access revoked: treated as signed out everywhere
-  lastSignInAt DateTime?
-  loginLinks   LoginLink[]
-  identities   LoginIdentity[]
+  id                    String          @id @default(cuid())
+  email                 String          @unique
+  name                  String
+  passwordHash          String
+  role                  Role            @default(ADMIN)
+  createdAt             DateTime        @default(now())
+  angelId               String?         @unique // ANGEL users: their Angel record
+  angel                 Angel?          @relation("AngelUser", fields: [angelId], references: [id])
+  disabledAt            DateTime? // access revoked: treated as signed out everywhere
+  lastSignInAt          DateTime?
+  loginLinks            LoginLink[]
+  identities            LoginIdentity[]
+  emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreatedBy")
+  emailTemplatesUpdated EmailTemplate[] @relation("EmailTemplateUpdatedBy")
+  memberEmailsSent      MemberEmail[]
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -775,6 +778,7 @@ model Angel {
   profileConfirmedAt   DateTime?
   restrictedDeclaredAt DateTime? // said no FCA exemption applies: portal without deal content
   onboardedAt          DateTime? // finished onboarding (saw the welcome)
+  emailOptOutAt        DateTime? // unsubscribed from bulk member emails (invites and resets still go)
   createdById          String
   createdBy            User      @relation("AngelCreatedBy", fields: [createdById], references: [id])
   updatedById          String?
@@ -788,10 +792,11 @@ model Angel {
   preSelectionVotes PreSelectionVote[]
   investmentVotes   InvestmentVote[]
   finalInvestments  FinalInvestment[]
-  user              User?                @relation("AngelUser")
+  user              User?                  @relation("AngelUser")
   invites           AngelInvite[]
   events            AngelEvent[]
   portfolio         PortfolioHolding[]
+  memberEmails      MemberEmailRecipient[]
 
   @@index([status])
 }
@@ -1154,4 +1159,60 @@ model LoginIdentity {
 
   @@unique([provider, subject])
   @@index([userId])
+}
+
+// ── Emails to angels ───────────────────────────────────────────────────────
+// Team-edited templates (the welcome email, bulk-email starting points) and a record of
+// every bulk email: what was sent, to whom, and how each send went. Bodies use
+// {{first_name}} / {{platform_link}} placeholders and [text](url) links (src/lib/member-email.ts).
+model EmailTemplate {
+  id          String    @id @default(cuid())
+  key         String?   @unique // "welcome": the email new angels get with their invite
+  name        String
+  subject     String
+  body        String
+  createdById String?
+  createdBy   User?     @relation("EmailTemplateCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("EmailTemplateUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+}
+
+/**
+ * A bulk email as sent (never edited afterwards).
+ */
+model MemberEmail {
+  id          String                 @id @default(cuid())
+  subject     String
+  body        String
+  audience    String // which group it was for (MEMBER_EMAIL_AUDIENCES)
+  createdById String
+  createdBy   User                   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime               @default(now())
+  recipients  MemberEmailRecipient[]
+}
+
+enum MemberEmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model MemberEmailRecipient {
+  id            String            @id @default(cuid())
+  memberEmailId String
+  memberEmail   MemberEmail       @relation(fields: [memberEmailId], references: [id])
+  angelId       String
+  angel         Angel             @relation(fields: [angelId], references: [id])
+  email         String // where it went
+  status        MemberEmailStatus @default(PENDING)
+  error         String?
+  invited       Boolean           @default(false) // their email carried a new sign-up link
+  sentAt        DateTime?
+
+  @@unique([memberEmailId, angelId])
+  @@index([memberEmailId, status])
 }

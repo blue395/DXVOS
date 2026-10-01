@@ -67,6 +67,9 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
           <a href={`/api/angels/export${archived ? "?archived=1" : ""}`} className={buttonClass("secondary")}>
             Export CSV
           </a>
+          <Link href="/angels/emails" className={buttonClass("secondary")}>
+            Email angels
+          </Link>
           <Link href="/angels/new" className={buttonClass("secondary")}>
             + Add angel
           </Link>

@@ -6,7 +6,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 // changing the settings. Without them, production sends nothing and the sign-in page hides
 // the email options; local development prints each email to the server console instead.
 
-export type Mail = { to: string; subject: string; text: string; html: string };
+export type Mail = { to: string; subject: string; text: string; html: string; headers?: Record<string, string> };
 
 const isProduction = () => process.env.NODE_ENV === "production";
 
@@ -45,5 +45,5 @@ export async function sendMail(mail: Mail): Promise<void> {
     requireTLS: port !== 465,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
-  await transport.sendMail({ from: process.env.MAIL_FROM, to: mail.to, subject: mail.subject, text: mail.text, html: mail.html });
+  await transport.sendMail({ from: process.env.MAIL_FROM, to: mail.to, subject: mail.subject, text: mail.text, html: mail.html, headers: mail.headers });
 }

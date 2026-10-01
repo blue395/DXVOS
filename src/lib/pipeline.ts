@@ -728,6 +728,48 @@ export function loginLinkState(link: { usedAt: Date | null; revokedAt: Date | nu
   return link.expiresAt <= now ? "expired" : "ok";
 }
 
+// ── Emails to angels (Blue, 2026-10-01) ─────────────────────────────────────
+
+/** Who a bulk email can go to. Archived angels, angels without an email, and anyone who unsubscribed never get one. */
+export const MEMBER_EMAIL_AUDIENCES = [
+  { key: "members-not-on-platform", label: "Members not yet on the platform", note: "Each gets their own sign-up link." },
+  { key: "members-on-platform", label: "Members on the platform", note: "Their link goes to the sign-in page." },
+  { key: "all-members", label: "All members", note: "Sign-up links for those not on yet." },
+  { key: "prospects", label: "Prospects", note: "People interested in joining." },
+  { key: "lapsed", label: "Lapsed members", note: "Former members." },
+] as const;
+export type MemberEmailAudience = (typeof MEMBER_EMAIL_AUDIENCES)[number]["key"];
+export const isMemberEmailAudience = (k: string): k is MemberEmailAudience => MEMBER_EMAIL_AUDIENCES.some((a) => a.key === k);
+
+type AudienceAngel = { status: AngelStatus; archivedAt: Date | null; email: string | null; emailOptOutAt: Date | null; hasLogin: boolean };
+
+/** The angels in an audience, and how many were left out (no email / unsubscribed). */
+export function memberEmailAudience<T extends AudienceAngel>(angels: T[], audience: MemberEmailAudience): { included: T[]; noEmail: number; optedOut: number } {
+  const inGroup = angels.filter((a) => {
+    if (a.archivedAt) return false;
+    switch (audience) {
+      case "members-not-on-platform":
+        return a.status === "MEMBER" && !a.hasLogin;
+      case "members-on-platform":
+        return a.status === "MEMBER" && a.hasLogin;
+      case "all-members":
+        return a.status === "MEMBER";
+      case "prospects":
+        return a.status === "PROSPECT";
+      case "lapsed":
+        return a.status === "LAPSED";
+    }
+  });
+  return {
+    included: inGroup.filter((a) => a.email && !a.emailOptOutAt),
+    noEmail: inGroup.filter((a) => !a.email).length,
+    optedOut: inGroup.filter((a) => a.email && a.emailOptOutAt).length,
+  };
+}
+
+/** Invites to Prospects (new applicants) use the team's welcome email; everyone else gets the standard invite. */
+export const usesWelcomeEmail = (status: AngelStatus) => status === "PROSPECT";
+
 // ── Google / Microsoft sign-in ──────────────────────────────────────────────
 
 /** Microsoft's tenant for personal accounts (Outlook.com, Hotmail, Live): Microsoft verifies their email. */
