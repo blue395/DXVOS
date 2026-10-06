@@ -13,12 +13,20 @@ export async function triggerBackgroundJob(opts: {
   subject: string; // what the signed token names, e.g. an id or "memo:<id>"
   runInline: () => Promise<void>;
 }): Promise<boolean> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+  // The site's fixed address when it's set (never trust the request's Host header: public
+  // pages like /apply also start jobs, and the signed token must only go to DXV OS itself).
+  const fixed = process.env.APP_URL || process.env.URL;
+  let origin: string;
+  if (fixed) origin = fixed.replace(/\/+$/, "");
+  else {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+    origin = `${proto}://${host}`;
+  }
 
   try {
-    const res = await fetch(`${proto}://${host}/.netlify/functions/${opts.functionName}`, {
+    const res = await fetch(`${origin}/.netlify/functions/${opts.functionName}`, {
       method: "POST",
       headers: { "x-dxv-worker-token": createWorkerToken(opts.subject, process.env.SESSION_SECRET!) },
     });

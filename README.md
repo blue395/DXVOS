@@ -212,6 +212,10 @@ them; deals appear only when DXV shares one (next build: the deal room, with sta
   angels@diversityx.vc (or *Create invite link to copy instead*, to send by WhatsApp). Only its hash is stored. The same card makes **password reset links**, revokes or restores
   access, previews the angel's portal ("View as angel"), and shows their portal activity. Team members who are
   also angels keep their team login (one email, one login).
+- **Founder applications** (`/apply`, public; team view at Deals → Website submissions): founders fill a short form
+  and upload a PDF deck; the deal lands in Submitted, the AI screens the deck (a suggestion), the founder gets an
+  acknowledgement, and partners get a morning digest. Decision updates are drafted from editable templates on the
+  deal page for a partner to check and send. Same company again: the deck joins the existing deal.
 - **Insights** (`/insights`, team): what to act on next, then Growth (members over time, sources, the sign-up
   funnel), Engagement (weekly active members, deal rooms and documents opened, most engaged, gone quiet), Investment
   (member-to-investor funnel, per-deal views/votes/EOIs/tickets, ticket sizes, repeat investors) and Dealflow (deals in,

@@ -232,6 +232,20 @@ registering an app is free). Skip this section to offer Google only.
 Redeploy, then test in a private window: sign in with Google using the email you sign in to DXV with.
 `OAUTH_DEV_SERVER` is for local testing only; never add it to Netlify (production ignores it anyway).
 
+## 11. Founder applications and the morning digest
+
+No new settings: it uses email (§9) and `APP_URL`.
+
+- **The application page** is `APP_URL` + `/apply` (e.g. `https://dxv-os.netlify.app/apply`). On Squarespace:
+  open the Founders page → **Edit** → add a **Button** block → text "Submit your deck", link the application
+  page address → **Save**. (Optional: point a subdomain such as `apply.diversityxventures.com` at Netlify, §4,
+  so the address matches the website.)
+- **The morning digest** is a Netlify Scheduled Function (`netlify/functions/founder-digest.mts`, 07:00 UTC).
+  Scheduled functions only run on the published production site; check it under Netlify → Logs → Functions →
+  `founder-digest`. "Send the digest now" on Deals → Website submissions sends it by hand.
+- **Spam limits:** 5 submissions an hour per person, 3 a day per email address, 60 a day in total (then founders
+  are asked to email their deck instead). Change them in `src/lib/founder-intake.ts`.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.

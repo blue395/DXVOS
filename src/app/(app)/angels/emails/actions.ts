@@ -43,12 +43,12 @@ export async function saveTemplate(id: string | null, _prev: ActionResult, formD
   return { ok: true };
 }
 
-/** Archive a template (the welcome email can't be: invites need it). */
+/** Archive a template (not ones DXV OS uses itself: the welcome email and founder emails). */
 export async function archiveTemplate(id: string): Promise<ActionResult> {
   const me = await requireAdmin();
   const t = await db.emailTemplate.findUnique({ where: { id }, select: { key: true } });
   if (!t) return { error: "Template not found." };
-  if (t.key === "welcome") return { error: "The welcome email is used for invites, so it stays. Edit it instead." };
+  if (t.key) return { error: "DXV OS sends this email itself, so it stays. Edit it instead." };
   await db.emailTemplate.update({ where: { id }, data: { archivedAt: new Date(), updatedById: me.id } });
   revalidatePath("/angels/emails");
   redirect("/angels/emails");

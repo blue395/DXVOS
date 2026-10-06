@@ -122,6 +122,9 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
               Import past declined deals
             </Link>
           )}
+          <Link href="/deals/submissions" className={buttonClass("secondary")}>
+            Website submissions
+          </Link>
           <Link href="/deals/new" className={buttonClass("accent")}>
             + New venture
           </Link>

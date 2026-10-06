@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { requireAdminWith } from "@/lib/auth";
 import { aliasMap, angelNameOptions } from "@/lib/angels";
 import { db } from "@/lib/db";
+import { founderFirstName, founderTemplateKey } from "@/lib/founder-intake";
+import { fill } from "@/lib/member-email";
+import { FounderEmailComposer } from "../founder-email-composer";
 import {
   GATE_LABELS,
   PASS_REASON_LABELS,
@@ -57,7 +60,7 @@ import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
 
-  const [v, { _max }, angelNames, withAccess, aliases] = await requireAdminWith(() =>
+  const [v, { _max }, angelNames, withAccess, aliases, founderTemplates] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -99,6 +102,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           },
           entryAudits: { orderBy: { changedAt: "desc" }, include: { changedBy: { select: { name: true } } } },
           founderComms: { orderBy: { createdAt: "asc" }, include: { sentBy: { select: { name: true } } } },
+          founderEmails: { orderBy: { createdAt: "desc" }, include: { sentBy: { select: { name: true } } } },
+          founderSubmissions: { where: { status: "COMPLETE" }, orderBy: { createdAt: "desc" } },
           deckAnalyses: { orderBy: { createdAt: "desc" }, include: { createdBy: { select: { name: true } } } },
           eligibilityReviews: { orderBy: { decidedAt: "desc" }, include: { decidedBy: { select: { name: true } } } },
           shareLog: { orderBy: { createdAt: "desc" }, include: { by: { select: { name: true } } } },
@@ -108,6 +113,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       angelNameOptions(),
       angelIdsWithDealAccess(),
       aliasMap(),
+      db.emailTemplate.findMany({ where: { key: { in: ["founder-progress", "founder-decline"] }, archivedAt: null }, select: { key: true, subject: true, body: true } }),
     ]),
   );
   if (!v) notFound();
@@ -137,6 +143,15 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
   const collapse = (s: DealSection) => ({ open: focus.has(s), now: focus.has(s) && s !== "documents" });
   const invested = investedGbp(v);
   const commsSplit = splitLatestComm(v.founderComms);
+  // Check-and-send drafts for founder updates not yet sent, from the team's templates.
+  const draftFor = (c: CommRow): CommDraft | undefined => {
+    if (c.status !== "NOT_YET_SENT") return undefined;
+    if (!v.founderEmail?.trim()) return { problem: "Add the founder's email under Details → Edit venture details to email this update." };
+    const t = founderTemplates.find((x) => x.key === founderTemplateKey(c.gate));
+    if (!t) return undefined;
+    const vars = { first_name: founderFirstName(v.founderNames), company: v.name, next_step: stageLabel(v.currentStage) };
+    return { to: v.founderEmail.trim(), subject: fill(t.subject, vars), body: fill(t.body, vars) };
+  };
   const audits = (entity: "INVESTMENT_VOTE" | "FINAL_INVESTMENT"): AuditEntry[] => v.entryAudits.filter((a) => a.entity === entity);
   const latestMemo = v.memoVersions[0];
   const latestMemoName = latestMemo
@@ -450,6 +465,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
         {/* ── Sidebar ── */}
         <div className="min-w-0 space-y-6">
           <Card title="Details" id="details">
+            {v.founderSubmissions[0] && <WebsiteSubmission s={v.founderSubmissions[0]} />}
             <details>
               <summary className="cursor-pointer text-sm text-dxv-green">Edit venture details</summary>
               <ActionForm action={updateVenture.bind(null, v.id)} resetOnSuccess={false} className="mt-4 space-y-4">
@@ -523,7 +539,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               <div className="space-y-3">
                 {/* The most recent comm, sent or not; earlier ones fold away. */}
                 <ul>
-                  <CommItem c={commsSplit.latest} />
+                  <CommItem c={commsSplit.latest} draft={draftFor(commsSplit.latest)} />
                 </ul>
                 {commsSplit.earlier.length > 0 && (
                   <details className="group">
@@ -539,12 +555,32 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                     </summary>
                     <ul className="mt-3 space-y-3">
                       {commsSplit.earlier.map((c) => (
-                        <CommItem key={c.id} c={c} />
+                        <CommItem key={c.id} c={c} draft={draftFor(c)} />
                       ))}
                     </ul>
                   </details>
                 )}
               </div>
+            )}
+                      {v.founderEmails.length > 0 && (
+              <details className="mt-3 border-t border-black/10 pt-3 text-sm">
+                <summary className="cursor-pointer text-dxv-green">Emails to the founder ({v.founderEmails.length})</summary>
+                <ul className="mt-2 space-y-2">
+                  {v.founderEmails.map((e) => (
+                    <li key={e.id} className="rounded-md bg-black/[0.03] p-2">
+                      <p className="font-medium">{e.subject}</p>
+                      <p className="text-xs text-black/55">
+                        {formatDate(e.createdAt)} · to {e.to} · {e.kind === "ACKNOWLEDGEMENT" ? "automatic acknowledgement" : `sent by ${e.sentBy?.name ?? "the team"}`}
+                        {e.error ? ` · didn't send` : ""}
+                      </p>
+                      <details className="mt-1 text-xs">
+                        <summary className="cursor-pointer text-black/55">Show the email</summary>
+                        <p className="mt-1 whitespace-pre-wrap text-black/75">{e.body}</p>
+                      </details>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </Card>
 
@@ -648,9 +684,10 @@ const declinePillClass =
   "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-black bg-white px-3.5 py-1.5 text-sm font-medium text-black transition hover:-translate-y-px hover:bg-black hover:text-white active:translate-y-0";
 
 type CommRow = FounderComm & { sentBy: { name: string } | null };
+type CommDraft = { to: string; subject: string; body: string } | { problem: string };
 
 /** One founder comm: the gate, what the founder is told, status and a quick update form. */
-function CommItem({ c }: { c: CommRow }) {
+function CommItem({ c, draft }: { c: CommRow; draft?: CommDraft }) {
   return (
     <li className={`rounded-md border p-3 ${c.status === "NOT_YET_SENT" ? "border-dxv-yellow bg-dxv-yellow/10" : "border-black/10"}`}>
       <div className="flex items-start justify-between gap-2">
@@ -678,6 +715,45 @@ function CommItem({ c }: { c: CommRow }) {
         <input name="note" defaultValue={c.note ?? ""} placeholder="Note" className={`${inputClass} w-auto flex-1`} aria-label="Note" />
         <SubmitButton variant="secondary">Save</SubmitButton>
       </ActionForm>
+      {draft &&
+        ("problem" in draft ? (
+          <p className="mt-2 text-xs text-black/60">{draft.problem}</p>
+        ) : (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm font-medium text-dxv-green">Draft email to the founder</summary>
+            <FounderEmailComposer commId={c.id} to={draft.to} subject={draft.subject} body={draft.body} />
+          </details>
+        ))}
     </li>
+  );
+}
+
+/** What the founder told DXV on the website form (kept exactly as they gave it). */
+function WebsiteSubmission({ s }: { s: { createdAt: Date; linkedinUrl: string | null; heardFrom: string | null; pitch: string; resubmission: boolean; previousVentureId: string | null; diversityConsentAt: Date | null } }) {
+  return (
+    <div className="mb-3 space-y-1 rounded-md bg-dxv-green/[0.04] p-3 text-sm">
+      <p className="font-medium text-dxv-green">
+        {s.resubmission ? "New deck submitted" : "Submitted"} via the website, {formatDate(s.createdAt)}
+      </p>
+      <p className="text-black/70">&ldquo;{s.pitch}&rdquo;</p>
+      <p className="text-xs text-black/55">
+        {s.heardFrom && <>Heard about DXV: {s.heardFrom}. </>}
+        {s.linkedinUrl && (
+          <a href={s.linkedinUrl} target="_blank" rel="noreferrer" className="underline">
+            LinkedIn
+          </a>
+        )}
+        {s.diversityConsentAt && <> · Founder diversity shared with consent, {formatDate(s.diversityConsentAt)}</>}
+      </p>
+      {s.previousVentureId && (
+        <p className="text-xs">
+          DXV declined this company before:{" "}
+          <Link href={`/deals/${s.previousVentureId}`} className="font-medium text-dxv-green underline">
+            see the earlier deal
+          </Link>
+          .
+        </p>
+      )}
+    </div>
   );
 }

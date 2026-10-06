@@ -28,9 +28,17 @@ describe("member email templates", () => {
   });
   it("lists what must be fixed before sending", () => {
     expect(templateProblems({ subject: "Hi", body: "[WhatsApp](PASTE-WHATSAPP-LINK-HERE) {{firstname}}" })).toEqual([
-      "{{firstname}} isn't a placeholder DXV OS knows (use {{first_name}} or {{platform_link}}).",
+      "{{firstname}} isn't a placeholder DXV OS knows (use {{first_name}}, {{platform_link}}, {{company}} or {{next_step}}).",
       "Replace PASTE-WHATSAPP-LINK-HERE with the real link.",
     ]);
     expect(templateProblems({ subject: "Hi {{first_name}}", body: "Hello" })).toEqual([]);
+  });
+});
+
+describe("founder email placeholders", () => {
+  it("fills company and next step, and leaves missing ones blank", () => {
+    const m = renderMemberEmail({ subject: "{{company}} and DXV", body: "Hi {{first_name}}, next: {{next_step}}." }, { first_name: "Sam", company: "Acme" });
+    expect(m.subject).toBe("Acme and DXV");
+    expect(m.text).toBe("Hi Sam, next: .");
   });
 });

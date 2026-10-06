@@ -25,6 +25,7 @@ datasource db {
 enum Role {
   ADMIN
   ANGEL // a syndicate member's portal login (linked to one Angel record); sees only /portal
+  SYSTEM // DXV OS itself (e.g. "DXV website" for founder submissions): never signs in
 }
 
 model User {
@@ -43,6 +44,7 @@ model User {
   emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreatedBy")
   emailTemplatesUpdated EmailTemplate[] @relation("EmailTemplateUpdatedBy")
   memberEmailsSent      MemberEmail[]
+  founderEmailsSent     FounderEmail[]
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -179,6 +181,8 @@ model Venture {
   lessonJobs         LessonJob[]
   shareLog           DealShareLog[]
   syndicateHolding   SyndicateHolding?
+  founderSubmissions FounderSubmission[] @relation("SubmissionVenture")
+  founderEmails      FounderEmail[]
 
   @@index([currentStage])
 }
@@ -1244,4 +1248,71 @@ model PortalView {
   @@index([createdAt])
   @@index([angelId, createdAt])
   @@index([ventureId])
+}
+
+// ── Founder submissions (Blue, 2026-10-06) ─────────────────────────────────
+// A founder's application from the public /apply page, exactly as they gave it. The deal
+// itself is an ordinary Venture (created by the "DXV website" system user); this keeps
+// what the founder said, their consents, and how the submission was handled.
+enum SubmissionStatus {
+  UPLOADING // form received, waiting for the deck upload to finish
+  COMPLETE // deck stored, deal created or updated
+  ABANDONED // the upload never finished
+}
+
+model FounderSubmission {
+  id                  String           @id @default(cuid())
+  status              SubmissionStatus @default(UPLOADING)
+  completionTokenHash String // the browser's one-time proof it started this submission
+  companyName         String
+  founderNames        String
+  email               String
+  website             String?
+  linkedinUrl         String?
+  sector              String?
+  companyStage        String?
+  raiseAmountGbp      Int?
+  pitch               String // their one-line description
+  heardFrom           String?
+  diversityThemes     String[] // only with diversity consent; as the founder stated
+  privacyConsentAt    DateTime
+  diversityConsentAt  DateTime?
+  ipHash              String? // SHA-256 of the IP with SESSION_SECRET: rate limiting only
+  analysisId          String?          @unique // the deck's AI reading
+  ventureId           String?
+  venture             Venture?         @relation("SubmissionVenture", fields: [ventureId], references: [id])
+  resubmission        Boolean          @default(false) // the company was already on the board: deck added to it
+  previousVentureId   String? // the company was declined before: a new deal, linked back
+  digestedAt          DateTime? // included in the partners' daily digest
+  createdAt           DateTime         @default(now())
+  completedAt         DateTime?
+
+  @@index([createdAt])
+  @@index([ipHash, createdAt])
+  @@index([email, createdAt])
+}
+
+/**
+ * Every email DXV OS sends a founder (acknowledgements, decision updates). Never edited.
+ */
+enum FounderEmailKind {
+  ACKNOWLEDGEMENT
+  DECISION
+}
+
+model FounderEmail {
+  id        String           @id @default(cuid())
+  ventureId String
+  venture   Venture          @relation(fields: [ventureId], references: [id])
+  commId    String? // the FounderComm it answered (decision updates)
+  kind      FounderEmailKind
+  to        String
+  subject   String
+  body      String
+  sentById  String? // null: sent automatically (acknowledgements)
+  sentBy    User?            @relation(fields: [sentById], references: [id])
+  error     String? // set when it didn't send
+  createdAt DateTime         @default(now())
+
+  @@index([ventureId, createdAt])
 }

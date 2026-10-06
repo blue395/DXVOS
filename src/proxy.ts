@@ -15,7 +15,9 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Everything except the login page, invite links (/join: the one-time token is the
   // check), the Google/Microsoft sign-in callback (/api/auth: its signed state cookie is
-  // the check), unsubscribe links (a signed token naming one angel), Next internals, static files, and Netlify's own function endpoints (the
+  // the check), unsubscribe links (a signed token naming one angel), the founder application
+  // (/apply, public by design) and its dev-only deck upload, scheduled jobs (/api/cron: a
+  // signed token is the check), Next internals, static files, and Netlify's own function endpoints (the
   // workers authenticate their calls themselves).
-  matcher: ["/((?!login|join|unsubscribe/|api/auth/|api/unsubscribe/|_next/static|_next/image|favicon.ico|\\.netlify).*)"],
+  matcher: ["/((?!login|join|apply|unsubscribe/|api/auth/|api/unsubscribe/|api/cron/|api/dev/deck-upload/|_next/static|_next/image|favicon.ico|\\.netlify).*)"],
 };

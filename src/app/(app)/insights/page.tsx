@@ -262,6 +262,10 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
             <BarList rows={dealflow.declineReasons} empty="No declined deals yet." />
           </Panel>
         </div>
+        <Panel title="How founders heard about DXV" note={`From ${dealflow.websiteSubmissions} website ${dealflow.websiteSubmissions === 1 ? "application" : "applications"} in ${periodLabel}.`}>
+          <BarList rows={dealflow.founderSources} empty="No website applications in this period yet." />
+          <TableView headers={["Source", "Applications"]} rows={dealflow.founderSources.map((s) => [s.label, s.value])} />
+        </Panel>
         <Panel title="Founder diversity of invested deals" note="From each deal's founder diversity (what founders have stated).">
           <BarList rows={dealflow.diversity} empty="No themes recorded on invested deals yet." />
         </Panel>
