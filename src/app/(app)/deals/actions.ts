@@ -24,6 +24,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { angelIdForName } from "@/lib/angels";
 import { founderDiversityFrom } from "@/components/founder-diversity-field";
+import { founderFirstName } from "@/lib/founder-intake";
+import { mailConfigured, sendMail } from "@/lib/mail";
+import { renderMemberEmail, templateProblems } from "@/lib/member-email";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -477,6 +480,49 @@ export async function updateFounderComm(commId: string, _prev: ActionResult, for
     },
   });
   revalidateDeal(existing.ventureId);
+  return { ok: true };
+}
+
+const FounderEmailSchema = z.object({
+  subject: z.string().trim().min(1, "Add a subject").max(200),
+  body: z
+    .string()
+    .transform((b) => b.replace(/\r\n/g, "\n").trim())
+    .pipe(z.string().min(1, "Write the email").max(20_000)),
+});
+
+/**
+ * Check-and-send: email the founder the update a decision gate owes them (the partner has
+ * read and edited the draft), keep a copy, and mark the update Sent. Never automatic.
+ */
+export async function sendFounderDecisionEmail(commId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const parsed = FounderEmailSchema.safeParse(form(formData));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const comm = await db.founderComm.findUnique({ where: { id: commId }, include: { venture: { select: { id: true, name: true, founderNames: true, founderEmail: true, currentStage: true } } } });
+  if (!comm) return { error: "Founder update not found." };
+  if (comm.status !== "NOT_YET_SENT") return { error: "This update has already been sent." };
+  const to = comm.venture.founderEmail?.trim();
+  if (!to) return { error: "Add the founder's email under Details → Edit venture details first." };
+  if (!mailConfigured()) return { error: "Email isn't set up." };
+  const problems = templateProblems(parsed.data);
+  if (problems.length) return { error: problems.join(" ") };
+  const vars = { first_name: founderFirstName(comm.venture.founderNames), company: comm.venture.name, next_step: stageLabel(comm.venture.currentStage) };
+  const mail = renderMemberEmail(parsed.data, vars);
+  try {
+    await sendMail({ to, ...mail });
+  } catch (e) {
+    console.error("Founder decision email failed", e);
+    await db.founderEmail.create({ data: { ventureId: comm.venture.id, commId, kind: "DECISION", to, subject: mail.subject, body: mail.text, sentById: user.id, error: "Didn't send" } });
+    return { error: "The email didn't send. Check the founder's address and try again." };
+  }
+  const now = new Date();
+  await db.$transaction([
+    db.founderEmail.create({ data: { ventureId: comm.venture.id, commId, kind: "DECISION", to, subject: mail.subject, body: mail.text, sentById: user.id } }),
+    db.founderComm.update({ where: { id: commId }, data: { status: "SENT", sentAt: now, sentById: user.id, note: comm.note ?? `Emailed: ${mail.subject}` } }),
+  ]);
+  revalidateDeal(comm.venture.id);
+  revalidatePath("/");
   return { ok: true };
 }
 

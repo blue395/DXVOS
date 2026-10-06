@@ -32,7 +32,7 @@ const QUIET_DAYS = 30;
 export async function loadInsights(periodDays: number, now = new Date()) {
   const since = daysAgo(periodDays, now);
   const viewsSince = daysAgo(Math.max(periodDays, 7 * 12), now); // the weekly chart covers 12 weeks
-  const [angels, views, lastSeen, ventures, aliases, emails, unsubscribes, welcome, allViews] = await Promise.all([
+  const [angels, views, lastSeen, ventures, aliases, emails, unsubscribes, welcome, allViews, founderSources] = await Promise.all([
     db.angel.findMany({
       where: { archivedAt: null },
       select: {
@@ -77,6 +77,8 @@ export async function loadInsights(periodDays: number, now = new Date()) {
     db.emailTemplate.findUnique({ where: { key: "welcome" }, select: { subject: true, body: true } }),
     // Every member who ever opened each deal (room or document): one row per member and deal.
     db.portalView.findMany({ where: { team: false, ventureId: { not: null } }, select: { angelId: true, ventureId: true }, distinct: ["angelId", "ventureId"] }),
+    // How founders who applied on the website heard about DXV (in the period).
+    db.founderSubmission.findMany({ where: { status: "COMPLETE", createdAt: { gte: since } }, select: { heardFrom: true } }),
   ]);
 
   // ── Who's who ────────────────────────────────────────────────────────────
@@ -225,6 +227,8 @@ export async function loadInsights(periodDays: number, now = new Date()) {
     declineReasons: declineReasons(ventures.filter((v) => v.currentStage === "PASSED").map((v) => v.passReason)),
     diversity: [...themeCounts.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
     investedDeals: invested.length,
+    websiteSubmissions: founderSources.length,
+    founderSources: sourceBreakdown(founderSources.map((f) => f.heardFrom)),
   };
 
   const nudges = insightNudges({

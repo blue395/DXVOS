@@ -11,7 +11,19 @@ import { WritingHelp } from "../../writing-help";
 
 // The boxes are uncontrolled (defaultValue): typing before the page finishes loading can't
 // be lost or doubled; onChange keeps the live preview in step.
-export function TemplateForm({ id, welcome, initial }: { id: string | null; welcome: boolean; initial: { name: string; subject: string; body: string } }) {
+export function TemplateForm({
+  id,
+  keyed,
+  bulk,
+  initial,
+}: {
+  id: string | null;
+  /** Used by DXV OS itself (welcome, founder emails): edited, never archived. */
+  keyed: boolean;
+  /** A bulk email to angels (previewed with the unsubscribe line). */
+  bulk: boolean;
+  initial: { name: string; subject: string; body: string };
+}) {
   const [subject, setSubject] = useState(initial.subject);
   const [body, setBody] = useState(initial.body);
   const problems = templateProblems({ subject, body });
@@ -38,7 +50,7 @@ export function TemplateForm({ id, welcome, initial }: { id: string | null; welc
           <SubmitButton>{id ? "Save template" : "Create template"}</SubmitButton>
         </ActionForm>
         <WritingHelp />
-        {id && !welcome && (
+        {id && !keyed && (
           <ActionButton variant="secondary" confirm="Archive this template? Emails already sent keep their words." pendingLabel="Archiving…" run={() => archiveTemplate(id)}>
             Archive template
           </ActionButton>
@@ -46,7 +58,7 @@ export function TemplateForm({ id, welcome, initial }: { id: string | null; welc
       </div>
       <div className="space-y-2">
         <p className="text-sm font-medium text-black/70">Preview (as Ada would see it)</p>
-        <EmailPreview subject={subject} body={body} firstName="Ada" link="https://example.com/your-own-link" bulk={!welcome} />
+        <EmailPreview subject={subject} body={body} firstName="Ada" link="https://example.com/your-own-link" bulk={bulk} />
       </div>
     </div>
   );

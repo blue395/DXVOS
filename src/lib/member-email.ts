@@ -4,13 +4,15 @@
 //
 //   {{first_name}}      their first name
 //   {{platform_link}}   their own one-time sign-up link (or the sign-in page once they're on)
+//   {{company}}         the company (founder emails)
+//   {{next_step}}       where the deal is going next (founder decision emails)
 //   [link text](url)    a link; plain https:// addresses are linked too
 //   A blank line starts a new paragraph; a single line break is kept (e.g. a signature).
 
 import { emailShell, escapeHtml } from "./login-email";
 
-export const PLACEHOLDERS = ["first_name", "platform_link"] as const;
-export type EmailVars = { first_name: string; platform_link: string };
+export const PLACEHOLDERS = ["first_name", "platform_link", "company", "next_step"] as const;
+export type EmailVars = { first_name: string; platform_link?: string; company?: string; next_step?: string };
 
 /** Placeholders in a template that DXV OS doesn't fill in (typos like {{firstname}}). */
 export function unknownPlaceholders(text: string): string[] {
@@ -28,12 +30,14 @@ export function templateProblems(t: { subject: string; body: string }): string[]
   const problems: string[] = [];
   if (!t.subject.trim()) problems.push("Add a subject.");
   if (!t.body.trim()) problems.push("Add the message.");
-  for (const p of unknownPlaceholders(`${t.subject}\n${t.body}`)) problems.push(`{{${p}}} isn't a placeholder DXV OS knows (use {{first_name}} or {{platform_link}}).`);
+  for (const p of unknownPlaceholders(`${t.subject}\n${t.body}`)) problems.push(`{{${p}}} isn't a placeholder DXV OS knows (use {{first_name}}, {{platform_link}}, {{company}} or {{next_step}}).`);
   for (const b of unfinishedBits(t.body)) problems.push(`Replace ${b} with the real link.`);
   return problems;
 }
 
-const fill = (text: string, vars: EmailVars) => text.replace(/\{\{\s*(first_name|platform_link)\s*\}\}/gi, (_, k: string) => vars[k.toLowerCase() as keyof EmailVars]);
+/** Replace the placeholders, leaving the rest (links, spacing) as written: for drafts a person edits. */
+export const fill = (text: string, vars: EmailVars) =>
+  text.replace(/\{\{\s*(first_name|platform_link|company|next_step)\s*\}\}/gi, (_, k: string) => vars[k.toLowerCase() as keyof EmailVars] ?? "");
 
 const LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
 const safeUrl = (u: string) => /^(https?:\/\/|mailto:)/i.test(u);

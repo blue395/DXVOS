@@ -11,7 +11,7 @@ export const metadata = { title: "Email angels · DXV OS" };
 export default async function EmailsPage() {
   const [templates, emails] = await requireAdminWith(() =>
     Promise.all([
-      db.emailTemplate.findMany({ where: { archivedAt: null }, orderBy: [{ key: { sort: "asc", nulls: "last" } }, { name: "asc" }], include: { updatedBy: { select: { name: true } } } }),
+      db.emailTemplate.findMany({ where: { archivedAt: null, NOT: { key: { startsWith: "founder-" } } }, orderBy: [{ key: { sort: "asc", nulls: "last" } }, { name: "asc" }], include: { updatedBy: { select: { name: true } } } }),
       db.memberEmail.findMany({
         orderBy: { createdAt: "desc" },
         take: 50,

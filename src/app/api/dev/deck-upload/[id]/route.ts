@@ -3,17 +3,17 @@
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { MAX_DECK_BYTES, saveLocalDeck } from "@/lib/deck-storage";
+import { SYSTEM_USER_ID } from "@/lib/founder-submissions";
 
 export async function PUT(req: Request, ctx: RouteContext<"/api/dev/deck-upload/[id]">) {
   if (process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return new Response("Not found", { status: 404 });
   }
-  const user = await getCurrentUser();
-  if (!user || user.role !== "ADMIN") return new Response("Unauthorised", { status: 401 });
-
   const { id } = await ctx.params;
-  const analysis = await db.deckAnalysis.findUnique({ where: { id } });
+  const [user, analysis] = await Promise.all([getCurrentUser(), db.deckAnalysis.findUnique({ where: { id } })]);
   if (!analysis || analysis.status !== "PENDING") return new Response("Unknown upload", { status: 404 });
+  // The team's uploads, or a founder's from the public /apply page (filed by the website user).
+  if (user?.role !== "ADMIN" && analysis.createdById !== SYSTEM_USER_ID) return new Response("Unauthorised", { status: 401 });
 
   const bytes = Buffer.from(await req.arrayBuffer());
   if (bytes.length === 0 || bytes.length > MAX_DECK_BYTES) return new Response("Bad size", { status: 413 });
