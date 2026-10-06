@@ -13,6 +13,9 @@ import { completeFounderSubmission, startFounderSubmission } from "./actions";
 const HEARD_FROM = ["DXV website", "LinkedIn", "An event", "A founder recommended DXV", "An angel recommended DXV", "An accelerator or programme", "Other"];
 
 type Step = "idle" | "checking" | "uploading" | "filing" | "done";
+const pillClass =
+  "flex cursor-pointer items-center gap-1.5 rounded-full border border-dxv-green/25 px-3 py-1 text-sm has-[:checked]:border-dxv-green has-[:checked]:bg-dxv-green has-[:checked]:text-white";
+
 const STEP_LABEL: Record<Step, string> = { idle: "", checking: "Checking your details…", uploading: "Uploading your deck…", filing: "Filing your application…", done: "" };
 
 export function ApplyForm({ formToken, diversityOptions }: { formToken: string; diversityOptions: string[] }) {
@@ -53,6 +56,7 @@ export function ApplyForm({ formToken, diversityOptions }: { formToken: string; 
       linkedinUrl: String(f.get("linkedinUrl") ?? ""),
       heardFrom: String(f.get("heardFrom") ?? ""),
       diversityThemes: diversityConsent ? f.getAll("diversity").map(String) : [],
+      diversityOther: diversityConsent && f.getAll("diversity").includes("Other") ? String(f.get("diversityOther") ?? "") : "",
       privacyConsent: f.get("privacyConsent") === "on",
       diversityConsent,
       fileName: file.name,
@@ -162,20 +166,29 @@ export function ApplyForm({ formToken, diversityOptions }: { formToken: string; 
       <fieldset className="space-y-2 rounded-lg border border-black/10 p-4" disabled={busy}>
         <legend className="px-1 text-sm font-semibold uppercase tracking-wide text-dxv-green">Founder diversity (optional)</legend>
         <p className="text-sm text-black/65">
-          DXV exists to back Underestimated Founders, so we track the diversity of the founders we see and back. Tick any that describe your founding
-          team, only if you&apos;re happy to share. It never affects how we assess your application.
+          DXV exists to back Underestimated Founders, and we actively look for diverse founding teams: what you share here is part of how we
+          assess fit with our mission. Tick any that describe your founding team, only if you&apos;re happy to share.
         </p>
-        <div className="flex flex-wrap gap-2">
-          {diversityOptions.map((t) => (
-            <label key={t} className="flex cursor-pointer items-center gap-1.5 rounded-full border border-dxv-green/25 px-3 py-1 text-sm has-[:checked]:border-dxv-green has-[:checked]:bg-dxv-green has-[:checked]:text-white">
-              <input type="checkbox" name="diversity" value={t} className="sr-only" />
-              {t}
-            </label>
-          ))}
+        <div className="group space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {[...diversityOptions.filter((t) => t !== "Prefer not to say"), "Other", "Prefer not to say"].map((t) => (
+              <label key={t} className={pillClass}>
+                <input type="checkbox" name="diversity" value={t} id={t === "Other" ? "diversity-other" : undefined} className="sr-only" />
+                {t}
+              </label>
+            ))}
+          </div>
+          <label className="hidden space-y-1 group-has-[#diversity-other:checked]:block">
+            <span className="text-sm font-medium">Other: in your own words</span>
+            <input name="diversityOther" maxLength={60} className={inputClass} />
+          </label>
         </div>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="diversityConsent" className="mt-1 accent-dxv-green" />
-          <span>I consent to DXV recording the founder diversity information I&apos;ve ticked, to track who we see and back. I can ask for it to be removed at any time.</span>
+          <span>
+            I consent to DXV recording the founder diversity information I&apos;ve shared, using it when assessing my application, and tracking who
+            DXV sees and backs. I can ask for it to be removed at any time.
+          </span>
         </label>
       </fieldset>
 

@@ -1376,6 +1376,7 @@ export const FOUNDER_DIVERSITY_THEMES = [
   "Not university educated",
   "Global majority",
   "Experienced homelessness",
+  "Experienced Care",
 ] as const;
 
 /** The first sentence or two of some text, for a short "what they do" (at most `max` characters). */
