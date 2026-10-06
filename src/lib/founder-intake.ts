@@ -34,16 +34,20 @@ export const SubmissionSchema = z
     website: url("Website"),
     linkedinUrl: url("LinkedIn"),
     heardFrom: optional(120),
-    diversityThemes: z.array(z.string().trim().max(60)).max(12).default([]),
+    diversityThemes: z.array(z.string().trim().max(60)).max(14).default([]),
+    // "Other": the founder's own words, kept as one more theme.
+    diversityOther: z.string().trim().max(60, "Keep your \"Other\" answer to 60 characters").optional(),
     privacyConsent: z.literal(true, { message: "Please agree to how we'll use your details" }),
     diversityConsent: z.boolean().default(false),
     fileName: text(255).refine((n) => /\.pdf$/i.test(n), "Upload your deck as a PDF"),
     fileSize: z.number().int().positive().max(20 * 1024 * 1024, "Decks must be 20 MB or smaller"),
   })
-  .transform((d) => ({
+  .transform(({ diversityOther, ...d }) => ({
     ...d,
     // Diversity answers are only kept with explicit consent (special-category data).
-    diversityThemes: d.diversityConsent ? [...new Set(d.diversityThemes.filter((t) => t && t !== "Prefer not to say"))] : [],
+    diversityThemes: d.diversityConsent
+      ? [...new Set([...d.diversityThemes, diversityOther ?? ""].filter((t) => t && t !== "Prefer not to say" && t !== "Other"))]
+      : [],
   }));
 export type SubmissionInput = z.input<typeof SubmissionSchema>;
 

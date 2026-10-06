@@ -25,6 +25,14 @@ describe("founder submission form", () => {
     expect(r.success).toBe(true);
     expect(r.data).toMatchObject({ email: "jane@acme.com", raiseAmountGbp: 250000, linkedinUrl: null, diversityThemes: ["Female Founder"] });
   });
+  it("keeps an \"Other\" answer in the founder's own words", () => {
+    const r = SubmissionSchema.parse({ ...valid, diversityThemes: ["Experienced Care", "Other"], diversityOther: "  Refugee " });
+    expect(r.diversityThemes).toEqual(["Experienced Care", "Refugee"]);
+    expect(r).not.toHaveProperty("diversityOther");
+    expect(SubmissionSchema.parse({ ...valid, diversityConsent: false, diversityOther: "Refugee" }).diversityThemes).toEqual([]);
+    expect(SubmissionSchema.safeParse({ ...valid, diversityOther: "x".repeat(61) }).success).toBe(false);
+  });
+
   it("only keeps diversity answers with consent", () => {
     expect(SubmissionSchema.parse({ ...valid, diversityConsent: false }).diversityThemes).toEqual([]);
   });
