@@ -106,7 +106,7 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
       ? [
           db.loginIdentity.deleteMany({ where: { userId: user.id } }),
           db.loginLink.updateMany({ where: { userId: user.id, usedAt: null, revokedAt: null }, data: { revokedAt: now } }),
-          db.user.update({ where: { id: user.id }, data: { email: `erased-${user.id}@deleted.invalid`, name: ERASED_ANGEL_NAME, passwordHash: unusable!, disabledAt: now } }),
+          db.user.update({ where: { id: user.id }, data: { email: `erased-${user.id}@deleted.invalid`, name: ERASED_ANGEL_NAME, passwordHash: unusable!, disabledAt: now, sessionVersion: { increment: 1 } } }),
         ]
       : []),
     db.angel.update({

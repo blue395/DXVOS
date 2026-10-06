@@ -17,6 +17,7 @@ import { renderMemberEmail, templateProblems } from "./member-email";
 import { formatGbpCompact } from "./pipeline";
 import { aiContextFor } from "./playbook/current";
 import { triggerBackgroundJob } from "./trigger-worker";
+import { hashIp } from "./client-ip";
 
 export const SYSTEM_USER_ID = "system-website";
 const DAY_MS = 86_400_000;
@@ -35,8 +36,6 @@ function formTokenTime(token: string): number | null {
   return Number(t);
 }
 
-/** IPs are only ever kept as a keyed hash, for rate limiting. */
-export const hashIp = (ip: string | null) => (ip ? hmac(`ip:${ip}`) : null);
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 export type StartResult = { error: string } | { submissionId: string; completionToken: string; target: UploadTarget };

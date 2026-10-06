@@ -51,7 +51,7 @@ export async function acceptTeamInvite(token: string, _prev: ActionResult, formD
     const target = invite.user!;
     const ok = await db.$transaction(async (tx) => {
       if ((await claim(tx)).count !== 1) return false;
-      await tx.user.update({ where: { id: target.id }, data: { passwordHash, lastSignInAt: new Date() } });
+      await tx.user.update({ where: { id: target.id }, data: { passwordHash, lastSignInAt: new Date(), sessionVersion: { increment: 1 } } }); // ends any other session
       await tx.teamEvent.create({ data: { subjectId: target.id, email: invite.email, kind: "password-reset", actorId: target.id } });
       return true;
     });

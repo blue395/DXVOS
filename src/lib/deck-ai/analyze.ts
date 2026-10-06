@@ -9,6 +9,7 @@ import { normaliseCompanyStage } from "../pipeline";
 import { DECK_AI_MODEL } from "./prompt";
 import { DeckAnalysisOutputSchema, type DeckAnalysisOutput } from "./schema";
 import { cleanOutput } from "./render";
+import { withDataNote } from "../ai-untrusted";
 
 export class DeckAnalysisError extends Error {}
 
@@ -40,7 +41,7 @@ export async function analyzeDeck(
             source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") },
             title: fileName,
           },
-          { type: "text", text: buildDeckUserInstructions(playbook) },
+          { type: "text", text: withDataNote(buildDeckUserInstructions(playbook)) },
         ],
       },
     ],

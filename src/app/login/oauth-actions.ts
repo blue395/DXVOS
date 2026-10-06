@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import type { OAuthProvider } from "@/generated/prisma/enums";
 import type { ActionResult } from "@/lib/action-result";
 import { getCurrentUser } from "@/lib/auth";
+import { createSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { emailChangedEmail } from "@/lib/login-email";
 import { loginLinkEvent } from "@/lib/login-links";
@@ -101,13 +102,15 @@ export async function switchToIdentityEmail(identityId: string): Promise<ActionR
   }
   const via = PROVIDER_LABEL[idn.provider];
   await db.$transaction([
-    db.user.update({ where: { id: me.id }, data: { email: newEmail } }),
+    // A new login email ends every other session; this browser is signed in again below.
+    db.user.update({ where: { id: me.id }, data: { email: newEmail, sessionVersion: { increment: 1 } } }),
     ...(syncAngel ? [db.angel.update({ where: { id: me.angelId! }, data: { email: newEmail } })] : []),
     db.loginIdentity.update({ where: { id: idn.id }, data: { emailChoiceAt: new Date() } }),
     // Links emailed to the old address stop working.
     db.loginLink.updateMany({ where: { userId: me.id, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
     loginLinkEvent(me, "login-email-changed", `${oldEmail} to ${newEmail} (chosen by them, verified by ${via})`),
   ]);
+  await createSession(me.id);
   const origin = appOrigin();
   if (mailConfigured() && origin) {
     await sendMail({ to: oldEmail, ...emailChangedEmail({ name: me.name, oldEmail, newEmail, via, signInUrl: `${origin}/login` }) }).catch((e) =>

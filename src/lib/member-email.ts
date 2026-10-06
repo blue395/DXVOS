@@ -35,9 +35,27 @@ export function templateProblems(t: { subject: string; body: string }): string[]
   return problems;
 }
 
+/**
+ * Names typed by founders and members (the public apply form, profiles) go into emails DXV
+ * sends. Make them plain words, so nobody can slip a link or extra lines into an email from
+ * DXV's address (e.g. a "company name" that's really a phishing link sent to someone else).
+ */
+export const inert = (s: string) =>
+  s
+    .replace(/[a-z][a-z0-9+.-]*:\/\//gi, "") // https://, ftp:// …
+    .replace(/[[\]()<>{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const UNTRUSTED = new Set(["first_name", "company"]);
+
 /** Replace the placeholders, leaving the rest (links, spacing) as written: for drafts a person edits. */
 export const fill = (text: string, vars: EmailVars) =>
-  text.replace(/\{\{\s*(first_name|platform_link|company|next_step)\s*\}\}/gi, (_, k: string) => vars[k.toLowerCase() as keyof EmailVars] ?? "");
+  text.replace(/\{\{\s*(first_name|platform_link|company|next_step)\s*\}\}/gi, (_, k: string) => {
+    const key = k.toLowerCase() as keyof EmailVars;
+    const v = vars[key] ?? "";
+    return UNTRUSTED.has(key) ? inert(v) : v;
+  });
 
 const LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
 const safeUrl = (u: string) => /^(https?:\/\/|mailto:)/i.test(u);

@@ -15,13 +15,15 @@ const optional = (max: number) =>
     .transform((s) => (s === "" ? null : s))
     .nullable()
     .optional();
+/** Names go into emails DXV sends, so no web addresses or link markup in them. */
+const noLinks = (schema: z.ZodString, message: string) => schema.refine((s) => !/:\/\/|www\.|[[\]<>]/i.test(s), message);
 const url = (label: string) =>
   optional(300).refine((s) => !s || /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(s), `${label} should be a full web address, starting https://`);
 
 export const SubmissionSchema = z
   .object({
-    companyName: text(120).min(1, "Add your company's name"),
-    founderNames: text(200).min(1, "Add the founders' names"),
+    companyName: noLinks(text(120).min(1, "Add your company's name"), "Add just the company name here (your website goes below)"),
+    founderNames: noLinks(text(200).min(1, "Add the founders' names"), "Add just the founders' names here"),
     email: z.string().trim().toLowerCase().pipe(z.email("Add an email address we can reply to")),
     pitch: text(200).min(10, "Describe what the company does in one line"),
     sector: text(80).min(1, "Add your sector"),

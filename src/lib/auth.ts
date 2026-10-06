@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./db";
-import { readSessionUserId } from "./session";
+import { readSession } from "./session";
 
 // The real access check. proxy.ts only does an optimistic redirect for signed-out
 // visitors; every page and server action must call requireAdmin() itself, because
@@ -10,13 +10,15 @@ import { readSessionUserId } from "./session";
 
 /** Current user or null (a revoked login, or an archived angel's, counts as signed out). `cache` dedupes the lookup within a request. */
 export const getCurrentUser = cache(async () => {
-  const userId = await readSessionUserId();
-  if (!userId) return null;
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, angelId: true, disabledAt: true, angel: { select: { archivedAt: true } } },
+  const session = await readSession();
+  if (!session) return null;
+  const found = await db.user.findUnique({
+    where: { id: session.userId },
+    select: { id: true, name: true, email: true, role: true, angelId: true, disabledAt: true, sessionVersion: true, angel: { select: { archivedAt: true } } },
   });
-  if (!user || user.disabledAt) return null;
+  // Revoked, or signed out everywhere since this session began.
+  if (!found || found.disabledAt || found.sessionVersion !== session.version) return null;
+  const user = found;
   // An angel login whose Angel record is gone or archived is signed out (never a redirect loop).
   if (user.role === "ANGEL" && (!user.angel || user.angel.archivedAt)) return null;
   return user;

@@ -1,18 +1,19 @@
 "use server";
 
+import { clientIp, hashIp } from "@/lib/client-ip";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { createSession, deleteSession } from "@/lib/session";
-import { homeFor } from "@/lib/auth";
+import { createSession, deleteSession, signOutEverywhere } from "@/lib/session";
+import { getCurrentUser, homeFor } from "@/lib/auth";
 import type { ActionResult } from "@/lib/action-result";
 import { newInviteToken } from "@/lib/invite-token";
 import { findUsableLoginLink, loginLinkEvent } from "@/lib/login-links";
 import { loginLinkEmail } from "@/lib/login-email";
 import { appOrigin, mailConfigured, sendMail } from "@/lib/mail";
-import { LOGIN_LINK_MINUTES, LOGIN_LINKS_PER_HOUR, MIN_PASSWORD_LENGTH, canSignIn } from "@/lib/pipeline";
+import { LOGIN_LIMITS, LOGIN_LINK_MINUTES, LOGIN_LINKS_PER_HOUR, LOGIN_PAUSED_MESSAGE, MIN_PASSWORD_LENGTH, canSignIn, loginThrottled } from "@/lib/pipeline";
 
 // Pre-computed hash of a random string. Comparing against it when the email is
 // unknown makes "no such user" take as long as "wrong password".
@@ -27,18 +28,40 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
   const parsed = LoginSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "Enter your email and password." };
 
-  const user = await db.user.findUnique({ where: { email: parsed.data.email } });
+  const { email } = parsed.data;
+  const ipHash = hashIp(clientIp(await headers()));
+  const since = new Date(Date.now() - LOGIN_LIMITS.windowMinutes * 60_000);
+  const [user, emailFailures, ipFailures] = await Promise.all([
+    db.user.findUnique({ where: { email } }),
+    db.loginAttempt.findMany({ where: { email, ok: false, createdAt: { gt: since } }, select: { createdAt: true }, take: LOGIN_LIMITS.perEmail }),
+    ipHash ? db.loginAttempt.count({ where: { ipHash, ok: false, createdAt: { gt: since } } }) : 0,
+  ]);
+  // Too many wrong passwords: pause before even checking this one (emailed links still work).
+  if (loginThrottled({ emailFailures: emailFailures.map((f) => f.createdAt), ipFailures, lastSignInAt: user?.lastSignInAt ?? null }, new Date())) {
+    return { error: LOGIN_PAUSED_MESSAGE };
+  }
   const valid = await bcrypt.compare(parsed.data.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !valid || user.disabledAt) return { error: "Incorrect email or password." };
+  const ok = !!user && valid && !user.disabledAt;
+  await db.loginAttempt.create({ data: { email, ipHash, ok } });
+  if (!ok) return { error: "Incorrect email or password." };
 
-  await createSession(user.id);
   await db.user.update({ where: { id: user.id }, data: { lastSignInAt: new Date() } });
+  await createSession(user.id);
   redirect(homeFor(user.role));
 }
 
 export async function logout() {
   await deleteSession();
   redirect("/login");
+}
+
+/** "Sign out other devices": ends every other session for this login (e.g. a lost phone), keeping this browser signed in. */
+export async function signOutOtherDevices(): Promise<ActionResult> {
+  const me = await getCurrentUser();
+  if (!me) redirect("/login");
+  await db.$transaction([signOutEverywhere(me.id), loginLinkEvent(me, "signed-out-everywhere", "Signed out of every other device")]);
+  await createSession(me.id);
+  return { ok: true };
 }
 
 // ── "Forgot password?": emailed one-time links (any login, team or member) ──
@@ -73,7 +96,7 @@ export async function requestLoginLink(_prev: ActionResult, formData: FormData):
       if (recent < LOGIN_LINKS_PER_HOUR) {
         const { token, tokenHash } = newInviteToken();
         const minutes = LOGIN_LINK_MINUTES[kind];
-        const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+        const ip = clientIp(await headers());
         await db.$transaction([
           db.loginLink.updateMany({ where: { userId: user.id, kind, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
           db.loginLink.create({ data: { userId: user.id, kind, tokenHash, expiresAt: new Date(Date.now() + minutes * 60_000), requestedIp: ip } }),
@@ -126,7 +149,8 @@ export async function resetPasswordWithLink(token: string, _prev: ActionResult, 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   if (!(await claimLink(link.id))) return { error: LINK_EXPIRED };
   await db.$transaction([
-    db.user.update({ where: { id: link.user.id }, data: { passwordHash, lastSignInAt: new Date() } }),
+    // A new password ends every other session (e.g. one someone else had), then signs this browser in.
+    db.user.update({ where: { id: link.user.id }, data: { passwordHash, lastSignInAt: new Date(), sessionVersion: { increment: 1 } } }),
     // Any other unused link for this login stops working once the password changes.
     db.loginLink.updateMany({ where: { userId: link.user.id, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
     loginLinkEvent(link.user, "password-reset", "By emailed link"),

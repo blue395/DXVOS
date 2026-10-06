@@ -3,6 +3,7 @@
 // The angel portal's actions. Each calls requireAngel() and only ever touches the
 // signed-in angel's own record (the id comes from the session, never from the form).
 
+import { clientIp } from "@/lib/client-ip";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -90,7 +91,7 @@ export async function signStatement(_prev: ActionResult, formData: FormData): Pr
 
   const type = STATEMENT_CERT_TYPE[text.kind];
   const signedOn = new Date();
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ip = clientIp(await headers());
   await db.$transaction([
     db.angelCertification.create({
       data: {
