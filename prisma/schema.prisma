@@ -39,6 +39,7 @@ model User {
   angel                 Angel?          @relation("AngelUser", fields: [angelId], references: [id])
   disabledAt            DateTime? // access revoked: treated as signed out everywhere
   lastSignInAt          DateTime?
+  sessionVersion        Int             @default(0) // in every session; bumping it signs this login out everywhere
   loginLinks            LoginLink[]
   identities            LoginIdentity[]
   emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreatedBy")
@@ -1315,4 +1316,17 @@ model FounderEmail {
   createdAt DateTime         @default(now())
 
   @@index([ventureId, createdAt])
+}
+
+/// Password sign-in attempts, for slowing down password guessing (loginThrottle() in pipeline.ts).
+/// Kept 30 days. IP stored only as a keyed hash.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ipHash    String?
+  ok        Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ipHash, createdAt])
 }

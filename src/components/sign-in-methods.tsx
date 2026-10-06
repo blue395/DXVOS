@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { PROVIDER_LABEL, enabledProviders } from "@/lib/oauth";
 import { emailSwitchOffer } from "@/lib/pipeline";
 import { formatDate } from "./ui";
-import { ConnectButton, DisconnectButton, EmailSwitchButtons } from "./provider-buttons";
+import { ConnectButton, DisconnectButton, EmailSwitchButtons, SignOutOtherDevicesButton } from "./provider-buttons";
 
 const CONNECT_MESSAGES: Record<string, string> = {
   ok: "✓ Connected. You can now sign in with it.",
@@ -84,6 +84,10 @@ export async function SignInMethods({
         </div>
       )}
       {providers.length === 0 && identities.length === 0 && <p className="text-xs text-black/50">Google and Microsoft sign-in aren&apos;t switched on yet.</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
+        <p className="text-sm text-black/60">Lost a phone, or signed in on a shared computer?</p>
+        <SignOutOtherDevicesButton />
+      </div>
     </section>
   );
 }

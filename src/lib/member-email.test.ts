@@ -42,3 +42,20 @@ describe("founder email placeholders", () => {
     expect(m.text).toBe("Hi Sam, next: .");
   });
 });
+
+describe("names from founders and members can't become links", () => {
+  it("strips link markup, web-address schemes and extra lines from {{company}} / {{first_name}}", () => {
+    const m = renderMemberEmail(
+      { subject: "Thanks, {{company}}", body: "Hi {{first_name}},\n\nWe've got {{company}}." },
+      { first_name: "Sam\n\nClick here", company: "[Reset your password](https://evil.example/x) https://evil.example" },
+    );
+    expect(m.html).not.toContain("evil.example/x\"");
+    expect(m.html).not.toContain("<a ");
+    expect(m.text).not.toContain("https://");
+    expect(m.text).toContain("Hi Sam Click here,");
+  });
+  it("leaves DXV's own links alone", () => {
+    const m = renderMemberEmail({ subject: "s", body: "Join: {{platform_link}}" }, { first_name: "Sam", platform_link: "https://dxv-os.netlify.app/join/abc" });
+    expect(m.html).toContain('href="https://dxv-os.netlify.app/join/abc"');
+  });
+});

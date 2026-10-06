@@ -135,7 +135,8 @@ export async function setTeamAccess(userId: string, enabled: boolean): Promise<A
     if (block) return { error: block };
   }
   await db.$transaction([
-    db.user.update({ where: { id: user.id }, data: { disabledAt: enabled ? null : new Date() } }),
+    // sessionVersion: restoring access never revives a session from before the revoke.
+    db.user.update({ where: { id: user.id }, data: { disabledAt: enabled ? null : new Date(), sessionVersion: { increment: 1 } } }),
     ...(enabled ? [] : [db.teamInvite.updateMany({ where: { email: user.email, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } })]),
     db.teamEvent.create({ data: { subjectId: user.id, email: user.email, kind: enabled ? "access-restored" : "access-revoked", actorId: admin.id } }),
   ]);

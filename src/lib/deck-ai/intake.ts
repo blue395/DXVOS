@@ -10,6 +10,7 @@ import { COMPANY_STAGES, normaliseCompanyStage } from "../pipeline";
 import { DeckAnalysisError, type DeckAnalysisResult } from "./analyze";
 import { DECK_AI_MODEL } from "./prompt";
 import type { ExtractedFields } from "./schema";
+import { withDataNote } from "../ai-untrusted";
 
 export const IntakeOutputSchema = z.object({
   name: z.string().nullable(),
@@ -58,7 +59,7 @@ export async function readDeckIntake(
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") }, title: fileName },
-          { type: "text", text: INTAKE_INSTRUCTIONS },
+          { type: "text", text: withDataNote(INTAKE_INSTRUCTIONS) },
         ],
       },
     ],

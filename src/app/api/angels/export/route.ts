@@ -3,12 +3,8 @@
 import { getCurrentUser } from "@/lib/auth";
 import { loadAngelRows } from "@/lib/angels";
 import { ANGEL_STATUS_LABELS, CERT_STATE_LABELS, CERTIFICATION_LABELS } from "@/lib/pipeline";
+import { csvCell } from "@/lib/csv";
 
-const cell = (v: unknown) => {
-  const s = v == null ? "" : v instanceof Date ? v.toISOString().slice(0, 10) : String(v);
-  // Quote everything; neutralise spreadsheet formulas (CSV injection).
-  return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
-};
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -35,10 +31,10 @@ export async function GET(req: Request) {
       r.committedGbp,
       r.investedGbp,
     ]
-      .map(cell)
+      .map(csvCell)
       .join(","),
   );
-  const csv = "﻿" + [header.map(cell).join(","), ...lines].join("\r\n");
+  const csv = "﻿" + [header.map(csvCell).join(","), ...lines].join("\r\n");
   const date = new Date().toISOString().slice(0, 10);
   return new Response(csv, {
     headers: {

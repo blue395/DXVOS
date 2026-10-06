@@ -6,6 +6,7 @@
 import { ActionButton } from "./action-button";
 import { ActionForm, SubmitButton } from "./action-form";
 import type { OAuthProvider } from "@/generated/prisma/enums";
+import { signOutOtherDevices } from "@/app/login/actions";
 import { disconnectIdentity, keepMyEmail, startProviderConnect, startProviderJoin, startProviderSignIn, switchToIdentityEmail } from "@/app/login/oauth-actions";
 
 const LABEL: Record<OAuthProvider, string> = { GOOGLE: "Google", MICROSOFT: "Microsoft" };
@@ -82,5 +83,19 @@ export function EmailSwitchButtons({ identityId, newEmail, oldEmail }: { identit
         Keep {oldEmail}
       </ActionButton>
     </span>
+  );
+}
+
+/** My profile / Account: end every other session for this login (a lost phone, a shared computer). */
+export function SignOutOtherDevicesButton() {
+  return (
+    <ActionButton
+      run={signOutOtherDevices}
+      variant="secondary"
+      pendingLabel="Signing out…"
+      confirm="Sign out of DXV OS on every other device and browser? You'll stay signed in here."
+    >
+      Sign out other devices
+    </ActionButton>
   );
 }

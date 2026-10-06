@@ -1,6 +1,7 @@
 // Where Google / Microsoft send people back after "Continue with …". Public: the signed
 // state cookie set when they left (lib/oauth.ts) is what ties this to their request.
 
+import { clientIp } from "@/lib/client-ip";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/auth/cal
     if (taken && !taken.removedAt) return go(`/join/${intent.inviteToken}?signin=taken`);
     // No password yet: they sign in with Google/Microsoft, or set one later with "Forgot your password?".
     const unusable = await bcrypt.hash(randomBytes(32).toString("base64url"), 12);
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const ip = clientIp(request.headers);
     const made = await createLoginFromInvite(invite, unusable, ip, `Set up their login with ${label}`);
     if ("error" in made) return go(`/join/${intent.inviteToken}`);
     const user = await db.user.findUniqueOrThrow({ where: { id: made.userId }, select: { id: true, email: true, role: true, angelId: true } });

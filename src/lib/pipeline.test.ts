@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
+  loginThrottled,
+  LOGIN_LIMITS,
   insightNudges,
   medianDaysInStage,
   monthlyCounts,
@@ -944,5 +946,22 @@ describe("insights", () => {
     expect(insightNudges(none)).toEqual([]);
     const n = insightNudges({ ...none, membersNotOnPlatform: 1, lowTurnoutDeals: [{ id: "v", name: "Acme", turnoutPct: 20 }] });
     expect(n.map((x) => x.text)).toEqual(["1 member isn't on the platform yet", "Only 20% of eligible members have voted on Acme"]);
+  });
+});
+
+describe("loginThrottled", () => {
+  const now = new Date("2026-10-06T12:00:00Z");
+  const ago = (min: number) => new Date(now.getTime() - min * 60_000);
+  const fails = (n: number, min = 1) => Array.from({ length: n }, () => ago(min));
+  it("pauses an email after too many recent wrong passwords", () => {
+    expect(loginThrottled({ emailFailures: fails(LOGIN_LIMITS.perEmail - 1), ipFailures: 0, lastSignInAt: null }, now)).toBe(false);
+    expect(loginThrottled({ emailFailures: fails(LOGIN_LIMITS.perEmail), ipFailures: 0, lastSignInAt: null }, now)).toBe(true);
+  });
+  it("forgets failures outside the window or before a successful sign-in", () => {
+    expect(loginThrottled({ emailFailures: fails(20, LOGIN_LIMITS.windowMinutes + 1), ipFailures: 0, lastSignInAt: null }, now)).toBe(false);
+    expect(loginThrottled({ emailFailures: fails(20, 5), ipFailures: 0, lastSignInAt: ago(2) }, now)).toBe(false);
+  });
+  it("pauses an IP trying many emails", () => {
+    expect(loginThrottled({ emailFailures: [], ipFailures: LOGIN_LIMITS.perIp, lastSignInAt: null }, now)).toBe(true);
   });
 });

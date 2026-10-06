@@ -33,6 +33,13 @@ describe("founder submission form", () => {
     expect(SubmissionSchema.safeParse({ ...valid, diversityOther: "x".repeat(61) }).success).toBe(false);
   });
 
+  it("refuses web addresses in the name fields (they go into emails)", () => {
+    expect(SubmissionSchema.safeParse({ ...valid, companyName: "Acme https://evil.example" }).success).toBe(false);
+    expect(SubmissionSchema.safeParse({ ...valid, companyName: "[Click](evil)" }).success).toBe(false);
+    expect(SubmissionSchema.safeParse({ ...valid, founderNames: "Jane www.evil.example" }).success).toBe(false);
+    expect(SubmissionSchema.safeParse({ ...valid, companyName: "Acme.io Ltd" }).success).toBe(true);
+  });
+
   it("only keeps diversity answers with consent", () => {
     expect(SubmissionSchema.parse({ ...valid, diversityConsent: false }).diversityThemes).toEqual([]);
   });

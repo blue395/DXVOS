@@ -742,6 +742,27 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
 /** Minimum password length for angel logins. */
 export const MIN_PASSWORD_LENGTH = 10;
 
+// ── Password guessing ────────────────────────────────────────────────────────
+
+/**
+ * Wrong passwords allowed before password sign-in pauses: per email (since its last
+ * successful sign-in) and per IP address, within the window. Emailed sign-in links still
+ * work while it's paused, so a real person is never locked out.
+ */
+export const LOGIN_LIMITS = { windowMinutes: 15, perEmail: 8, perIp: 40 } as const;
+export const LOGIN_PAUSED_MESSAGE = `Too many sign-in attempts. Wait ${LOGIN_LIMITS.windowMinutes} minutes, or use "Email me a sign-in link" below.`;
+
+/** Whether password sign-in is paused for this email / IP (failures: timestamps of wrong passwords). */
+export function loginThrottled(
+  a: { emailFailures: Date[]; ipFailures: number; lastSignInAt: Date | null },
+  now: Date,
+  limits: { windowMinutes: number; perEmail: number; perIp: number } = LOGIN_LIMITS,
+): boolean {
+  const since = Math.max(now.getTime() - limits.windowMinutes * 60_000, a.lastSignInAt?.getTime() ?? 0);
+  const forEmail = a.emailFailures.filter((d) => d.getTime() > since).length;
+  return forEmail >= limits.perEmail || a.ipFailures >= limits.perIp;
+}
+
 // ── Self-service sign-in links ("Forgot password?") ─────────────────────────
 
 /** How long an emailed link works: a magic sign-in link is shorter-lived than a reset. */

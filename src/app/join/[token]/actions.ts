@@ -3,6 +3,7 @@
 // Public: the one-time link is the only credential here. It's claimed atomically, so a
 // link can't be used twice, even by two clicks at once.
 
+import { clientIp } from "@/lib/client-ip";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -29,7 +30,7 @@ export async function acceptInvite(token: string, _prev: ActionResult, formData:
   const invite = await findUsableInvite(token);
   if (!invite) return { error: EXPIRED };
   const angel = invite.angel;
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const ip = clientIp(await headers());
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   let userId: string;
 
@@ -44,7 +45,7 @@ export async function acceptInvite(token: string, _prev: ActionResult, formData:
     const ok = await db.$transaction(async (tx) => {
       const claimed = await tx.angelInvite.updateMany({ where: { id: invite.id, usedAt: null, revokedAt: null }, data: { usedAt: new Date() } });
       if (claimed.count !== 1) return false;
-      await tx.user.update({ where: { id: target }, data: { passwordHash, lastSignInAt: new Date() } });
+      await tx.user.update({ where: { id: target }, data: { passwordHash, lastSignInAt: new Date(), sessionVersion: { increment: 1 } } }); // ends any other session
       await tx.angelEvent.create({ data: { angelId: angel.id, kind: "password-reset", actorId: target } });
       return true;
     });

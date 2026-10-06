@@ -2,11 +2,8 @@
 import { getCurrentUser, hasMemberAccess } from "@/lib/auth";
 import { HOLDING_STATUS_LABELS, INSTRUMENT_LABELS, holdingMultiple, holdingValueMinor } from "@/lib/pipeline";
 import { loadPortfolio } from "@/lib/portfolio";
+import { csvCell } from "@/lib/csv";
 
-const cell = (v: string | number | null | undefined) => {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 const money = (minor: number | null | undefined) => (minor == null ? "" : (minor / 100).toFixed(2));
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
@@ -26,9 +23,9 @@ export async function GET() {
       money(holdingValueMinor(r)), day(r.currentValueOn), money(r.proceedsMinor), holdingMultiple(r)?.toFixed(2),
       r.taxScheme, r.taxCertificateReceived ? "Yes" : "No", r.shareCertificateReceived ? "Yes" : "No", r.diversityThemes.join("; "),
       [r.rationale, r.notes, r.heardVia ? `How I heard about it: ${r.heardVia}` : null].filter(Boolean).join("\n\n"),
-    ].map(cell).join(","),
+    ].map(csvCell).join(","),
   );
-  const csv = "﻿" + [header.map(cell).join(","), ...lines].join("\r\n");
+  const csv = "﻿" + [header.map(csvCell).join(","), ...lines].join("\r\n");
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

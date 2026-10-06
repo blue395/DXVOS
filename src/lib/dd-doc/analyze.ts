@@ -5,6 +5,7 @@ import { applyHouseStyle } from "../deck-ai/render";
 import { renderDDContext, type DDContext } from "./context";
 import { DD_AI_MODEL, DD_SYSTEM_PROMPT, DD_USER_INSTRUCTIONS } from "./prompt";
 import { DDPlanError, DDPlanSchema, normaliseAreas, type DDPlan } from "./schema";
+import { withDataNote } from "../ai-untrusted";
 
 export type DDPlanResult = { plan: DDPlan; model: string; inputTokens: number; outputTokens: number };
 
@@ -30,7 +31,7 @@ export async function analyzeDD(client: Anthropic, pdf: Buffer | null, context: 
       title: context.deck?.fileName ?? "deck.pdf",
     });
   }
-  content.push({ type: "text", text: DD_USER_INSTRUCTIONS });
+  content.push({ type: "text", text: withDataNote(DD_USER_INSTRUCTIONS) });
 
   const response = await client.messages.parse({
     model: DD_AI_MODEL,

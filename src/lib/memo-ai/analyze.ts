@@ -7,6 +7,7 @@ import { DEFAULT_ASSESSMENT } from "../playbook/defaults";
 import { buildMemoPrompt, buildMemoUserInstructions } from "../playbook/prompts";
 import { MEMO_AI_MODEL } from "./prompt";
 import { memoContentSchema, MemoFormatError, normaliseScores, type MemoContent } from "./schema";
+import { withDataNote } from "../ai-untrusted";
 
 export type MemoAnalysisResult = { memo: MemoContent; model: string; inputTokens: number; outputTokens: number };
 
@@ -41,7 +42,7 @@ export async function analyzeMemo(client: Anthropic, pdf: Buffer, context: MemoC
             source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") },
             title: context.deck?.fileName ?? "deck.pdf",
           },
-          { type: "text", text: buildMemoUserInstructions(playbook) },
+          { type: "text", text: withDataNote(buildMemoUserInstructions(playbook)) },
         ],
       },
     ],

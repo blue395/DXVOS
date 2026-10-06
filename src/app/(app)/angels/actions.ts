@@ -143,10 +143,14 @@ export async function updateAngel(angelId: string, _prev: ActionResult, formData
 /** Hide an angel (a duplicate or a mistake). Nothing is deleted; restore brings it back. */
 export async function setAngelArchived(angelId: string, archived: boolean): Promise<ActionResult> {
   const user = await requireAdmin();
-  await db.angel.update({
-    where: { id: angelId },
-    data: { archivedAt: archived ? new Date() : null, updatedById: user.id },
-  });
+  await db.$transaction([
+    db.angel.update({
+      where: { id: angelId },
+      data: { archivedAt: archived ? new Date() : null, updatedById: user.id },
+    }),
+    // Their member login is signed out, and restoring never revives an old session.
+    db.user.updateMany({ where: { angelId, role: "ANGEL" }, data: { sessionVersion: { increment: 1 } } }),
+  ]);
   revalidateAngels(angelId);
   return { ok: true };
 }
