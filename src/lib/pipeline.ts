@@ -1116,8 +1116,11 @@ export function angelDealVisibility(v: { sharedWithAngelsAt: Date | null; curren
 const PHASE_ORDER: AngelDealPhase[] = ["pitch-selection", "post-pitch", "commitments"];
 const atLeast = (phase: AngelDealPhase, min: AngelDealPhase) => PHASE_ORDER.indexOf(phase) >= PHASE_ORDER.indexOf(min);
 
-/** The locked memo (DXV Review Issue) is shown from the post-pitch vote. */
-export const angelSeesMemo = (phase: AngelDealPhase) => atLeast(phase, "post-pitch");
+/**
+ * The locked memo (the latest DXV Review Issue: edited and issued by the team, never an AI
+ * or working draft) is shown from Member Pitch Selection onwards (Blue, 2026-10-13).
+ */
+export const angelSeesMemo = (phase: AngelDealPhase) => atLeast(phase, "pitch-selection");
 
 /**
  * Whether a (non-deck) document is shown in this phase: only if the team chose a phase

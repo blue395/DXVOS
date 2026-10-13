@@ -1,4 +1,4 @@
-// One deal as members see it: summary, pitch deck, memo (DXV Review Issue) and the
+// One deal as members see it: summary, pitch deck, memo (DXV Review Issue, from pitch selection once issued) and the
 // documents shared for the deal's phase. A plain view of loadDealRoom()'s output, so the
 // team's "Preview as angel" shows exactly the same page. Server-component safe.
 import { DocSpecView } from "@/components/doc-spec-view";
@@ -37,7 +37,11 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
             </>
           )}
         </p>
-        <p className="mt-2 text-sm">{PHASE_HELP[deal.phase]}</p>
+        <p className="mt-2 text-sm">
+          {deal.phase === "pitch-selection" && deal.memo
+            ? "DXV is asking members which companies they'd like to hear pitch. Read the deck and DXV's memo, and tell us if you're interested."
+            : PHASE_HELP[deal.phase]}
+        </p>
       </div>
 
       {deal.summary && <p className="whitespace-pre-wrap rounded-lg border border-black/10 bg-white p-4 text-sm">{deal.summary}</p>}
@@ -48,7 +52,8 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
         {deal.deck ? <DocLink d={deal.deck} href={docHref} /> : <p className="text-sm text-black/55">The deck will appear here shortly.</p>}
       </Section>
 
-      {deal.phase !== "pitch-selection" && (
+      {/* At pitch selection the memo shows once it's issued; later on, a placeholder until then. */}
+      {(deal.memo || deal.phase !== "pitch-selection") && (
         <Section title="DXV investment memo">
           {deal.memo ? (
             <DocSpecView spec={deal.memo.spec} />

@@ -598,7 +598,7 @@ describe("deal room", () => {
     expect(angelDealVisibility({ sharedWithAngelsAt: now, currentStage: "PITCH_SELECTION" })).toBe("pitch-selection");
   });
   it("unlocks the memo after the pitch and documents by their chosen phase", () => {
-    expect(angelSeesMemo("pitch-selection")).toBe(false);
+    expect(angelSeesMemo("pitch-selection")).toBe(true);
     expect(angelSeesMemo("post-pitch")).toBe(true);
     const doc = (angelVisibleFrom: "POST_PITCH" | "COMMITMENTS" | "DUE_DILIGENCE" | null, o: object = {}) => ({ angelVisibleFrom, archivedAt: null, uploadedAt: now, ...o });
     expect(angelSeesDocument("commitments", doc(null))).toBe(false);
