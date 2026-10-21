@@ -5,6 +5,7 @@ import { Field, inputClass } from "@/components/ui";
 import { FounderDiversityField } from "@/components/founder-diversity-field";
 import { COMPANY_STAGES, HOLDING_STATUS_LABELS, INSTRUMENT_LABELS, PORTFOLIO_CURRENCIES, TAX_SCHEME_LABELS } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
+import { SectorSelect } from "@/components/sector-select";
 
 export type SyndicateDefaults = {
   companyName?: string | null;
@@ -55,7 +56,7 @@ export function SyndicateForm({
               <input name="companyName" required defaultValue={v.companyName ?? ""} className={inputClass} />
             </Field>
             <Field label="Sector">
-              <input name="sector" defaultValue={v.sector ?? ""} className={inputClass} />
+              <SectorSelect value={v.sector} />
             </Field>
           </>
         )}

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Spinner, buttonClass, inputClass } from "@/components/ui";
 import { COMPANY_STAGES } from "@/lib/founder-intake";
+import type { Sector } from "@/lib/pipeline";
 import { deckFileProblem, uploadDeckFile } from "@/lib/deck-upload-client";
 import { actionErrorMessage } from "@/lib/stale-version";
 import { completeFounderSubmission, startFounderSubmission } from "./actions";
@@ -18,7 +19,7 @@ const pillClass =
 
 const STEP_LABEL: Record<Step, string> = { idle: "", checking: "Checking your details…", uploading: "Uploading your deck…", filing: "Filing your application…", done: "" };
 
-export function ApplyForm({ formToken, diversityOptions }: { formToken: string; diversityOptions: string[] }) {
+export function ApplyForm({ formToken, diversityOptions, sectorOptions }: { formToken: string; diversityOptions: string[]; sectorOptions: readonly string[] }) {
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState("");
@@ -49,7 +50,7 @@ export function ApplyForm({ formToken, diversityOptions }: { formToken: string; 
       founderNames: String(f.get("founderNames") ?? ""),
       email: String(f.get("email") ?? ""),
       pitch: String(f.get("pitch") ?? ""),
-      sector: String(f.get("sector") ?? ""),
+      sector: String(f.get("sector") ?? "") as Sector,
       companyStage: String(f.get("companyStage") ?? "") as (typeof COMPANY_STAGES)[number],
       raiseAmountGbp: String(f.get("raiseAmountGbp") ?? "").replace(/[£,\s]/g, ""),
       website: String(f.get("website") ?? ""),
@@ -123,7 +124,12 @@ export function ApplyForm({ formToken, diversityOptions }: { formToken: string; 
           </Field>
         </div>
         <Field label="Sector" required>
-          <input name="sector" required maxLength={80} placeholder="e.g. Healthtech" className={inputClass} />
+          <select name="sector" required defaultValue="" className={inputClass}>
+            <option value="">Choose your sector…</option>
+            {sectorOptions.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
         </Field>
         <Field label="Stage" required>
           <select name="companyStage" required defaultValue="" className={inputClass}>

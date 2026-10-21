@@ -7,7 +7,7 @@ const valid = {
   email: "Jane@Acme.com ",
   pitch: "Repeat prescriptions for independent pharmacies",
   sector: "Healthtech",
-  companyStage: "Pre-seed",
+  companyStage: "Pre-Seed",
   raiseAmountGbp: "250000",
   website: "https://acme.example",
   linkedinUrl: "",
@@ -38,6 +38,12 @@ describe("founder submission form", () => {
     expect(SubmissionSchema.safeParse({ ...valid, companyName: "[Click](evil)" }).success).toBe(false);
     expect(SubmissionSchema.safeParse({ ...valid, founderNames: "Jane www.evil.example" }).success).toBe(false);
     expect(SubmissionSchema.safeParse({ ...valid, companyName: "Acme.io Ltd" }).success).toBe(true);
+  });
+
+  it("only takes a sector from DXV's list", () => {
+    expect(SubmissionSchema.safeParse({ ...valid, sector: "Health Tech" }).success).toBe(false);
+    expect(SubmissionSchema.safeParse({ ...valid, sector: "Impact" }).success).toBe(false);
+    expect(SubmissionSchema.safeParse({ ...valid, sector: "Fintech" }).success).toBe(true);
   });
 
   it("only keeps diversity answers with consent", () => {

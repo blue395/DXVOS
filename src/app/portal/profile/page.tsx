@@ -1,10 +1,10 @@
-import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ActionForm, SavedNote, SubmitButton } from "@/components/action-form";
 import { OnboardingStepper } from "@/components/portal/stepper";
 import { Field, inputClass } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
 import { trackPortalView } from "@/lib/portal-analytics";
 import { EmailSwitchOffer, SignInMethods, loadSignInMethods } from "@/components/sign-in-methods";
-import { ANGEL_TAG_SUGGESTIONS, EXPERIENCE_LEVELS, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
+import { ANGEL_TAG_SUGGESTIONS, EXPERIENCE_LEVELS, PREFER_NOT_TO_SAY, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
 import { updateMyProfile } from "../actions";
 
 export const metadata = { title: "Your details · DXV Members" };
@@ -32,7 +32,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
             : "This helps us share the right opportunities with you. Only the DXV team sees your details."}
         </p>
       </div>
-      <ActionForm action={updateMyProfile} resetOnSuccess={false} className="space-y-5 rounded-lg border border-black/10 bg-white p-5">
+      <ActionForm action={updateMyProfile} resetOnSuccess={false} savedMs={6000} className="space-y-5 rounded-lg border border-black/10 bg-white p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name">
             <input name="name" required defaultValue={angel.name} autoComplete="name" className={inputClass} />
@@ -72,7 +72,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Your typical cheque size">
             <select name="ticketRange" defaultValue={angel.ticketRange ?? ""} className={inputClass}>
-              <option value="">Prefer not to say</option>
+              <option value="">{PREFER_NOT_TO_SAY}</option>
               {TICKET_RANGES.map((t) => (
                 <option key={t}>{t}</option>
               ))}
@@ -80,7 +80,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
           </Field>
           <Field label="Your angel investing experience">
             <select name="experience" defaultValue={angel.experience ?? ""} className={inputClass}>
-              <option value="">Prefer not to say</option>
+              <option value="">{PREFER_NOT_TO_SAY}</option>
               {EXPERIENCE_LEVELS.map((t) => (
                 <option key={t}>{t}</option>
               ))}
@@ -109,7 +109,11 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
           <input name="otherTags" defaultValue={otherTags.join(", ")} placeholder="Anything else you'd like to share (comma-separated)" className={inputClass} />
         </fieldset>
 
-        <SubmitButton pendingLabel="Saving…">{onboarding ? "Save and continue" : "Save"}</SubmitButton>
+        {/* Pinned to the bottom of the window while the form is on screen: it's a long form. */}
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center gap-3 rounded-b-lg border-t border-black/10 bg-white/95 px-5 py-3 backdrop-blur">
+          <SubmitButton pendingLabel="Saving…">{onboarding ? "Save and continue" : "Save"}</SubmitButton>
+          <SavedNote>Your details are saved.</SavedNote>
+        </div>
       </ActionForm>
       <SignInMethods email={user.email} identities={identities} returnTo="/portal/profile" connectStatus={typeof sp.connect === "string" ? sp.connect : undefined} />
     </div>

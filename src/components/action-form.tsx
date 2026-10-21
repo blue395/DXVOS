@@ -14,6 +14,8 @@ type Props = {
   resetOnSuccess?: boolean;
   /** Called after a successful submit (e.g. to close a panel). */
   onSuccess?: () => void;
+  /** How long the "Saved" confirmation shows (longer for long forms with a <SavedNote>). */
+  savedMs?: number;
 };
 
 const FormStateContext = createContext({ pending: false, justSaved: false });
@@ -26,7 +28,7 @@ const FormStateContext = createContext({ pending: false, justSaved: false });
 // wipes what the user typed. Dispatching ourselves inside startTransition skips that
 // auto-reset, so we only clear the form on success. `action` stays set so the form
 // still works before JavaScript has loaded.
-export function ActionForm({ action, children, className, resetOnSuccess = true, onSuccess }: Props) {
+export function ActionForm({ action, children, className, resetOnSuccess = true, onSuccess, savedMs = 2000 }: Props) {
   // A page left open across a deploy can call an action the server no longer knows:
   // turn that into a clear "reload" message instead of a crash.
   const [state, formAction, pending] = useActionState(async (prev: ActionResult, formData: FormData): Promise<ActionResult> => {
@@ -59,9 +61,9 @@ export function ActionForm({ action, children, className, resetOnSuccess = true,
     if (!state.ok) return;
     if (resetOnSuccess) ref.current?.reset();
     onSuccessRef.current?.();
-    const t = setTimeout(() => setJustSaved(false), 2000);
+    const t = setTimeout(() => setJustSaved(false), savedMs);
     return () => clearTimeout(t);
-  }, [state, resetOnSuccess]);
+  }, [state, resetOnSuccess, savedMs]);
 
   return (
     <form
@@ -81,6 +83,16 @@ export function ActionForm({ action, children, className, resetOnSuccess = true,
         </p>
       )}
     </form>
+  );
+}
+
+/** A short "saved" message next to the button, for long forms where the button alone is easy to miss. */
+export function SavedNote({ children = "Your changes are saved." }: { children?: React.ReactNode }) {
+  const { justSaved } = useContext(FormStateContext);
+  return (
+    <span role="status" aria-live="polite" className={`text-sm font-medium text-dxv-green transition-opacity ${justSaved ? "opacity-100" : "opacity-0"}`}>
+      {justSaved ? <>✓ {children}</> : null}
+    </span>
   );
 }
 

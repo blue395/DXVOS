@@ -19,7 +19,7 @@ import { DomainError, moveVentureStage } from "@/lib/ventures";
 import { recordDeckDocument } from "@/lib/deck-documents";
 import type { ActionResult } from "@/lib/action-result";
 import type { EntrySnapshot } from "@/lib/audit";
-import { canDecline, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel, teamCardOneLiner } from "@/lib/pipeline";
+import { canDecline, canonicalSector, isSector, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel, teamCardOneLiner } from "@/lib/pipeline";
 import { Prisma } from "@/generated/prisma/client";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { angelIdForName } from "@/lib/angels";
@@ -79,7 +79,7 @@ const VentureSchema = z.object({
     .optional()
     .refine((s) => !s || z.email().safeParse(s).success, "Founder email isn't valid"),
   website: optionalUrl,
-  sector: optionalText,
+  sector: optionalText.transform(canonicalSector).refine((s) => !s || isSector(s), "Choose a sector from the list"),
   companyStage: optionalText,
   raiseAmountGbp: optionalPounds,
   leadAngel: optionalText,

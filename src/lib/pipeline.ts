@@ -695,7 +695,67 @@ export function angelTotals(
 /** Onboarding answers (what the angel tells us about themselves). */
 export const TICKET_RANGES = ["Under £1k", "£1k to £2k", "£2k to £5k", "£5k to £10k", "£10k to £25k", "£25k+"] as const;
 export const EXPERIENCE_LEVELS = ["I haven't made an angel investment yet", "1 to 5 angel investments", "6 or more angel investments", "I invest professionally"] as const;
-export const SECTOR_SUGGESTIONS = ["Fintech", "Healthtech", "Climate", "Edtech", "Consumer", "B2B SaaS", "Deeptech", "Impact", "Creative industries", "Food"] as const;
+/**
+ * DXV's sectors (Blue, 2026-10-21): ONE list for a deal's sector (chosen from a drop-down on
+ * the apply form, the deal page and both portfolios) and for the sectors angels say interest
+ * them, so the two always match. "Impact" was dropped as too generic. Edit the list here.
+ */
+export const SECTORS = [
+  "Fintech",
+  "Healthtech",
+  "Femtech",
+  "Climate",
+  "Edtech",
+  "Consumer",
+  "B2B SaaS",
+  "Deeptech",
+  "Proptech",
+  "Food",
+  "Creative industries",
+  "Mobility",
+  "Other",
+] as const;
+export type Sector = (typeof SECTORS)[number];
+/** The sectors angels can pick as interests (the same list, without "Other"). */
+export const SECTOR_SUGGESTIONS = SECTORS.filter((s) => s !== "Other");
+
+/** Other spellings of each sector, as a key: lower case, letters and digits only ("Health Tech" is "healthtech"). */
+export const SECTOR_ALIASES: Record<string, Sector | null> = {
+  ...Object.fromEntries(SECTORS.map((s) => [sectorKey(s), s])),
+  health: "Healthtech", healthcare: "Healthtech", digitalhealth: "Healthtech", medtech: "Healthtech", mentalhealth: "Healthtech", wellbeing: "Healthtech", healthandwellbeing: "Healthtech",
+  finance: "Fintech", financialservices: "Fintech", insurtech: "Fintech", wealthtech: "Fintech", regtech: "Fintech",
+  womenshealth: "Femtech",
+  climatetech: "Climate", cleantech: "Climate", greentech: "Climate", sustainability: "Climate", energy: "Climate", cleanenergy: "Climate",
+  education: "Edtech", learning: "Edtech",
+  ecommerce: "Consumer", retail: "Consumer", d2c: "Consumer", dtc: "Consumer", consumergoods: "Consumer", cpg: "Consumer",
+  saas: "B2B SaaS", software: "B2B SaaS", enterprisesoftware: "B2B SaaS", b2b: "B2B SaaS",
+  ai: "Deeptech", artificialintelligence: "Deeptech", machinelearning: "Deeptech", robotics: "Deeptech",
+  property: "Proptech", realestate: "Proptech", construction: "Proptech", contech: "Proptech",
+  foodtech: "Food", foodanddrink: "Food", foodandbeverage: "Food", agritech: "Food", agtech: "Food",
+  creative: "Creative industries", media: "Creative industries", music: "Creative industries", gaming: "Creative industries",
+  transport: "Mobility", logistics: "Mobility", automotive: "Mobility",
+  // Too generic to be a sector: cleared, so the team picks a real one.
+  impact: null, socialimpact: null,
+};
+
+export function sectorKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * A sector as typed (a deck, an old record, another spelling) mapped onto DXV's list:
+ * "Health Tech" and "healthtech" are "Healthtech"; "Impact" is null. Text that matches
+ * nothing is kept as is (a person then picks from the list).
+ */
+export function canonicalSector(raw: string | null | undefined): string | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  const key = sectorKey(t);
+  return key in SECTOR_ALIASES ? SECTOR_ALIASES[key] : t;
+}
+
+/** Whether a value is on DXV's list (what the drop-downs save). */
+export const isSector = (s: string | null | undefined): s is Sector => !!s && (SECTORS as readonly string[]).includes(s);
 
 export type OnboardingStep = "profile" | "certify" | "welcome" | "done";
 
@@ -747,6 +807,19 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
 export function cleanPhone(s: string | null | undefined): string | null {
   const t = (s ?? "").replace(/^[\s'‘’`]+/, "").replace(/\s+/g, " ").trim();
   return t || null;
+}
+
+/** What the profile's dropdowns call a blank answer (cheque size, experience). */
+export const PREFER_NOT_TO_SAY = "Prefer not to say";
+
+/**
+ * One way to show an optional profile answer on every page (member home, the team's angel
+ * page): blank after they've confirmed their profile means they chose "Prefer not to say";
+ * blank before that means they haven't answered yet.
+ */
+export function profileAnswer(value: string | null | undefined, profileConfirmedAt: Date | null): string {
+  if (value?.trim()) return value;
+  return profileConfirmedAt ? PREFER_NOT_TO_SAY : "Not answered yet";
 }
 
 /** Minimum password length for angel logins. */
@@ -1244,6 +1317,12 @@ export function memberBoardCards<T extends { round: number | null; currentStage:
     if (!MEMBER_BOARD_STAGES.some((s) => s.key === column)) return [];
     return [{ ...v, column, phase: angelDealVisibility(v) }];
   });
+}
+
+/** When the members' board last changed: the round being opened, or any of its cards being updated. */
+export function boardLastUpdated(roundOpenedAt: Date | null, cardUpdates: Date[]): Date | null {
+  const times = [roundOpenedAt, ...cardUpdates].filter((d): d is Date => !!d).map((d) => d.getTime());
+  return times.length ? new Date(Math.max(...times)) : null;
 }
 
 // ── My Portfolio (an angel's own investments; Blue, 2026-09-30) ─────────────

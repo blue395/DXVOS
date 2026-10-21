@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { PROVIDER_LABEL, enabledProviders } from "@/lib/oauth";
 import { emailSwitchOffer } from "@/lib/pipeline";
 import { formatDate } from "./ui";
+import { logout } from "@/app/login/actions";
+import { SignOutButton } from "./sign-out-button";
 import { ConnectButton, DisconnectButton, EmailSwitchButtons, SignOutOtherDevicesButton } from "./provider-buttons";
 
 const CONNECT_MESSAGES: Record<string, string> = {
@@ -44,6 +46,7 @@ export async function SignInMethods({
   returnTo: "/portal/profile" | "/account";
   connectStatus?: string;
 }) {
+  const member = returnTo === "/portal/profile";
   const providers = enabledProviders();
   const connected = new Set(identities.map((i) => i.provider));
   const toConnect = providers.filter((p: OAuthProvider) => !connected.has(p));
@@ -71,7 +74,8 @@ export async function SignInMethods({
                   {i.lastUsedAt ? ` · last used ${formatDate(i.lastUsedAt)}` : ""}
                 </span>
               </span>
-              <DisconnectButton identityId={i.id} provider={i.provider} />
+              {/* Members: the account they sign in with gets "Sign out", not "Disconnect" (Blue, 2026-10-21: less confusing). */}
+              {member ? identities.length === 1 && <SignOutButton action={logout} onLight /> : <DisconnectButton identityId={i.id} provider={i.provider} />}
             </li>
           ))}
         </ul>
@@ -86,7 +90,10 @@ export async function SignInMethods({
       {providers.length === 0 && identities.length === 0 && <p className="text-xs text-black/50">Google and Microsoft sign-in aren&apos;t switched on yet.</p>}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3">
         <p className="text-sm text-black/60">Lost a phone, or signed in on a shared computer?</p>
-        <SignOutOtherDevicesButton />
+        <span className="flex flex-wrap items-center gap-2">
+          {member && identities.length !== 1 && <SignOutButton action={logout} onLight />}
+          <SignOutOtherDevicesButton />
+        </span>
       </div>
     </section>
   );

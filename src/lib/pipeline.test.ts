@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
+  canonicalSector,
+  isSector,
+  SECTORS,
+  SECTOR_SUGGESTIONS,
+  SECTOR_ALIASES,
+  profileAnswer,
+  boardLastUpdated,
   cleanPhone,
   loginThrottled,
   LOGIN_LIMITS,
@@ -978,5 +985,50 @@ describe("cleanPhone", () => {
     expect(cleanPhone("'")).toBeNull();
     expect(cleanPhone("")).toBeNull();
     expect(cleanPhone(null)).toBeNull();
+  });
+});
+
+describe("boardLastUpdated", () => {
+  it("is the latest of the round opening and its cards' updates", () => {
+    const d = (s: string) => new Date(s);
+    expect(boardLastUpdated(d("2026-10-01"), [d("2026-10-05"), d("2026-10-03")])).toEqual(d("2026-10-05"));
+    expect(boardLastUpdated(d("2026-10-09"), [d("2026-10-05")])).toEqual(d("2026-10-09"));
+    expect(boardLastUpdated(null, [])).toBeNull();
+  });
+});
+
+describe("profileAnswer", () => {
+  it("shows the answer, else what a blank means", () => {
+    expect(profileAnswer("£5k–£10k", null)).toBe("£5k–£10k");
+    expect(profileAnswer(null, new Date())).toBe("Prefer not to say");
+    expect(profileAnswer("", null)).toBe("Not answered yet");
+  });
+});
+
+describe("sectors", () => {
+  it("merges other spellings onto DXV's list", () => {
+    expect(canonicalSector("Health Tech")).toBe("Healthtech");
+    expect(canonicalSector("healthtech")).toBe("Healthtech");
+    expect(canonicalSector("HealthTech")).toBe("Healthtech");
+    expect(canonicalSector(" FinTech ")).toBe("Fintech");
+    expect(canonicalSector("Clean-tech")).toBe("Climate");
+    expect(canonicalSector("B2B SaaS")).toBe("B2B SaaS");
+  });
+  it("clears 'Impact' (too generic) and keeps unknown text for a person to fix", () => {
+    expect(canonicalSector("Impact")).toBeNull();
+    expect(canonicalSector("Space")).toBe("Space");
+    expect(isSector("Space")).toBe(false);
+    expect(canonicalSector("")).toBeNull();
+  });
+  it("the clean-up migration knows every spelling (regenerate it if the list changes)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync("prisma/migrations/20261022090000_one_sector_list/migration.sql", "utf8");
+    for (const [k, v] of Object.entries(SECTOR_ALIASES)) expect(sql).toContain(`WHEN '${k}' THEN ${v === null ? "NULL" : `'${v}'`}`);
+  });
+
+  it("has one list for deals and angels' interests, without Impact", () => {
+    expect(SECTORS).not.toContain("Impact");
+    expect(SECTOR_SUGGESTIONS).not.toContain("Other");
+    for (const s of SECTORS) expect(canonicalSector(s)).toBe(s);
   });
 });
