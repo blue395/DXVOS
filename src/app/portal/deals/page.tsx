@@ -91,7 +91,7 @@ export default async function MemberBoardPage() {
   );
 }
 
-/** A card like the team board's: name and raise, a one-liner written for members, then stage, sector and round. */
+/** A card like the team board's: name and raise, a one-liner written for members, then stage and sector (the round is in the page heading). */
 function CardBody({ c, muted = false }: { c: MemberBoardCard; muted?: boolean }) {
   return (
     <>
@@ -110,7 +110,6 @@ function CardBody({ c, muted = false }: { c: MemberBoardCard; muted?: boolean })
       <span className="mt-2 flex flex-wrap gap-1">
         {c.companyStage && <Pill className="bg-white text-black/75 ring-1 ring-black/15">{c.companyStage}</Pill>}
         {c.sector && <Pill className="bg-dxv-green/10 text-dxv-green">{c.sector}</Pill>}
-        {c.round && <Pill className="bg-dxv-yellow text-dxv-green">Round {c.round}</Pill>}
       </span>
     </>
   );
