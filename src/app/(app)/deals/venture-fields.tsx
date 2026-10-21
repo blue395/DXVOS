@@ -2,6 +2,7 @@ import { Field, inputClass } from "@/components/ui";
 import { CompanyStageField } from "./company-stage-field";
 import { LeadAngelField } from "./lead-angel-field";
 import { FounderDiversityField } from "@/components/founder-diversity-field";
+import { SectorSelect } from "@/components/sector-select";
 
 type VentureValues = {
   name?: string | null;
@@ -64,7 +65,7 @@ export function VentureFields({
         <input name="website" type="url" placeholder="https://" defaultValue={v.website ?? ""} className={inputClass} />
       </Field>
       <Field aiSuggested={tag("sector")} label="Sector">
-        <input name="sector" defaultValue={v.sector ?? ""} className={inputClass} />
+        <SectorSelect value={v.sector} />
       </Field>
       <CompanyStageField value={v.companyStage} aiSuggested={tag("companyStage")} />
       <Field aiSuggested={tag("raiseAmountGbp")} label="Raise amount (£)">

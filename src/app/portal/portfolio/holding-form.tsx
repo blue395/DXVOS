@@ -4,6 +4,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, inputClass } from "@/components/ui";
 import { HOLDING_STATUS_LABELS, INSTRUMENT_LABELS, INVESTMENT_ROUNDS, PORTFOLIO_CURRENCIES, TAX_SCHEME_LABELS } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
+import { SectorSelect } from "@/components/sector-select";
 
 export type HoldingDefaults = {
   companyName?: string | null;
@@ -63,7 +64,7 @@ export function HoldingForm({
             <input name="description" defaultValue={v.description ?? ""} placeholder="e.g. Wearable reducing perineal tears" className={inputClass} />
           </Field>
           <Field label="Sector">
-            <input name="sector" defaultValue={v.sector ?? ""} placeholder="e.g. HealthTech" className={inputClass} />
+            <SectorSelect value={v.sector} />
           </Field>
           <Field label="Invested with">
             <input name="investedVia" defaultValue={v.investedVia ?? ""} placeholder="Direct, or a syndicate / platform" className={inputClass} />

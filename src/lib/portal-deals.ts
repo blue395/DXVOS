@@ -17,6 +17,7 @@ import {
   committedAngelIds,
   latestCertification,
   memberBoardCards,
+  boardLastUpdated,
   nextOnboardingStep,
   type AngelDealPhase,
 } from "@/lib/pipeline";
@@ -111,27 +112,34 @@ export type MemberBoardCard = {
  * The members' read-only board: the offered round's live deals, name and sector only.
  * Only cards with a phase open into the deal room (shared, from Member Pitch Selection).
  */
-export async function loadMemberBoard(): Promise<{ round: number | null; cards: MemberBoardCard[] }> {
-  const round = await currentMemberRound();
-  if (round === null) return { round, cards: [] };
-  const rows = await db.venture.findMany({
-    where: { round, currentStage: { not: "PASSED" } },
-    orderBy: { stageEnteredAt: "asc" },
-    select: {
-      id: true,
-      name: true,
-      sector: true,
-      companyStage: true,
-      raiseAmountGbp: true,
-      round: true,
-      currentStage: true,
-      sharedWithAngelsAt: true,
-      oneLiner: true,
-    },
-  });
+export async function loadMemberBoard(): Promise<{ round: number | null; cards: MemberBoardCard[]; updatedAt: Date | null }> {
+  // One round trip: the latest round choice and every live deal in any round, together
+  // (memberBoardCards() keeps the chosen round's). Saves a sequential query on every visit.
+  const [latest, rows] = await Promise.all([
+    db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, select: { round: true, createdAt: true } }),
+    db.venture.findMany({
+      where: { round: { not: null }, currentStage: { not: "PASSED" } },
+      orderBy: { stageEnteredAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        sector: true,
+        companyStage: true,
+        raiseAmountGbp: true,
+        round: true,
+        currentStage: true,
+        sharedWithAngelsAt: true,
+        oneLiner: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
+  const round = latest?.round ?? null;
+  const cards = memberBoardCards(rows, round);
   return {
     round,
-    cards: memberBoardCards(rows, round).map((c) => ({
+    updatedAt: round === null ? null : boardLastUpdated(latest?.createdAt ?? null, cards.map((c) => c.updatedAt)),
+    cards: cards.map((c) => ({
       id: c.id,
       name: c.name,
       sector: c.sector,

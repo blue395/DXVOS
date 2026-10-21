@@ -163,7 +163,7 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
             {HOLDING_STATUS_LABELS[r.status]}
           </span>
         )}
-        <span className="block text-xs text-black/55">{[r.description, r.sector, r.source === "OUTSIDE" ? r.investedVia : null].filter(Boolean).join(" · ")}</span>
+        <span className="block text-xs text-black/55">{[r.sector, r.source === "OUTSIDE" ? r.investedVia : null].filter(Boolean).join(" · ")}</span>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5">{r.investedOn ? formatDate(r.investedOn) : "–"}</td>
       <td className="whitespace-nowrap px-3 py-2.5">
@@ -204,7 +204,7 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
           (r.taxScheme === "NONE" ? "None" : "–")
         )}
       </td>
-      <td className="px-3 py-2.5">{r.shareCertificateReceived ? "✓ Received" : <span className="text-black/50">Awaited</span>}</td>
+      <td className="px-3 py-2.5">{r.shareCertificateReceived ? "✓ Received" : <span className="text-black/50">Requested from founder</span>}</td>
       <td className="whitespace-nowrap px-3 py-2.5 text-right">
         <Link
           href={r.finalInvestmentId ? `/portal/portfolio/dxv/${r.finalInvestmentId}` : `/portal/portfolio/${r.holdingId}`}

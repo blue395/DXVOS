@@ -4,7 +4,7 @@
 // import action. Unit-tested. (CSV parsing and dates are shared with the angels import.)
 import type { PassReason, Stage } from "@/generated/prisma/enums";
 import { parseImportDate } from "./angel-import";
-import { normaliseCompanyStage } from "./pipeline";
+import { canonicalSector, normaliseCompanyStage } from "./pipeline";
 
 export { parseCsv } from "./angel-import";
 
@@ -152,7 +152,7 @@ export function mapDealRow(row: string[], mapping: (DealImportField | null)[]): 
     founderNames: get("founderNames") ?? null,
     founderEmail: get("founderEmail")?.toLowerCase() ?? null,
     website: website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : null,
-    sector: get("sector") ?? null,
+    sector: canonicalSector(get("sector")),
     companyStage: normaliseCompanyStage(get("companyStage")),
     raiseAmountGbp: parsePounds(get("raise")),
     round: parseRound(get("round")),

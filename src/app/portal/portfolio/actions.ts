@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAngel } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { INSTRUMENT_LABELS, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
+import { canonicalSector, INSTRUMENT_LABELS, isSector, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
 import { ownsFinalInvestment } from "@/lib/portfolio";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -72,7 +72,7 @@ const DetailsSchema = z.object({
 const OutsideSchema = DetailsSchema.extend({
   companyName: z.string().trim().min(1, "Enter the company name").max(200),
   description: text(600),
-  sector: text(120),
+  sector: text(120).transform(canonicalSector).refine((s) => !s || isSector(s), "Choose a sector from the list"),
   investedVia: text(120),
   round: text(60),
   investedOn: date,

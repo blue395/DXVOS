@@ -2,7 +2,7 @@
 // ("Preview as angel") exactly as the angel sees it. Server-component safe.
 import Link from "next/link";
 import { buttonClass, formatDate } from "@/components/ui";
-import { CERTIFICATION_LABELS, certState, canSeeLiveDeals, formatGbp, type CertLike } from "@/lib/pipeline";
+import { CERTIFICATION_LABELS, profileAnswer, certState, canSeeLiveDeals, formatGbp, type CertLike } from "@/lib/pipeline";
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
 import type { DealListItem } from "@/lib/portal-deals";
 import { PhaseBadge } from "./deal-room";
@@ -17,6 +17,7 @@ export type PortalAngel = {
   experience: string | null;
   location: string | null;
   restrictedDeclaredAt: Date | null;
+  profileConfirmedAt: Date | null;
 };
 
 export function PortalHome({
@@ -96,8 +97,8 @@ export function PortalHome({
             <Row label="Email" value={angel.email} />
             <Row label="Location" value={angel.location} />
             <Row label="Interested in" value={angel.sectors.join(", ")} />
-            <Row label="Typical cheque" value={angel.ticketRange} />
-            <Row label="Experience" value={angel.experience} />
+            <Row label="Typical cheque" value={profileAnswer(angel.ticketRange, angel.profileConfirmedAt)} />
+            <Row label="Experience" value={profileAnswer(angel.experience, angel.profileConfirmedAt)} />
           </dl>
           {!preview && (
             <Link href="/portal/profile" className="mt-3 inline-block text-sm font-medium text-dxv-green underline">

@@ -5,9 +5,9 @@
 import { z } from "zod";
 import type { Gate, Stage } from "@/generated/prisma/enums";
 import { normaliseCompanyName } from "./deal-import";
-import { FOUNDER_DIVERSITY_THEMES } from "./pipeline";
+import { FOUNDER_DIVERSITY_THEMES, SECTORS } from "./pipeline";
 
-export const COMPANY_STAGES = ["Pre-seed", "Seed"] as const;
+export const COMPANY_STAGES = ["Pre-Seed", "Seed"] as const; // the same labels as the rest of DXV OS (pipeline.ts)
 
 const text = (max: number) => z.string().trim().max(max);
 const optional = (max: number) =>
@@ -26,7 +26,7 @@ export const SubmissionSchema = z
     founderNames: noLinks(text(200).min(1, "Add the founders' names"), "Add just the founders' names here"),
     email: z.string().trim().toLowerCase().pipe(z.email("Add an email address we can reply to")),
     pitch: text(200).min(10, "Describe what the company does in one line"),
-    sector: text(80).min(1, "Add your sector"),
+    sector: z.enum(SECTORS, { message: "Choose your sector" }),
     companyStage: z.enum(COMPANY_STAGES, { message: "Choose your stage" }),
     raiseAmountGbp: z.coerce
       .number({ message: "Add how much you're raising (in £)" })

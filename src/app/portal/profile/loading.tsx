@@ -1,8 +1,9 @@
-import { Skeleton } from "@/components/ui";
+import { LoadingBar, Skeleton } from "@/components/ui";
 
 export default function Loading() {
   return (
     <div className="space-y-4" aria-busy="true" aria-label="Loading">
+      <LoadingBar label="Loading your profile…" />
       <Skeleton className="h-8 w-64" />
       <Skeleton className="h-4 w-96" />
       <div className="grid gap-4 md:grid-cols-2">

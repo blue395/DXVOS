@@ -191,6 +191,24 @@ export function Spinner({ className = "h-3.5 w-3.5" }: { className?: string }) {
 }
 
 /** Grey placeholder block for loading screens. */
+/**
+ * Shown by loading.tsx while a page loads (the first visit after a quiet spell can take a
+ * few seconds while the host wakes up): a moving bar across the top of the window and a
+ * short "Loading…" line, so it's clearly working rather than stuck.
+ */
+export function LoadingBar({ label = "Loading…" }: { label?: string }) {
+  return (
+    <>
+      <div className="fixed inset-x-0 top-0 z-50 h-1 overflow-hidden bg-dxv-yellow/30" role="progressbar" aria-label={label}>
+        <div className="dxv-loading-bar h-full w-1/4 bg-dxv-yellow" />
+      </div>
+      <p className="text-sm text-black/55" role="status">
+        {label}
+      </p>
+    </>
+  );
+}
+
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div aria-hidden className={`animate-pulse rounded-md bg-black/[0.06] ${className}`} />;
 }

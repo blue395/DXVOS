@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { INSTRUMENT_LABELS, isInvestedStage, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
+import { canonicalSector, INSTRUMENT_LABELS, isSector, isInvestedStage, parseMoneyMinor, PORTFOLIO_CURRENCIES } from "@/lib/pipeline";
 import { founderDiversityFrom } from "@/components/founder-diversity-field";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -72,7 +72,7 @@ const DetailsSchema = z.object({
 
 const AddedSchema = DetailsSchema.extend({
   companyName: z.string().trim().min(1, "Enter the company name").max(200),
-  sector: text(120),
+  sector: text(120).transform(canonicalSector).refine((s) => !s || isSector(s), "Choose a sector from the list"),
   round: whole("DXV round"),
   companyStage: text(60),
   investedOn: date,

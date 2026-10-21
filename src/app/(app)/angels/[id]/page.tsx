@@ -17,6 +17,7 @@ import {
   portalState,
   usesWelcomeEmail,
   angelDeleteMode,
+  profileAnswer,
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
 import { complianceReady } from "@/lib/compliance";
@@ -171,7 +172,7 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                   <Row key={f.id} venture={f.venture} right={`${formatGbp(f.ticketGbp)} · ${f.paidAt ? `paid ${formatDate(f.paidAt)}` : "not yet paid"}`} />
                 ))}
               </Section>
-              <Section title="EOIs" empty="None yet.">
+              <Section title="Investment Commitments" empty="None yet.">
                 {myEois.map((e) => (
                   <Row key={e.id} venture={e.venture} right={`${e.interested ? `up to ${formatGbp(e.maxTicketGbp)}` : "not interested"} · ${formatDate(e.createdAt)}`} />
                 ))}
@@ -287,8 +288,8 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
               <Item label="WhatsApp groups">{angel.whatsappGroups.length ? <Chips items={angel.whatsappGroups} className="bg-black/5 text-black/75" /> : "–"}</Item>
               <Item label="Member since">{angel.joinedAt ? formatDate(angel.joinedAt) : "–"}</Item>
               <Item label="Came to DXV via">{angel.source ?? "–"}</Item>
-              <Item label="Typical cheque">{angel.ticketRange ?? "–"}</Item>
-              <Item label="Experience">{angel.experience ?? "–"}</Item>
+              <Item label="Typical cheque">{profileAnswer(angel.ticketRange, angel.profileConfirmedAt)}</Item>
+              <Item label="Experience">{profileAnswer(angel.experience, angel.profileConfirmedAt)}</Item>
               {angel.bio && <Item label="Bio">{angel.bio}</Item>}
               <Item label="Added">
                 {formatDate(angel.createdAt)} by {angel.createdBy.name}

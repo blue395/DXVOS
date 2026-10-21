@@ -24,3 +24,15 @@ body {
   outline: 2px solid var(--color-dxv-green);
   outline-offset: 2px;
 }
+
+/* LoadingBar (ui.tsx): a slim moving bar across the top while a page loads. */
+@keyframes dxv-loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.dxv-loading-bar {
+  animation: dxv-loading 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dxv-loading-bar { animation: none; transform: none; width: 100%; opacity: 0.6; }
+}

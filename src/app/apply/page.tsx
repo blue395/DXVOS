@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { issueFormToken } from "@/lib/founder-submissions";
 import { DIVERSITY_OPTIONS } from "@/lib/founder-intake";
+import { SECTORS } from "@/lib/pipeline";
 import { ApplyForm } from "./apply-form";
 
 export const metadata = {
@@ -23,7 +24,7 @@ export default async function ApplyPage() {
             your company and share your deck: it takes about two minutes.
           </p>
         </div>
-        <ApplyForm formToken={issueFormToken()} diversityOptions={DIVERSITY_OPTIONS} />
+        <ApplyForm formToken={issueFormToken()} diversityOptions={DIVERSITY_OPTIONS} sectorOptions={SECTORS} />
       </div>
     </main>
   );
