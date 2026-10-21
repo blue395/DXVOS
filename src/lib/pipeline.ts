@@ -739,6 +739,16 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
   revoked: "Access revoked",
 };
 
+/**
+ * A phone number as typed or imported, tidied: spreadsheets keep numbers like +44… or 07…
+ * as text by adding a leading apostrophe (also curly ones), which isn't part of the number.
+ * Empty becomes null.
+ */
+export function cleanPhone(s: string | null | undefined): string | null {
+  const t = (s ?? "").replace(/^[\s'‘’`]+/, "").replace(/\s+/g, " ").trim();
+  return t || null;
+}
+
 /** Minimum password length for angel logins. */
 export const MIN_PASSWORD_LENGTH = 10;
 

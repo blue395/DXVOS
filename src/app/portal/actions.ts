@@ -11,7 +11,7 @@ import { z } from "zod";
 import { requireAngel } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
-import { certificationExpiry, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, TICKET_RANGES } from "@/lib/pipeline";
+import { certificationExpiry, cleanPhone, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, TICKET_RANGES } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 import { angelHasDealAccess, loadDealRoom } from "@/lib/portal-deals";
 
@@ -26,7 +26,7 @@ const text = (max: number) =>
 
 const ProfileSchema = z.object({
   name: z.string().trim().min(2, "Enter your name").max(120),
-  phone: text(40),
+  phone: text(40).transform(cleanPhone),
   location: text(120),
   linkedinUrl: text(300).refine((s) => !s || /^https?:\/\//.test(s), "LinkedIn links start with https://"),
   bio: text(2000),
