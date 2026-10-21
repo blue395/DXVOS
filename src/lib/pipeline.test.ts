@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
+  cleanPhone,
   loginThrottled,
   LOGIN_LIMITS,
   insightNudges,
@@ -963,5 +964,19 @@ describe("loginThrottled", () => {
   });
   it("pauses an IP trying many emails", () => {
     expect(loginThrottled({ emailFailures: [], ipFailures: LOGIN_LIMITS.perIp, lastSignInAt: null }, now)).toBe(true);
+  });
+});
+
+describe("cleanPhone", () => {
+  it("drops the spreadsheet apostrophe in front of a number", () => {
+    expect(cleanPhone("'+44 7700 900123")).toBe("+44 7700 900123");
+    expect(cleanPhone("'07700900123")).toBe("07700900123");
+    expect(cleanPhone("  ’07700  900123 ")).toBe("07700 900123");
+  });
+  it("leaves clean numbers alone and empties to null", () => {
+    expect(cleanPhone("+44 7700 900123")).toBe("+44 7700 900123");
+    expect(cleanPhone("'")).toBeNull();
+    expect(cleanPhone("")).toBeNull();
+    expect(cleanPhone(null)).toBeNull();
   });
 });

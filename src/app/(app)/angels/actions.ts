@@ -15,7 +15,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createUploadTargetIn, objectExists, objectPath, type UploadTarget } from "@/lib/deck-storage";
 import { checkUpload, DOCUMENTS_BUCKET } from "@/lib/documents";
-import { certificationExpiry, deleteConfirmed, normaliseAngelName, parseList } from "@/lib/pipeline";
+import { certificationExpiry, cleanPhone, deleteConfirmed, normaliseAngelName, parseList } from "@/lib/pipeline";
 import type { ImportRow } from "@/lib/angel-import";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -36,7 +36,7 @@ const AngelSchema = z.object({
     .nullable()
     .optional()
     .refine((s) => !s || z.email().safeParse(s).success, "Email isn't valid"),
-  phone: optionalText,
+  phone: optionalText.transform(cleanPhone),
   linkedinUrl: optionalText.refine((s) => !s || /^https?:\/\//.test(s), "LinkedIn links must start with https://"),
   location: optionalText,
   bio: optionalText,
@@ -450,7 +450,7 @@ function sanitise(r: ImportRow): ImportRow | null {
   return {
     name,
     email: email && z.email().safeParse(email).success ? email : null,
-    phone: clip(r.phone, 60),
+    phone: cleanPhone(clip(r.phone, 60)),
     linkedinUrl: clip(r.linkedinUrl, 300)?.match(/^https?:\/\//) ? clip(r.linkedinUrl, 300) : null,
     location: clip(r.location, 120),
     sectors: clip(r.sectors, 500),

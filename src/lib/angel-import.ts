@@ -2,6 +2,7 @@
 // column is which, and turn values into Angel fields. Pure; used in the browser (the
 // column mapper) and by the import action. Unit-tested.
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
+import { cleanPhone } from "./pipeline";
 
 /** Parse CSV text (RFC 4180: quoted fields, "" escapes, commas and newlines inside quotes). */
 export function parseCsv(text: string): string[][] {
@@ -148,7 +149,7 @@ export function mapRow(cells: string[], mapping: (ImportField | null)[]): Import
   return {
     name: name ?? email!.split("@")[0],
     email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null,
-    phone: get("phone"),
+    phone: cleanPhone(get("phone")),
     linkedinUrl: get("linkedinUrl"),
     location: get("location"),
     sectors: get("sectors"),
