@@ -34,5 +34,6 @@ jobs:
       - run: npx prisma generate
       - run: npm test
       - run: npm run test:db
+      - run: npx next typegen # route types (PageProps etc.) that the build would generate
       - run: npm run typecheck
       - run: npm run lint
