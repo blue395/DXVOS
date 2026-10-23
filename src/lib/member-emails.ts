@@ -91,7 +91,7 @@ export async function sendNextBatch(memberEmailId: string, actorId: string) {
         db.angelEvent.create({ data: { angelId: r.angel.id, kind: "member-email", detail: `"${email.subject}" sent to ${r.angel.email}`, actorId } }),
       ]);
     } catch (e) {
-      console.error("Member email failed", r.angel.email, e);
+      console.error("Member email failed", e instanceof Error ? e.name : "error"); // no address or message: the failure is recorded on the recipient row
       await fail(e instanceof Error ? e.message.slice(0, 200) : "Didn't send");
     }
   }

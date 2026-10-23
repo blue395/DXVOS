@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { removeObject } from "./deck-storage";
+import { eraseDiversityForAngel } from "./diversity/store";
 import { ERASED_ANGEL_NAME, angelDeleteMode, normaliseAngelName, scrubAuditSnapshot, type AngelHistory } from "./pipeline";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -55,6 +56,9 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
   if (angel.user?.role === "ADMIN") {
     return { error: "This angel record is linked to a DXV team login. Revoke the team login on the Team page first, or keep the record." };
   }
+  // Diversity answers go first, in their own protected tables (consent records are kept,
+  // withdrawn, per the retention schedule; they outlive the angel record if it's removed).
+  await eraseDiversityForAngel(angelId, actor.id === angel.user?.id ? "profile_edit" : "admin_on_request");
   const history = await angelHistory(angelId);
   const mode = angelDeleteMode(history);
 

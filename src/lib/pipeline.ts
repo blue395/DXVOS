@@ -806,7 +806,7 @@ export function canonicalSector(raw: string | null | undefined): string | null {
 /** Whether a value is on DXV's list (what the drop-downs save). */
 export const isSector = (s: string | null | undefined): s is Sector => !!s && (SECTORS as readonly string[]).includes(s);
 
-export type OnboardingStep = "profile" | "certify" | "welcome" | "done";
+export type OnboardingStep = "profile" | "diversity" | "certify" | "welcome" | "done";
 
 /**
  * The next onboarding step for an angel who has signed in (terms were accepted when they
@@ -814,11 +814,14 @@ export type OnboardingStep = "profile" | "certify" | "welcome" | "done";
  * applies), then the welcome. Certify is done when their statement is current.
  */
 export function nextOnboardingStep(
-  a: { profileConfirmedAt: Date | null; restrictedDeclaredAt: Date | null; onboardedAt: Date | null },
+  a: { profileConfirmedAt: Date | null; restrictedDeclaredAt: Date | null; onboardedAt: Date | null; diversityPromptedAt?: Date | null },
   latest: CertLike | null,
   now: Date = new Date(),
 ): OnboardingStep {
   if (!a.profileConfirmedAt) return "profile";
+  // The optional diversity step: its own screen after account set-up (docs/privacy), shown
+  // once during onboarding (answered or skipped). Members already onboarded aren't sent back.
+  if (a.diversityPromptedAt === null && !a.onboardedAt) return "diversity";
   const s = certState(latest, now);
   if (s !== "current" && s !== "due-soon" && !a.restrictedDeclaredAt) return "certify";
   return a.onboardedAt ? "done" : "welcome";

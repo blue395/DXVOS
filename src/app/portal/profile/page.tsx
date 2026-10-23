@@ -1,6 +1,7 @@
 import { ActionForm, SavedNote, SubmitButton } from "@/components/action-form";
 import { OnboardingStepper } from "@/components/portal/stepper";
-import { Field, inputClass } from "@/components/ui";
+import Link from "next/link";
+import { Field, buttonClass, inputClass } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
 import { trackPortalView } from "@/lib/portal-analytics";
 import { EmailSwitchOffer, SignInMethods, loadSignInMethods } from "@/components/sign-in-methods";
@@ -118,6 +119,15 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
           <SavedNote>Your details are saved.</SavedNote>
         </div>
       </ActionForm>
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-black/10 bg-white p-5">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">My diversity information</h2>
+          <p className="text-sm text-black/60">Optional and private: see, change or remove your answers and consent. Download or delete your data.</p>
+        </div>
+        <Link href="/portal/profile/diversity" className={buttonClass("secondary")}>
+          Open
+        </Link>
+      </section>
       <SignInMethods email={user.email} identities={identities} returnTo="/portal/profile" connectStatus={typeof sp.connect === "string" ? sp.connect : undefined} />
     </div>
   );

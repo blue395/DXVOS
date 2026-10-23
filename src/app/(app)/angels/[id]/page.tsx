@@ -1,3 +1,4 @@
+import { DiversityPeek } from "./diversity-peek";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -304,6 +305,9 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
             </details>
           </Card>
 
+          <Card title="Diversity information" collapse={{ open: false }}>
+            <DiversityPeek angelId={angel.id} />
+          </Card>
           <Card title="Names on votes">
             {angel.aliases.length === 0 ? (
               <p className="text-sm text-black/55">

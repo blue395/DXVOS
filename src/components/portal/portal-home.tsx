@@ -18,6 +18,8 @@ export type PortalAngel = {
   location: string | null;
   restrictedDeclaredAt: Date | null;
   profileConfirmedAt: Date | null;
+  /** Null until they've seen the optional diversity questions (members who joined before 2026-10-24). */
+  diversityPromptedAt?: Date | null;
 };
 
 export function PortalHome({
@@ -90,6 +92,16 @@ export function PortalHome({
             </div>
           )}
         </section>
+
+        {!preview && angel.diversityPromptedAt === null && (
+          <section className="rounded-lg border border-dxv-yellow bg-dxv-yellow/15 p-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Help us see who we&apos;re reaching (optional)</h2>
+            <p className="mt-1 text-sm text-black/70">A few optional, private questions, used only in combined statistics. Joining and deal access are the same whether you answer or not.</p>
+            <Link href="/portal/profile/diversity" className="mt-2 inline-block text-sm font-medium text-dxv-green underline">
+              Answer or skip
+            </Link>
+          </section>
+        )}
 
         <section className="rounded-lg border border-black/10 bg-white p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Your profile</h2>

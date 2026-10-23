@@ -2,6 +2,8 @@ import Link from "next/link";
 import { buttonClass, formatDate } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
 import { aliasMap, loadAngelRows, unlinkedNames } from "@/lib/angels";
+import { rawDiversityCounts } from "@/lib/diversity/store";
+import { countOf } from "@/lib/diversity/report";
 import { findDuplicateAngels, formatGbpCompact, matchesAngelFilter, parseAngelFilter, type AngelFilter } from "@/lib/pipeline";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
 import { CopyEmailsButton } from "../copy-emails";
@@ -21,10 +23,12 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
   const q = (Array.isArray(params.q) ? params.q[0] : params.q)?.trim() ?? "";
   const archived = params.archived === "1";
 
-  const [rows, unlinked] = await requireAdminWith(async () => {
+  const [rows, unlinked, diversity] = await requireAdminWith(async () => {
     const aliases = await aliasMap();
-    return Promise.all([loadAngelRows({ archived }), unlinkedNames(aliases)]);
+    return Promise.all([loadAngelRows({ archived }), unlinkedNames(aliases), rawDiversityCounts()]);
   });
+  // From consented answers only, under the small-number rule (never a figure under 10).
+  const femaleMembers = countOf(diversity, "gender", "Woman");
 
   const members = rows.filter((r) => r.status === "MEMBER");
   const needsAction = rows.filter((r) => r.needsAction).length;
@@ -97,6 +101,7 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
           />
           <Stat label="Due in 30 days" value={dueSoon} href={href("due-soon")} note="Statements expiring soon" />
           <Stat label="Prospects" value={count("prospects")} href={href("prospects")} note="Being recruited" />
+          <Stat label="Female angels" value={femaleMembers} note="Combined, from consented answers" />
         </div>
       )}
 
@@ -224,7 +229,7 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
   );
 }
 
-function Stat({ label, value, note, href, alarm }: { label: string; value: number; note?: string; href?: string; alarm?: boolean }) {
+function Stat({ label, value, note, href, alarm }: { label: string; value: number | string; note?: string; href?: string; alarm?: boolean }) {
   const body = (
     <>
       <p className={`text-xs font-medium uppercase tracking-wide ${alarm ? "text-black" : "text-black/55"}`}>{label}</p>

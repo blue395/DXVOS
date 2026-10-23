@@ -14,7 +14,7 @@ export default async function WelcomePage() {
   const certs = await db.angelCertification.findMany({ where: { angelId: angel.id }, select: { signedOn: true, expiresOn: true } });
   const cert = latestCertification(certs);
   const step = nextOnboardingStep(angel, cert);
-  if (step === "profile" || step === "certify") redirect(`/portal/${step}`);
+  if (step === "profile" || step === "diversity" || step === "certify") redirect(`/portal/${step}`);
   const access = canSeeLiveDeals(angel, cert);
   const first = angel.name.split(" ")[0];
 
