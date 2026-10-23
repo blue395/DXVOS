@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
+  isFemaleAngelTag,
+  ANGEL_TAG_SUGGESTIONS,
   canonicalSector,
   isSector,
   SECTORS,
@@ -1014,15 +1016,24 @@ describe("sectors", () => {
     expect(canonicalSector("Clean-tech")).toBe("Climate");
     expect(canonicalSector("B2B SaaS")).toBe("B2B SaaS");
   });
+  it("knows the added standard sectors and their common spellings", () => {
+    expect(canonicalSector("Artificial Intelligence")).toBe("AI");
+    expect(canonicalSector("Life Sciences")).toBe("Biotech & life sciences");
+    expect(canonicalSector("Sports")).toBe("Sport & fitness");
+    expect(canonicalSector("eCommerce")).toBe("E-commerce");
+    expect(canonicalSector("Supply chain")).toBe("Logistics");
+    expect(SECTORS.at(-1)).toBe("Other");
+  });
+
   it("clears 'Impact' (too generic) and keeps unknown text for a person to fix", () => {
     expect(canonicalSector("Impact")).toBeNull();
-    expect(canonicalSector("Space")).toBe("Space");
-    expect(isSector("Space")).toBe(false);
+    expect(canonicalSector("Pet care")).toBe("Pet care");
+    expect(isSector("Pet care")).toBe(false);
     expect(canonicalSector("")).toBeNull();
   });
   it("the clean-up migration knows every spelling (regenerate it if the list changes)", async () => {
     const { readFileSync } = await import("node:fs");
-    const sql = readFileSync("prisma/migrations/20261022090000_one_sector_list/migration.sql", "utf8");
+    const sql = readFileSync("prisma/migrations/20261023090000_more_sectors_angel_tags/migration.sql", "utf8");
     for (const [k, v] of Object.entries(SECTOR_ALIASES)) expect(sql).toContain(`WHEN '${k}' THEN ${v === null ? "NULL" : `'${v}'`}`);
   });
 
@@ -1030,5 +1041,17 @@ describe("sectors", () => {
     expect(SECTORS).not.toContain("Impact");
     expect(SECTOR_SUGGESTIONS).not.toContain("Other");
     for (const s of SECTORS) expect(canonicalSector(s)).toBe(s);
+  });
+});
+
+describe("angel 'About you' tags", () => {
+  it("counts Female angel (and the older Woman angel) for the Female members figure", () => {
+    expect(isFemaleAngelTag("Female angel")).toBe(true);
+    expect(isFemaleAngelTag(" woman Angel ")).toBe(true);
+    expect(isFemaleAngelTag("First-time angel")).toBe(false);
+  });
+  it("offers Neurodiverse, but no ethnicity options until Kevin confirms the lawful basis", () => {
+    expect(ANGEL_TAG_SUGGESTIONS).toContain("Neurodiverse");
+    expect(ANGEL_TAG_SUGGESTIONS.join(" ")).not.toMatch(/ethnic|global majority/i);
   });
 });

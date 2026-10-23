@@ -587,7 +587,28 @@ export function canSeeLiveDeals(angel: { status: AngelStatus; archivedAt: Date |
 }
 
 /** Tags the team can pick from (free text allowed). Only record what the angel has shared. */
-export const ANGEL_TAG_SUGGESTIONS = ["Woman angel", "First-time angel", "Founder", "Operator", "Lead angel experience"] as const;
+/**
+ * "About you" options on an angel's profile: self-declared only, optional, team-only.
+ * Diversity characteristics mirror the founder themes (Blue, 2026-10-23), except ethnicity
+ * ones (Ethnic Minority, Global majority): no ethnicity until Kevin confirms the lawful basis.
+ */
+export const ANGEL_TAG_SUGGESTIONS = [
+  "Female angel",
+  "First-time angel",
+  "Founder",
+  "Operator",
+  "Lead angel experience",
+  "Neurodiverse",
+  "LGBTQ+",
+  "Disabled",
+  "Immigrant",
+  "Low socio-economic background",
+  "Not university educated",
+  "Experienced care",
+  "Experienced homelessness",
+] as const;
+/** The tag the "Female members" count reads ("Woman angel" before 2026-10-23). */
+export const isFemaleAngelTag = (t: string) => /^(female|woman) angel$/i.test(t.trim());
 
 /** A comma-separated list as typed: trimmed, blanks dropped, duplicates (any case) removed. */
 export function parseList(raw: string | null | undefined): string[] {
@@ -701,18 +722,35 @@ export const EXPERIENCE_LEVELS = ["I haven't made an angel investment yet", "1 t
  * them, so the two always match. "Impact" was dropped as too generic. Edit the list here.
  */
 export const SECTORS = [
-  "Fintech",
-  "Healthtech",
-  "Femtech",
-  "Climate",
-  "Edtech",
-  "Consumer",
+  // Alphabetical (more standard angel / VC sectors added 2026-10-23), "Other" last.
+  "Agritech",
+  "AI",
   "B2B SaaS",
-  "Deeptech",
-  "Proptech",
-  "Food",
+  "Biotech & life sciences",
+  "Climate",
+  "Consumer",
   "Creative industries",
+  "Cybersecurity",
+  "Deeptech",
+  "E-commerce",
+  "Edtech",
+  "Femtech",
+  "Fintech",
+  "Food",
+  "Gaming",
+  "Govtech",
+  "Hardware & IoT",
+  "Healthtech",
+  "HR tech",
+  "Insurtech",
+  "Legaltech",
+  "Logistics",
+  "Marketplaces",
   "Mobility",
+  "Proptech",
+  "Sport & fitness",
+  "Travel & hospitality",
+  "Web3",
   "Other",
 ] as const;
 export type Sector = (typeof SECTORS)[number];
@@ -723,17 +761,33 @@ export const SECTOR_SUGGESTIONS = SECTORS.filter((s) => s !== "Other");
 export const SECTOR_ALIASES: Record<string, Sector | null> = {
   ...Object.fromEntries(SECTORS.map((s) => [sectorKey(s), s])),
   health: "Healthtech", healthcare: "Healthtech", digitalhealth: "Healthtech", medtech: "Healthtech", mentalhealth: "Healthtech", wellbeing: "Healthtech", healthandwellbeing: "Healthtech",
-  finance: "Fintech", financialservices: "Fintech", insurtech: "Fintech", wealthtech: "Fintech", regtech: "Fintech",
+  finance: "Fintech", financialservices: "Fintech", wealthtech: "Fintech", regtech: "Fintech", payments: "Fintech",
+  insurance: "Insurtech",
   womenshealth: "Femtech",
   climatetech: "Climate", cleantech: "Climate", greentech: "Climate", sustainability: "Climate", energy: "Climate", cleanenergy: "Climate",
   education: "Edtech", learning: "Edtech",
-  ecommerce: "Consumer", retail: "Consumer", d2c: "Consumer", dtc: "Consumer", consumergoods: "Consumer", cpg: "Consumer",
+  d2c: "Consumer", dtc: "Consumer", consumergoods: "Consumer", cpg: "Consumer", beauty: "Consumer",
+  retail: "E-commerce", onlineretail: "E-commerce",
   saas: "B2B SaaS", software: "B2B SaaS", enterprisesoftware: "B2B SaaS", b2b: "B2B SaaS",
-  ai: "Deeptech", artificialintelligence: "Deeptech", machinelearning: "Deeptech", robotics: "Deeptech",
+  artificialintelligence: "AI", machinelearning: "AI", ml: "AI", aiml: "AI", aiandmachinelearning: "AI", generativeai: "AI",
+  robotics: "Deeptech", quantum: "Deeptech", space: "Deeptech",
+  biotech: "Biotech & life sciences", lifesciences: "Biotech & life sciences", biotechnology: "Biotech & life sciences", pharma: "Biotech & life sciences",
+  cyber: "Cybersecurity", security: "Cybersecurity", infosec: "Cybersecurity",
   property: "Proptech", realestate: "Proptech", construction: "Proptech", contech: "Proptech",
-  foodtech: "Food", foodanddrink: "Food", foodandbeverage: "Food", agritech: "Food", agtech: "Food",
-  creative: "Creative industries", media: "Creative industries", music: "Creative industries", gaming: "Creative industries",
-  transport: "Mobility", logistics: "Mobility", automotive: "Mobility",
+  foodtech: "Food", foodanddrink: "Food", foodandbeverage: "Food",
+  agtech: "Agritech", agriculture: "Agritech",
+  creative: "Creative industries", media: "Creative industries", music: "Creative industries", mediaandentertainment: "Creative industries",
+  games: "Gaming", esports: "Gaming",
+  govtech: "Govtech", publicsector: "Govtech", civictech: "Govtech",
+  hardware: "Hardware & IoT", iot: "Hardware & IoT", internetofthings: "Hardware & IoT",
+  hrtech: "HR tech", hr: "HR tech", futureofwork: "HR tech", worktech: "HR tech", recruitment: "HR tech",
+  legal: "Legaltech", lawtech: "Legaltech",
+  supplychain: "Logistics", logisticsandsupplychain: "Logistics",
+  marketplace: "Marketplaces",
+  transport: "Mobility", automotive: "Mobility",
+  sport: "Sport & fitness", sports: "Sport & fitness", sportstech: "Sport & fitness", fitness: "Sport & fitness", sporttech: "Sport & fitness",
+  travel: "Travel & hospitality", hospitality: "Travel & hospitality", traveltech: "Travel & hospitality",
+  blockchain: "Web3", crypto: "Web3", web3andblockchain: "Web3",
   // Too generic to be a sector: cleared, so the team picks a real one.
   impact: null, socialimpact: null,
 };
