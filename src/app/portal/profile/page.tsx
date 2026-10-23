@@ -93,10 +93,13 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
         </Field>
 
         <fieldset className="space-y-2 rounded-md bg-dxv-green/[0.03] p-3">
-          <legend className="px-1 text-xs font-medium text-black/70">About you (optional)</legend>
+          <legend className="px-1 text-xs font-medium text-black/70">Your angel experience (optional)</legend>
           <p className="text-xs text-black/55">
-            Entirely optional. DXV champions diversity in who invests as well as who gets funded; if you&apos;re happy to share, this helps us understand
-            our community. Only the DXV team sees it, and you can remove it at any time.
+            Helps us match you with deals and roles in the syndicate. Diversity questions are separate, private and entirely optional: see{" "}
+            <a href="/portal/profile/diversity" className="font-medium text-dxv-green underline">
+              My diversity information
+            </a>
+            .
           </p>
           <div className="flex flex-wrap gap-2">
             {ANGEL_TAG_SUGGESTIONS.map((t) => (
@@ -106,7 +109,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
               </label>
             ))}
           </div>
-          <input name="otherTags" defaultValue={otherTags.join(", ")} placeholder="Anything else you'd like to share (comma-separated)" className={inputClass} />
+          <input name="otherTags" defaultValue={otherTags.join(", ")} placeholder="Other experience (comma-separated)" className={inputClass} />
         </fieldset>
 
         {/* Pinned to the bottom of the window while the form is on screen: it's a long form. */}

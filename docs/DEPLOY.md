@@ -246,6 +246,24 @@ No new settings: it uses email (§9) and `APP_URL`.
 - **Spam limits:** 5 submissions an hour per person, 3 a day per email address, 60 a day in total (then founders
   are asked to email their deck instead). Change them in `src/lib/founder-intake.ts`.
 
+## 12. Members' diversity information (row-level security)
+
+Members' diversity answers and consent records live in their own tables, protected by
+Postgres row-level security that applies even to the app's own login (see
+`docs/privacy/` and `src/lib/diversity/`). The deploy's migrations create four
+no-login roles (`dxv_member`, `dxv_diversity_admin`, `dxv_diversity_system`,
+`dxv_diversity_reader`); Supabase's `postgres` role can do this. Nothing to set up, but
+**check once after the first deploy**, in Supabase → SQL editor:
+
+```sql
+select rolname, rolsuper, rolbypassrls from pg_roles where rolname = 'postgres';
+select count(*) from "DiversityAnswer";   -- must be 0 (the app's own role sees nothing)
+```
+
+If `rolbypassrls` is `true`, the app's login can still read the tables directly (the
+policies protect every path the app uses, but not someone holding the database password):
+tell Claude, and keep the database password to as few people as possible either way.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.

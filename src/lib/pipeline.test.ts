@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
-  isFemaleAngelTag,
+  withoutDiversityTags,
   ANGEL_TAG_SUGGESTIONS,
   canonicalSector,
   isSector,
@@ -1044,14 +1044,11 @@ describe("sectors", () => {
   });
 });
 
-describe("angel 'About you' tags", () => {
-  it("counts Female angel (and the older Woman angel) for the Female members figure", () => {
-    expect(isFemaleAngelTag("Female angel")).toBe(true);
-    expect(isFemaleAngelTag(" woman Angel ")).toBe(true);
-    expect(isFemaleAngelTag("First-time angel")).toBe(false);
+describe("profile tags never hold diversity information", () => {
+  it("offers experience tags only", () => {
+    expect([...ANGEL_TAG_SUGGESTIONS]).toEqual(["First-time angel", "Founder", "Operator", "Lead angel experience"]);
   });
-  it("offers Neurodiverse, but no ethnicity options until Kevin confirms the lawful basis", () => {
-    expect(ANGEL_TAG_SUGGESTIONS).toContain("Neurodiverse");
-    expect(ANGEL_TAG_SUGGESTIONS.join(" ")).not.toMatch(/ethnic|global majority/i);
+  it("drops the old diversity pills wherever tags are saved", () => {
+    expect(withoutDiversityTags(["Founder", "Female angel", " lgbtq+ ", "Neurodiverse", "Operator"])).toEqual({ tags: ["Founder", "Operator"], dropped: 3 });
   });
 });

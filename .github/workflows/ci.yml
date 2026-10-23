@@ -1,0 +1,39 @@
+# Checks on every pull request and push to main: unit tests, database tests (a throwaway
+# Postgres with synthetic data only), types and lint. No secrets are used or needed.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # A non-superuser that can create databases and roles, like Supabase's postgres role
+      # (a superuser would skip row-level security and hide real failures).
+      DATABASE_URL: postgresql://dxv:dxv@localhost:5432/dxvos_ci
+      TEST_DATABASE_URL: postgresql://dxv:dxv@localhost:5432/dxvos_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Database login for tests
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE ROLE dxv LOGIN PASSWORD 'dxv' CREATEDB CREATEROLE"
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm test
+      - run: npm run test:db
+      - run: npx next typegen # route types (PageProps etc.) that the build would generate
+      - run: npm run typecheck
+      - run: npm run lint

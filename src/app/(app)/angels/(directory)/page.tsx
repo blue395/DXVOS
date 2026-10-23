@@ -2,7 +2,7 @@ import Link from "next/link";
 import { buttonClass, formatDate } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
 import { aliasMap, loadAngelRows, unlinkedNames } from "@/lib/angels";
-import { findDuplicateAngels, isFemaleAngelTag, formatGbpCompact, matchesAngelFilter, parseAngelFilter, type AngelFilter } from "@/lib/pipeline";
+import { findDuplicateAngels, formatGbpCompact, matchesAngelFilter, parseAngelFilter, type AngelFilter } from "@/lib/pipeline";
 import { AngelStatusBadge, CertBadge, Chips } from "../badges";
 import { CopyEmailsButton } from "../copy-emails";
 
@@ -29,7 +29,6 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
   const members = rows.filter((r) => r.status === "MEMBER");
   const needsAction = rows.filter((r) => r.needsAction).length;
   const dueSoon = members.filter((r) => r.certState === "due-soon").length;
-  const womenMembers = members.filter((r) => r.tags.some(isFemaleAngelTag)).length;
   const duplicates = findDuplicateAngels(rows).length;
   const count = (f: AngelFilter) => rows.filter((r) => matchesAngelFilter(f, r.status, r.certState)).length;
 
@@ -98,7 +97,6 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
           />
           <Stat label="Due in 30 days" value={dueSoon} href={href("due-soon")} note="Statements expiring soon" />
           <Stat label="Prospects" value={count("prospects")} href={href("prospects")} note="Being recruited" />
-          <Stat label="Female members" value={womenMembers} note="Self-declared (Female angel tag)" />
         </div>
       )}
 
