@@ -23,8 +23,6 @@ export default async function MemberBoardPage() {
   const [access, { round, cards, updatedAt }] = await Promise.all([angelHasDealAccess(angel), loadMemberBoard(), trackPortalView(who, "BOARD")]);
   if (!access) redirect("/portal");
   const open = cards.filter((c) => c.phase).length;
-  // The first open card in board order, for the "open to you" jump link.
-  const firstOpenId = MEMBER_BOARD_STAGES.flatMap((s) => cards.filter((c) => c.column === s.key && c.phase))[0]?.id;
 
   return (
     <div className="space-y-4">
@@ -41,9 +39,8 @@ export default async function MemberBoardPage() {
             {open === 0 ? (
               <span className="text-black/70">No companies are open to you yet: they open from Member Pitch Selection.</span>
             ) : (
-              <a href="#open-deal" className="font-semibold text-dxv-green underline decoration-dxv-green/30 underline-offset-2 hover:decoration-dxv-green">
-                {open === 1 ? "1 company is open to you" : `${open} companies are open to you`} →
-              </a>
+              // Plain text (Blue, 2026-10-23): the open cards are highlighted on the board itself.
+              <span className="font-semibold text-dxv-green">{open === 1 ? "1 company is open to you" : `${open} companies are open to you`}</span>
             )}
             {updatedAt && <span className="text-xs text-black/50">Last updated {formatDateTime(updatedAt)}</span>}
           </p>
@@ -78,7 +75,7 @@ export default async function MemberBoardPage() {
                   </div>
                   <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
                     {col.map((c) => (
-                      <BoardCard key={c.id} c={c} anchor={c.id === firstOpenId} />
+                      <BoardCard key={c.id} c={c} />
                     ))}
                   </div>
                 </div>
@@ -119,13 +116,12 @@ function Pill({ className, children }: { className: string; children: React.Reac
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{children}</span>;
 }
 
-function BoardCard({ c, anchor }: { c: MemberBoardCard; anchor: boolean }) {
+function BoardCard({ c }: { c: MemberBoardCard }) {
   if (c.phase) {
     return (
       <Link
-        id={anchor ? "open-deal" : undefined}
         href={`/portal/deals/${c.id}`}
-        className="block scroll-mx-8 scroll-mt-20 rounded-lg border-2 border-dxv-green bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+        className="block rounded-lg border-2 border-dxv-green bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md"
       >
         <CardBody c={c} />
         <span className="mt-2.5 block border-t border-black/5 pt-2 text-right text-xs font-semibold text-dxv-green">View deal →</span>
