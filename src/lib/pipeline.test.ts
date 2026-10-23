@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   declineReasons,
+  inactivityAction,
+  teamSignInRefusal,
+  parseDomains,
   withoutDiversityTags,
   ANGEL_TAG_SUGGESTIONS,
   canonicalSector,
@@ -1057,5 +1060,44 @@ describe("profile tags never hold diversity information", () => {
   });
   it("drops the old diversity pills wherever tags are saved", () => {
     expect(withoutDiversityTags(["Founder", "Female angel", " lgbtq+ ", "Neurodiverse", "Operator"])).toEqual({ tags: ["Founder", "Operator"], dropped: 3 });
+  });
+});
+
+describe("teamSignInRefusal (MFA for the team via Google Workspace)", () => {
+  const d = ["diversityx.vc"];
+  it("does nothing until domains are set, and never affects members", () => {
+    expect(teamSignInRefusal("ADMIN", "password", [])).toBeNull();
+    expect(teamSignInRefusal("ANGEL", "password", d)).toBeNull();
+    expect(teamSignInRefusal("ANGEL", "link", d)).toBeNull();
+  });
+  it("refuses passwords and emailed links for team logins once on", () => {
+    expect(teamSignInRefusal("ADMIN", "password", d)).toMatch(/Google/);
+    expect(teamSignInRefusal("ADMIN", "link", d)).toMatch(/Google/);
+  });
+  it("accepts only Google on the Workspace domain", () => {
+    expect(teamSignInRefusal("ADMIN", "provider", d, { name: "GOOGLE", hostedDomain: "diversityx.vc" })).toBeNull();
+    expect(teamSignInRefusal("ADMIN", "provider", d, { name: "GOOGLE", hostedDomain: null })).toMatch(/Google/); // personal Gmail
+    expect(teamSignInRefusal("ADMIN", "provider", d, { name: "MICROSOFT", hostedDomain: null })).toMatch(/Google/);
+  });
+  it("reads the domain list", () => {
+    expect(parseDomains(" @DiversityX.vc, other.org ")).toEqual(["diversityx.vc", "other.org"]);
+    expect(parseDomains(undefined)).toEqual([]);
+  });
+});
+
+describe("inactivityAction (retention: 24 months, then a 30-day warning)", () => {
+  const now = new Date("2028-12-01T00:00:00Z");
+  const monthsAgo = (m: number) => { const d = new Date(now); d.setMonth(d.getMonth() - m); return d; };
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000);
+  it("leaves active members alone", () => {
+    expect(inactivityAction({ lastActiveAt: monthsAgo(6), warnedAt: null }, now)).toBe("none");
+  });
+  it("warns after 24 months, deletes 30 days after the warning", () => {
+    expect(inactivityAction({ lastActiveAt: monthsAgo(25), warnedAt: null }, now)).toBe("warn");
+    expect(inactivityAction({ lastActiveAt: monthsAgo(25), warnedAt: daysAgo(10) }, now)).toBe("none");
+    expect(inactivityAction({ lastActiveAt: monthsAgo(25), warnedAt: daysAgo(31) }, now)).toBe("delete");
+  });
+  it("cancels the warning if they come back", () => {
+    expect(inactivityAction({ lastActiveAt: daysAgo(2), warnedAt: daysAgo(10) }, now)).toBe("cancel-warning");
   });
 });

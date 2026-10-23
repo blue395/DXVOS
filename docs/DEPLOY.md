@@ -264,6 +264,20 @@ If `rolbypassrls` is `true`, the app's login can still read the tables directly 
 policies protect every path the app uses, but not someone holding the database password):
 tell Claude, and keep the database password to as few people as possible either way.
 
+### 12.1 Settings for the privacy launch (docs/privacy)
+
+| Setting (Netlify → Environment variables) | What it does |
+| --- | --- |
+| `TEAM_GOOGLE_DOMAINS` | e.g. `diversityx.vc`. Team logins then sign in **only** with Google on that Workspace domain (passwords and emailed links stop working for them; members unaffected). Turn on 2-step verification enforcement in Google Workspace Admin → Security → 2-Step Verification first, and make sure every partner has connected their Workspace Google account (Account page) before setting it. |
+| `RETENTION_DELETE_INACTIVE` | `on` lets the daily job warn members inactive for 24 months and erase them 30 days later. Until then it only counts them (see the scheduled function's log). |
+| `NEXT_PUBLIC_PRIVACY_NOTICE_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_PRIVACY_EMAIL` | The footer and sign-up links. Placeholders until set (then redeploy). |
+
+**Provider settings the app can't set** (check and record in the processor register):
+- **Deploy previews:** in Netlify, scope `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_SECRET_KEY` and the other secrets to **Production** only (or turn off deploy previews), so preview sites can't reach real data.
+- **Backups:** Supabase → Database → Backups: confirm the retention fits "30 days rolling" (daily backups on Pro keep 7 days; point-in-time recovery is an add-on). Test a restore.
+- **Logs:** Supabase keeps Postgres logs (failed statements appear there; the app sends values as parameters, which Postgres doesn't log by default: keep `log_parameter_max_length_on_error` at 0 and `log_statement` at none). Netlify function logs: check the retention on your plan.
+- **MFA on the providers:** Netlify, Supabase, GitHub and Google Workspace admin accounts.
+
 ## Day to day
 
 - **Deploying:** merge a PR into `main` → Netlify builds, applies any new migrations, deploys.

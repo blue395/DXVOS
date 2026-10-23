@@ -36,6 +36,7 @@ export async function acceptInvite(token: string, _prev: ActionResult, formData:
 
   if (invite.kind === "INVITE") {
     if (parsed.data.terms !== "on") return { error: "Please read and accept the member terms to continue." };
+    if (formData.get("adult") !== "on") return { error: "Please confirm you're 18 or over: DXV OS is for adults only." };
     const made = await createLoginFromInvite(invite, passwordHash, ip, "Set up their login");
     if ("error" in made) return { error: made.error };
     userId = made.userId;

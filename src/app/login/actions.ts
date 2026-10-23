@@ -8,12 +8,13 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession, deleteSession, signOutEverywhere } from "@/lib/session";
 import { getCurrentUser, homeFor } from "@/lib/auth";
+import { teamRefusal } from "@/lib/team-signin";
 import type { ActionResult } from "@/lib/action-result";
 import { newInviteToken } from "@/lib/invite-token";
 import { findUsableLoginLink, loginLinkEvent } from "@/lib/login-links";
 import { loginLinkEmail } from "@/lib/login-email";
 import { appOrigin, mailConfigured, sendMail } from "@/lib/mail";
-import { LOGIN_LIMITS, LOGIN_LINK_MINUTES, LOGIN_LINKS_PER_HOUR, LOGIN_PAUSED_MESSAGE, MIN_PASSWORD_LENGTH, canSignIn, loginThrottled } from "@/lib/pipeline";
+import { LOGIN_LIMITS, LOGIN_LINK_MINUTES, LOGIN_LINKS_PER_HOUR, LOGIN_LINKS_PER_IP_HOUR, LOGIN_PAUSED_MESSAGE, MIN_PASSWORD_LENGTH, canSignIn, loginThrottled } from "@/lib/pipeline";
 
 // Pre-computed hash of a random string. Comparing against it when the email is
 // unknown makes "no such user" take as long as "wrong password".
@@ -44,6 +45,8 @@ export async function login(_prev: ActionResult, formData: FormData): Promise<Ac
   const ok = !!user && valid && !user.disabledAt;
   await db.loginAttempt.create({ data: { email, ipHash, ok } });
   if (!ok) return { error: "Incorrect email or password." };
+  const teamOnly = teamRefusal(user.role, "password"); // after the password check: reveals nothing to a guesser
+  if (teamOnly) return { error: teamOnly };
 
   await db.user.update({ where: { id: user.id }, data: { lastSignInAt: new Date() } });
   await createSession(user.id);
@@ -91,12 +94,17 @@ export async function requestLoginLink(_prev: ActionResult, formData: FormData):
       where: { email },
       select: { id: true, email: true, name: true, role: true, angelId: true, disabledAt: true, angel: { select: { archivedAt: true } } },
     });
-    if (user && canSignIn(user)) {
-      const recent = await db.loginLink.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
-      if (recent < LOGIN_LINKS_PER_HOUR) {
+    if (user && canSignIn(user) && !teamRefusal(user.role, "link")) {
+      const ip = clientIp(await headers());
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      const [recent, fromIp] = await Promise.all([
+        db.loginLink.count({ where: { userId: user.id, createdAt: { gt: hourAgo } } }),
+        ip ? db.loginLink.count({ where: { requestedIp: ip, createdAt: { gt: hourAgo } } }) : 0,
+      ]);
+      // Per login AND per connection: one visitor can't fill many inboxes (the answer stays the same).
+      if (recent < LOGIN_LINKS_PER_HOUR && fromIp < LOGIN_LINKS_PER_IP_HOUR) {
         const { token, tokenHash } = newInviteToken();
         const minutes = LOGIN_LINK_MINUTES[kind];
-        const ip = clientIp(await headers());
         await db.$transaction([
           db.loginLink.updateMany({ where: { userId: user.id, kind, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
           db.loginLink.create({ data: { userId: user.id, kind, tokenHash, expiresAt: new Date(Date.now() + minutes * 60_000), requestedIp: ip } }),
@@ -124,7 +132,10 @@ async function claimLink(id: string) {
 /** Magic link: sign in. A button press, not the page load, so email scanners that open links can't use it up. */
 export async function signInWithLink(token: string): Promise<ActionResult> {
   const link = await findUsableLoginLink(token);
-  if (!link || link.kind !== "MAGIC" || !(await claimLink(link.id))) return { error: LINK_EXPIRED };
+  if (!link || link.kind !== "MAGIC") return { error: LINK_EXPIRED };
+  const teamOnly = teamRefusal(link.user.role, "link");
+  if (teamOnly) return { error: teamOnly };
+  if (!(await claimLink(link.id))) return { error: LINK_EXPIRED };
   await Promise.all([
     db.user.update({ where: { id: link.user.id }, data: { lastSignInAt: new Date() } }),
     loginLinkEvent(link.user, "signed-in-by-link"),
@@ -146,6 +157,8 @@ export async function resetPasswordWithLink(token: string, _prev: ActionResult, 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
   const link = await findUsableLoginLink(token);
   if (!link || link.kind !== "RESET") return { error: LINK_EXPIRED };
+  const teamOnly = teamRefusal(link.user.role, "link");
+  if (teamOnly) return { error: teamOnly };
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   if (!(await claimLink(link.id))) return { error: LINK_EXPIRED };
   await db.$transaction([

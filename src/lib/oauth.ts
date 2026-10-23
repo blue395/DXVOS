@@ -94,7 +94,15 @@ export async function beginOAuth(provider: OAuthProvider, intent: OAuthIntent): 
 }
 
 /** Who the provider says signed in. `email` is set only when the provider vouches for it. */
-export type ProviderIdentity = { provider: OAuthProvider; subject: string; email: string | null; anyEmail: string | null; name: string | null };
+export type ProviderIdentity = {
+  provider: OAuthProvider;
+  subject: string;
+  email: string | null;
+  anyEmail: string | null;
+  name: string | null;
+  /** Google Workspace domain ("hd" claim); null for personal Gmail and Microsoft. */
+  hostedDomain: string | null;
+};
 
 export class OAuthError extends Error {}
 
@@ -154,7 +162,14 @@ export async function finishOAuth(provider: OAuthProvider, params: URLSearchPara
   const email =
     provider === "GOOGLE" ? (claims.email_verified === true && typeof claims.email === "string" ? claims.email.toLowerCase() : null) : microsoftVerifiedEmail(claims as Record<string, unknown>);
   return {
-    identity: { provider, subject: claims.sub, email, anyEmail, name: typeof claims.name === "string" ? claims.name : null },
+    identity: {
+      provider,
+      subject: claims.sub,
+      email,
+      anyEmail,
+      name: typeof claims.name === "string" ? claims.name : null,
+      hostedDomain: provider === "GOOGLE" && typeof claims.hd === "string" ? claims.hd.toLowerCase() : null,
+    },
     intent: saved.intent,
   };
 }

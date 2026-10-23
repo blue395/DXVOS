@@ -31,6 +31,7 @@ export function ProviderJoinButtons({ token, providers, agreed }: { token: strin
       {providers.map((p) => (
         <ActionForm key={p} action={startProviderJoin.bind(null, token, p)} resetOnSuccess={false}>
           <input type="hidden" name="terms" value={agreed ? "on" : ""} />
+          <input type="hidden" name="adult" value={agreed ? "on" : ""} />
           <ProviderSubmit provider={p} />
         </ActionForm>
       ))}

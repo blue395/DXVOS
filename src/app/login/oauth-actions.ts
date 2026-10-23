@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import type { OAuthProvider } from "@/generated/prisma/enums";
 import type { ActionResult } from "@/lib/action-result";
 import { getCurrentUser } from "@/lib/auth";
+import { teamGoogleDomains } from "@/lib/team-signin";
 import { createSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { emailChangedEmail } from "@/lib/login-email";
@@ -40,6 +41,7 @@ export async function startProviderConnect(provider: OAuthProvider, returnTo: Ac
 /** Invite page: set up the login with Google / Microsoft instead of a password (terms first). */
 export async function startProviderJoin(token: string, provider: OAuthProvider, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   if (formData.get("terms") !== "on") return { error: "Please read and accept the member terms first." };
+  if (formData.get("adult") !== "on") return { error: "Please confirm you're 18 or over: DXV OS is for adults only." };
   const invite = await findUsableInvite(token);
   if (!invite || invite.kind !== "INVITE") return { error: "This link has expired or has already been used. Ask the DXV team for a new one." };
   if (!enabledProviders().includes(provider)) return notSetUp(provider);
@@ -58,6 +60,12 @@ export async function disconnectIdentity(identityId: string): Promise<ActionResu
   if (!me) return { error: "Please sign in again." };
   const idn = await db.loginIdentity.findFirst({ where: { id: identityId, userId: me.id, removedAt: null } });
   if (!idn) return { error: "That account isn't connected." };
+  // Team logins on Google Workspace sign-in only: never disconnect the last way in.
+  const domains = teamGoogleDomains();
+  if (me.role === "ADMIN" && domains.length && idn.provider === "GOOGLE") {
+    const workspace = await db.loginIdentity.count({ where: { userId: me.id, removedAt: null, provider: "GOOGLE", id: { not: idn.id }, email: { endsWith: `@${domains[0]}` } } });
+    if (workspace === 0) return { error: "This Google account is how you sign in to DXV OS, so it can't be disconnected. Connect another DXV Workspace account first." };
+  }
   await db.$transaction([
     db.loginIdentity.update({ where: { id: idn.id }, data: { removedAt: new Date() } }),
     loginLinkEvent(me, "sign-in-disconnected", `${PROVIDER_LABEL[idn.provider]} account ${idn.email ?? ""}`.trim()),
