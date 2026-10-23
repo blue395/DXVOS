@@ -586,29 +586,24 @@ export function canSeeLiveDeals(angel: { status: AngelStatus; archivedAt: Date |
   return s === "current" || s === "due-soon";
 }
 
-/** Tags the team can pick from (free text allowed). Only record what the angel has shared. */
 /**
- * "About you" options on an angel's profile: self-declared only, optional, team-only.
- * Diversity characteristics mirror the founder themes (Blue, 2026-10-23), except ethnicity
- * ones (Ethnic Minority, Global majority): no ethnicity until Kevin confirms the lawful basis.
+ * Profile tags (team-visible): angel EXPERIENCE only. Diversity information is never a tag:
+ * it lives in its own protected tables with per-category consent (src/lib/diversity/,
+ * Blue 2026-10-23, docs/privacy). The old diversity pills moved there.
  */
-export const ANGEL_TAG_SUGGESTIONS = [
-  "Female angel",
-  "First-time angel",
-  "Founder",
-  "Operator",
-  "Lead angel experience",
-  "Neurodiverse",
-  "LGBTQ+",
-  "Disabled",
-  "Immigrant",
-  "Low socio-economic background",
-  "Not university educated",
-  "Experienced care",
-  "Experienced homelessness",
-] as const;
-/** The tag the "Female members" count reads ("Woman angel" before 2026-10-23). */
-export const isFemaleAngelTag = (t: string) => /^(female|woman) angel$/i.test(t.trim());
+export const ANGEL_TAG_SUGGESTIONS = ["First-time angel", "Founder", "Operator", "Lead angel experience"] as const;
+
+/** The old "About you" diversity pills: never kept as tags (they need the member's own consent). */
+export const DIVERSITY_TAG_WORDS = [
+  "disabled", "neurodiverse", "neurodivergent", "lgbtq+", "lgbt", "lgbtq", "female angel", "woman angel", "not university educated",
+  "experienced care", "experienced homelessness", "low socio-economic background", "immigrant",
+];
+
+/** Tags with any diversity characteristic removed (team form, CSV import, profile). */
+export function withoutDiversityTags(tags: string[]): { tags: string[]; dropped: number } {
+  const keep = tags.filter((t) => !DIVERSITY_TAG_WORDS.includes(t.trim().toLowerCase()));
+  return { tags: keep, dropped: tags.length - keep.length };
+}
 
 /** A comma-separated list as typed: trimmed, blanks dropped, duplicates (any case) removed. */
 export function parseList(raw: string | null | undefined): string[] {

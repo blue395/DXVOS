@@ -48,7 +48,10 @@ export function AngelFields({ v }: { v?: AngelFieldValues }) {
       <Field label="Sectors of interest" hint="Comma-separated, e.g. Fintech, Healthtech">
         <input name="sectors" defaultValue={v?.sectors.join(", ")} className={inputClass} />
       </Field>
-      <Field label="Tags" hint={`Only what the angel has shared with you. Suggestions: ${ANGEL_TAG_SUGGESTIONS.join(", ")}`}>
+      <Field
+        label="Experience tags"
+        hint={`Angel experience only, e.g. ${ANGEL_TAG_SUGGESTIONS.join(", ")}. Diversity information is the member's own: they add it, with consent, in the portal.`}
+      >
         <input name="tags" list="angel-tag-suggestions" defaultValue={v?.tags.join(", ")} className={inputClass} />
         <datalist id="angel-tag-suggestions">
           {ANGEL_TAG_SUGGESTIONS.map((t) => (

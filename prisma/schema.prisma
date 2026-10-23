@@ -29,23 +29,24 @@ enum Role {
 }
 
 model User {
-  id                    String          @id @default(cuid())
-  email                 String          @unique
+  id                    String               @id @default(cuid())
+  email                 String               @unique
   name                  String
   passwordHash          String
-  role                  Role            @default(ADMIN)
-  createdAt             DateTime        @default(now())
-  angelId               String?         @unique // ANGEL users: their Angel record
-  angel                 Angel?          @relation("AngelUser", fields: [angelId], references: [id])
+  role                  Role                 @default(ADMIN)
+  createdAt             DateTime             @default(now())
+  angelId               String?              @unique // ANGEL users: their Angel record
+  angel                 Angel?               @relation("AngelUser", fields: [angelId], references: [id])
   disabledAt            DateTime? // access revoked: treated as signed out everywhere
   lastSignInAt          DateTime?
-  sessionVersion        Int             @default(0) // in every session; bumping it signs this login out everywhere
+  sessionVersion        Int                  @default(0) // in every session; bumping it signs this login out everywhere
   loginLinks            LoginLink[]
   identities            LoginIdentity[]
-  emailTemplatesCreated EmailTemplate[] @relation("EmailTemplateCreatedBy")
-  emailTemplatesUpdated EmailTemplate[] @relation("EmailTemplateUpdatedBy")
+  emailTemplatesCreated EmailTemplate[]      @relation("EmailTemplateCreatedBy")
+  emailTemplatesUpdated EmailTemplate[]      @relation("EmailTemplateUpdatedBy")
   memberEmailsSent      MemberEmail[]
   founderEmailsSent     FounderEmail[]
+  diversityAccess       DiversityAccessLog[]
 
   stageChanges            StageChange[]
   memoVersions            MemoVersion[]
@@ -792,18 +793,23 @@ model Angel {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  certifications    AngelCertification[]
-  notes             AngelNote[]
-  aliases           AngelAlias[]
-  preSelectionVotes PreSelectionVote[]
-  investmentVotes   InvestmentVote[]
-  finalInvestments  FinalInvestment[]
-  user              User?                  @relation("AngelUser")
-  invites           AngelInvite[]
-  events            AngelEvent[]
-  portfolio         PortfolioHolding[]
-  memberEmails      MemberEmailRecipient[]
-  portalViews       PortalView[]
+  certifications      AngelCertification[]
+  notes               AngelNote[]
+  aliases             AngelAlias[]
+  preSelectionVotes   PreSelectionVote[]
+  investmentVotes     InvestmentVote[]
+  finalInvestments    FinalInvestment[]
+  user                User?                  @relation("AngelUser")
+  invites             AngelInvite[]
+  events              AngelEvent[]
+  portfolio           PortfolioHolding[]
+  memberEmails        MemberEmailRecipient[]
+  portalViews         PortalView[]
+  diversitySubject    DiversitySubject?
+  /// When the member saw (answered or skipped) the optional diversity step. Not diversity data itself.
+  diversityPromptedAt DateTime?
+  /// When they confirmed they're 18 or over (sign-up).
+  ageConfirmedAt      DateTime?
 
   @@index([status])
 }
@@ -1329,4 +1335,121 @@ model LoginAttempt {
 
   @@index([email, createdAt])
   @@index([ipHash, createdAt])
+}
+
+// ── Members' diversity information (UK GDPR special category data) ──────────
+// Blue, 2026-10-23, per docs/privacy. Kept apart from the profile: every table below is
+// keyed by DiversitySubject.id (a random UUID), never stored on the Angel row. Database
+// row-level security (FORCE) limits each row to its own member (role dxv_member, with
+// dxv.angel_id set per transaction), the system jobs (dxv_diversity_system) and two
+// admin functions (counts; one member's answers, logged). Only src/lib/diversity/ may
+// touch these tables. Never log, email, put in URLs or send to AI anything from here.
+
+enum DiversityCategory {
+  health
+  sexual_orientation
+  ethnicity
+  religion
+  gender_background
+}
+
+enum ConsentStatus {
+  given
+  withdrawn
+}
+
+enum ConsentMethod {
+  signup_screen
+  profile_edit
+  admin_on_request
+  retention // set by the retention job, not the member
+  migration // carried over answers the member had not consented to (pending only)
+}
+
+/// The random ID that links a member to their diversity rows.
+model DiversitySubject {
+  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  angelId    String?               @unique // SetNull if the member record is ever removed: consent records outlive it
+  angel      Angel?                @relation(fields: [angelId], references: [id], onDelete: SetNull)
+  createdAt  DateTime              @default(now())
+  answers    DiversityAnswer[]
+  consents   DiversityConsent[]
+  consentLog DiversityConsentLog[]
+  pending    DiversityPending[]
+  accessLog  DiversityAccessLog[]
+}
+
+/// One answer (an option, or self-described text). A database trigger refuses a row without
+/// a given consent for its category, and withdrawing consent deletes the category's rows.
+model DiversityAnswer {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId     String            @db.Uuid
+  subject       DiversitySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  category      DiversityCategory
+  question      String // key in src/lib/diversity/questions.ts
+  value         String
+  selfDescribed Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+
+  @@unique([subjectId, question, value])
+  @@index([subjectId, category])
+}
+
+/// Current consent per member per category (the launch pack's consent record).
+model DiversityConsent {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId      String            @db.Uuid
+  subject        DiversitySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  category       DiversityCategory
+  status         ConsentStatus
+  wordingVersion String
+  givenAt        DateTime
+  withdrawnAt    DateTime?
+  method         ConsentMethod
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([subjectId, category])
+}
+
+/// Append-only history of consent given / withdrawn (shown to the member).
+model DiversityConsentLog {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId      String            @db.Uuid
+  subject        DiversitySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  category       DiversityCategory
+  action         ConsentStatus
+  wordingVersion String
+  method         ConsentMethod
+  at             DateTime          @default(now())
+
+  @@index([subjectId, at])
+}
+
+/// Answers from the old "About you" pills, held without consent until the member confirms
+/// or removes them (pre-filled on their consent screen). Never shown to the team or counted.
+/// Deleted after 60 days (retention job).
+model DiversityPending {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId String            @db.Uuid
+  subject   DiversitySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  category  DiversityCategory
+  question  String
+  value     String
+  createdAt DateTime          @default(now())
+  expiresAt DateTime
+
+  @@unique([subjectId, question, value])
+}
+
+/// Every time a partner opens one member's answers: who, when, why. Append-only.
+model DiversityAccessLog {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId String           @db.Uuid
+  subject   DiversitySubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User             @relation(fields: [viewerId], references: [id])
+  reason    String
+  at        DateTime         @default(now())
+
+  @@index([subjectId, at])
 }

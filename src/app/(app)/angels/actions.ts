@@ -15,7 +15,7 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createUploadTargetIn, objectExists, objectPath, type UploadTarget } from "@/lib/deck-storage";
 import { checkUpload, DOCUMENTS_BUCKET } from "@/lib/documents";
-import { certificationExpiry, cleanPhone, deleteConfirmed, normaliseAngelName, parseList } from "@/lib/pipeline";
+import { certificationExpiry, cleanPhone, deleteConfirmed, normaliseAngelName, parseList, withoutDiversityTags } from "@/lib/pipeline";
 import type { ImportRow } from "@/lib/angel-import";
 import type { ActionResult } from "@/lib/action-result";
 
@@ -64,7 +64,7 @@ function angelData(formData: FormData) {
     data: {
       ...rest,
       sectors: parseList(sectors),
-      tags: parseList(tags),
+      tags: withoutDiversityTags(parseList(tags)).tags, // diversity is the member's own, with consent: never typed in by the team
       whatsappGroups: parseList(whatsappGroups),
     },
   } as const;

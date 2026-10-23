@@ -26,7 +26,12 @@ cp .env.example .env             # set DATABASE_URL and SESSION_SECRET
 npm run db:migrate               # create tables
 npm run db:seed                  # DEV ONLY: sample ventures + admin@dxv.local / dxv-dev-password
 npm run dev                      # http://localhost:3000
+npm run test:db                  # database tests on a fresh throwaway "dxvos_test" (synthetic data)
 ```
+
+The database login needs `CREATEDB` and `CREATEROLE` (like Supabase's `postgres` role): the
+diversity migrations create least-privilege roles. Locally: `ALTER ROLE <you> CREATEDB CREATEROLE;`
+as a superuser. It must **not** be a superuser for `test:db`, or row-level security is skipped.
 
 Create the first admin (prints a generated password once). After that, partners invite each other from the
 **Team** page (header, top right) with one-time links, so this script is only for bootstrapping:

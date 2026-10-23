@@ -11,7 +11,7 @@ import { z } from "zod";
 import { requireAngel } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
-import { certificationExpiry, cleanPhone, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, TICKET_RANGES } from "@/lib/pipeline";
+import { certificationExpiry, cleanPhone, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, withoutDiversityTags, TICKET_RANGES } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 import { angelHasDealAccess, loadDealRoom } from "@/lib/portal-deals";
 
@@ -49,7 +49,8 @@ export async function updateMyProfile(_prev: ActionResult, formData: FormData): 
   const { ticketRange, experience, ...rest } = parsed.data;
   // Sectors: the ticked suggestions plus anything typed in "Other".
   const sectors = parseList([...formData.getAll("sector").map(String), String(formData.get("otherSectors") ?? "")].join(","));
-  const tags = parseList([...formData.getAll("tag").map(String), String(formData.get("otherTags") ?? "")].join(","));
+  // Experience tags only: diversity information is never a tag (it needs its own consent).
+  const { tags } = withoutDiversityTags(parseList([...formData.getAll("tag").map(String), String(formData.get("otherTags") ?? "")].join(",")));
   const first = !angel.profileConfirmedAt;
   await db.$transaction([
     db.angel.update({
