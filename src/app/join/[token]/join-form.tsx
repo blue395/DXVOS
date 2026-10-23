@@ -9,6 +9,7 @@ import { ProviderJoinButtons } from "@/components/provider-buttons";
 import { Field, inputClass } from "@/components/ui";
 import type { OAuthProvider } from "@/generated/prisma/enums";
 import { acceptInvite } from "./actions";
+import { PRIVACY_NOTICE_URL, TERMS_URL } from "@/lib/legal-links";
 
 export function JoinForm({
   token,
@@ -24,15 +25,33 @@ export function JoinForm({
   /** The approved member terms, rendered by the page. */
   terms: React.ReactNode;
 }) {
-  const [agreed, setAgreed] = useState(false);
+  const [termsTicked, setTermsTicked] = useState(false);
+  const [adult, setAdult] = useState(false);
+  // Both are needed for either way of setting up (docs/privacy: 18+ confirmation at sign-up).
+  const agreed = termsTicked && adult;
   return (
     <div className="space-y-5">
       <div className="space-y-2">
         <div className="max-h-64 overflow-y-auto rounded-md border border-black/15 bg-black/[0.02] p-3 text-sm">{terms}</div>
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1" />
+          <input type="checkbox" checked={termsTicked} onChange={(e) => setTermsTicked(e.target.checked)} className="mt-1" />
           <span>I have read and accept the DXV member terms and privacy notice.</span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1" />
+          <span>I confirm I am 18 or over.</span>
+        </label>
+        <p className="text-xs text-black/60">
+          By creating an account you agree to our{" "}
+          <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="text-dxv-green underline">
+            terms
+          </a>
+          . Read how we use your data in our{" "}
+          <a href={PRIVACY_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="text-dxv-green underline">
+            privacy notice
+          </a>
+          .
+        </p>
       </div>
 
       {providers.length > 0 && (
@@ -49,7 +68,8 @@ export function JoinForm({
       )}
 
       <ActionForm action={acceptInvite.bind(null, token)} className="space-y-4" resetOnSuccess={false}>
-        <input type="hidden" name="terms" value={agreed ? "on" : ""} />
+        <input type="hidden" name="terms" value={termsTicked ? "on" : ""} />
+        <input type="hidden" name="adult" value={adult ? "on" : ""} />
         <Field label="Your email (your login)">
           <input value={email} readOnly autoComplete="username" className={`${inputClass} bg-black/[0.03]`} />
         </Field>

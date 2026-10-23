@@ -12,6 +12,7 @@ import { appOrigin } from "@/lib/mail";
 import { OAuthError, PROVIDER_LABEL, finishOAuth, providerFromSlug, type ProviderIdentity } from "@/lib/oauth";
 import { canSignIn } from "@/lib/pipeline";
 import { createSession } from "@/lib/session";
+import { teamRefusal } from "@/lib/team-signin";
 import { db } from "@/lib/db";
 import { createLoginFromInvite, findUsableInvite } from "@/app/join/[token]/invite";
 
@@ -66,8 +67,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/auth/cal
 
   // Signing in.
   const found = await findUserForSignIn(identity);
-  if (!found) return go(`/login?signin=nomatch&provider=${slug}${identity.anyEmail ? `&email=${encodeURIComponent(identity.anyEmail)}` : ""}`);
+  // No email in the URL (it would land in browser history and hosting logs).
+  if (!found) return go(`/login?signin=nomatch&provider=${slug}`);
   if (!canSignIn(found.user)) return go("/login?signin=revoked");
+  if (teamRefusal(found.user.role, "provider", { name: identity.provider, hostedDomain: identity.hostedDomain })) return go("/login?signin=team-google");
   if (found.newlyConnected) await connectIdentity(found.user, identity);
   else await touchIdentity(identity);
   await Promise.all([

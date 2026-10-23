@@ -10,10 +10,12 @@ import { login } from "./actions";
 import { AuthCard } from "./auth-card";
 
 /** Why a Google / Microsoft sign-in came back without signing them in. */
-function providerMessage(code: string | undefined, provider: string, email: string | undefined): string | null {
+function providerMessage(code: string | undefined, provider: string): string | null {
   switch (code) {
+    case "team-google":
+      return "Team logins sign in with Google, using your DXV Google Workspace account (it has 2-step verification). Use the Google button below.";
     case "nomatch":
-      return `There's no DXV login for ${email && /^[^\s@<>]+@[^\s@<>]+$/.test(email) ? email : `that ${provider} account`} yet. If you're a member, sign in with your email (or an emailed link), then connect your ${provider} account in My profile. New to DXV? Ask the team for an invite.`;
+      return `There's no DXV login for that ${provider} account yet. If you're a member, sign in with your email (or an emailed link), then connect your ${provider} account in My profile. New to DXV? Ask the team for an invite.`;
     case "revoked":
       return "That login's access is switched off. Please contact the DXV team.";
     case "cancelled":
@@ -34,7 +36,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const providers = enabledProviders();
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const slug = providerFromSlug(one(sp.provider) ?? "");
-  const message = providerMessage(one(sp.signin), slug ? PROVIDER_LABEL[slug] : "Google or Microsoft", one(sp.email));
+  const message =
+    one(sp.account) === "deleted"
+      ? "Your account and personal data have been deleted. Thank you for being part of DXV."
+      : providerMessage(one(sp.signin), slug ? PROVIDER_LABEL[slug] : "Google or Microsoft");
 
   return (
     <AuthCard subtitle="Sign in (DXV team and members)">

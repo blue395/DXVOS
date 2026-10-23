@@ -95,3 +95,15 @@ export function emailChangedEmail(opts: { name: string; oldEmail: string; newEma
     small: "If this wasn't you, reply to this email straight away and the DXV team will lock the account.",
   });
 }
+
+/** Retention: their account will be deleted after 24 months without activity unless they sign in. */
+export function inactivityWarningEmail(opts: { name: string; deleteOn: string; signInUrl: string }) {
+  return linkEmail({
+    subject: "Your DXV account: sign in to keep it",
+    name: opts.name,
+    lead: `Your DXV OS account hasn't been used for two years. To keep the personal data we hold to a minimum, we'll delete your account on ${opts.deleteOn}. If you'd like to stay a DXV member, just sign in before then.`,
+    action: "Sign in to keep my account",
+    link: opts.signInUrl,
+    small: "Amounts from any investments you made through DXV are kept, without your name, for our records. Questions? Reply to this email.",
+  });
+}

@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/session";
+import { teamRefusal } from "@/lib/team-signin";
 import { MIN_PASSWORD_LENGTH } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 import { findUsableTeamInvite } from "./invite";
@@ -59,6 +60,8 @@ export async function acceptTeamInvite(token: string, _prev: ActionResult, formD
     userId = target.id;
   }
 
+  // Team logins that must use Google Workspace: the login is ready, but sign-in is with Google.
+  if (teamRefusal("ADMIN", "password")) redirect("/login?signin=team-google");
   await createSession(userId);
   redirect("/");
 }

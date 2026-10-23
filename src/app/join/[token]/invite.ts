@@ -46,6 +46,7 @@ export async function createLoginFromInvite(
         data: {
           termsAcceptedAt: new Date(),
           termsVersionId: terms.id,
+          ageConfirmedAt: new Date(), // ticked on the invite page (both ways of setting up require it)
           // Accepting an invite makes a prospect a member.
           ...(angel.status === "PROSPECT" ? { status: "MEMBER" as const, joinedAt: angel.joinedAt ?? new Date() } : {}),
         },
@@ -54,6 +55,7 @@ export async function createLoginFromInvite(
         data: [
           { angelId: angel.id, kind: "joined", detail: `${how}${ip ? ` from ${ip}` : ""}`, actorId: user.id },
           { angelId: angel.id, kind: "terms-accepted", detail: `Member terms version ${terms.version}`, actorId: user.id },
+          { angelId: angel.id, kind: "age-confirmed", detail: "Confirmed they are 18 or over", actorId: user.id },
         ],
       });
       return user.id;

@@ -810,6 +810,8 @@ model Angel {
   diversityPromptedAt DateTime?
   /// When they confirmed they're 18 or over (sign-up).
   ageConfirmedAt      DateTime?
+  /// Retention: when we warned them their account would be deleted after 24 months without activity.
+  inactivityWarnedAt  DateTime?
 
   @@index([status])
 }

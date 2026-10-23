@@ -877,6 +877,52 @@ export function profileAnswer(value: string | null | undefined, profileConfirmed
 /** Minimum password length for angel logins. */
 export const MIN_PASSWORD_LENGTH = 10;
 
+// ── Team sign-in: Google Workspace only (Blue, 2026-10-23: MFA for the team) ──
+
+/**
+ * When TEAM_GOOGLE_DOMAINS is set (e.g. "diversityx.vc"), team logins (ADMIN) may sign in
+ * ONLY with a Google account on one of those Workspace domains, where Google enforces
+ * 2-step verification; passwords and emailed links stop working for them. Members are
+ * never affected. Returns why a sign-in is refused, or null.
+ */
+export function teamSignInRefusal(
+  role: string,
+  method: "password" | "link" | "provider",
+  googleDomains: string[],
+  provider?: { name: "GOOGLE" | "MICROSOFT"; hostedDomain: string | null },
+): string | null {
+  if (role !== "ADMIN" || googleDomains.length === 0) return null;
+  const msg = `Team logins sign in with Google, using your ${googleDomains.join(" / ")} account (it has 2-step verification).`;
+  if (method !== "provider") return msg;
+  return provider?.name === "GOOGLE" && provider.hostedDomain && googleDomains.includes(provider.hostedDomain.toLowerCase()) ? null : msg;
+}
+
+/** TEAM_GOOGLE_DOMAINS ("diversityx.vc, other.org") as a clean list. */
+export const parseDomains = (raw: string | undefined) =>
+  (raw ?? "")
+    .split(/[,\s]+/)
+    .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
+
+// ── Retention: inactive members (docs/privacy retention schedule) ────────────
+
+export const INACTIVE_MONTHS = 24;
+export const INACTIVE_WARNING_DAYS = 30;
+
+/**
+ * What the daily job does for one angel record: after 24 months with no activity, warn
+ * them (email); 30 days after the warning, if still inactive, delete (smart erasure).
+ * Any activity after a warning cancels it.
+ */
+export function inactivityAction(a: { lastActiveAt: Date; warnedAt: Date | null }, now: Date): "none" | "warn" | "delete" | "cancel-warning" {
+  const inactiveSince = new Date(now);
+  inactiveSince.setMonth(inactiveSince.getMonth() - INACTIVE_MONTHS);
+  if (a.warnedAt && a.lastActiveAt > a.warnedAt) return "cancel-warning";
+  if (a.lastActiveAt > inactiveSince) return a.warnedAt ? "cancel-warning" : "none";
+  if (!a.warnedAt) return "warn";
+  return now.getTime() - a.warnedAt.getTime() >= INACTIVE_WARNING_DAYS * 86_400_000 ? "delete" : "none";
+}
+
 // ── Password guessing ────────────────────────────────────────────────────────
 
 /**
@@ -904,6 +950,8 @@ export function loginThrottled(
 export const LOGIN_LINK_MINUTES = { RESET: 30, MAGIC: 15 } as const;
 /** At most this many emailed links per login per hour (stops inbox flooding). */
 export const LOGIN_LINKS_PER_HOUR = 5;
+/** At most this many emailed links asked for from one connection per hour, across all emails. */
+export const LOGIN_LINKS_PER_IP_HOUR = 20;
 
 export type LoginLinkState = "ok" | "used" | "expired";
 
