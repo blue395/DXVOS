@@ -578,6 +578,13 @@ describe("angel onboarding", () => {
     expect(nextOnboardingStep({ ...blank, profileConfirmedAt: now, restrictedDeclaredAt: now }, null, now)).toBe("welcome");
     expect(nextOnboardingStep({ profileConfirmedAt: now, restrictedDeclaredAt: null, onboardedAt: now }, current, now)).toBe("done");
   });
+  it("asks the optional diversity questions once, after the profile, during onboarding only", () => {
+    const fresh = { ...blank, profileConfirmedAt: now, diversityPromptedAt: null };
+    expect(nextOnboardingStep({ ...fresh, profileConfirmedAt: null }, null, now)).toBe("profile");
+    expect(nextOnboardingStep(fresh, null, now)).toBe("diversity");
+    expect(nextOnboardingStep({ ...fresh, diversityPromptedAt: now }, null, now)).toBe("certify");
+    expect(nextOnboardingStep({ ...fresh, onboardedAt: now }, current, now)).toBe("done");
+  });
   it("reports portal access for the admin view", () => {
     const invite = (o: object = {}) => ({ expiresAt: d("2026-10-10"), usedAt: null, revokedAt: null, kind: "INVITE" as const, ...o });
     expect(portalState({ onboardedAt: null }, null, null, now)).toBe("not-invited");

@@ -1,11 +1,12 @@
 // Onboarding progress: shown until the angel has finished onboarding. Server-component safe.
 const STEPS = [
   { key: "profile", label: "Your details" },
+  { key: "diversity", label: "About you (optional)" },
   { key: "certify", label: "Investor statement" },
   { key: "welcome", label: "Welcome" },
 ] as const;
 
-export function OnboardingStepper({ current }: { current: "profile" | "certify" | "welcome" }) {
+export function OnboardingStepper({ current }: { current: "profile" | "diversity" | "certify" | "welcome" }) {
   const at = STEPS.findIndex((s) => s.key === current);
   return (
     <ol className="mb-5 flex flex-wrap items-center gap-2 text-xs" aria-label="Onboarding steps">

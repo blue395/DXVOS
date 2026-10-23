@@ -3,6 +3,8 @@ import { BarList, ColumnChart, Funnel, Meter, StatTile, TableView } from "@/comp
 import { formatDate } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
 import { loadInsights } from "@/lib/insights";
+import { rawDiversityCounts } from "@/lib/diversity/store";
+import { DIVERSITY_REPORT_LABELS, singleCharacteristicReport } from "@/lib/diversity/report";
 import { INSIGHT_PERIODS, formatGbp, formatGbpCompact, parseInsightPeriod, stageLabel } from "@/lib/pipeline";
 
 export const metadata = { title: "Insights · DXV OS" };
@@ -13,7 +15,9 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
   const sp = await searchParams;
   const period = parseInsightPeriod(sp.period);
   const periodLabel = INSIGHT_PERIODS.find((p) => p.days === period)!.label;
-  const { growth, engagement, investment, dealflow, nudges, hasVisits } = await requireAdminWith(() => loadInsights(period));
+  const [{ growth, engagement, investment, dealflow, nudges, hasVisits }, diversity] = await requireAdminWith(() =>
+    Promise.all([loadInsights(period), rawDiversityCounts().then(singleCharacteristicReport)]),
+  );
   const gbp = (n: number) => formatGbpCompact(n);
 
   return (
@@ -269,6 +273,34 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
         <Panel title="Founder diversity of invested deals" note="From each deal's founder diversity (what founders have stated).">
           <BarList rows={dealflow.diversity} empty="No themes recorded on invested deals yet." />
         </Panel>
+      </Section>
+
+      <Section
+        title="Community diversity (combined)"
+        note="From members who chose to answer and gave consent. Groups of fewer than 10 are never shown, and no individual's answers appear here."
+      >
+        {diversity.every((q) => q.hidden) ? (
+          <p className="text-sm text-black/55">Not enough answers yet to show anything (fewer than 10 people per question).</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {diversity
+              .filter((q) => !q.hidden)
+              .map((q) => (
+                <Panel key={q.question} title={DIVERSITY_REPORT_LABELS[q.question] ?? q.question} note={`${q.respondents} answered`}>
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-black/5">
+                      {q.rows.map((r) => (
+                        <tr key={r.value}>
+                          <td className="py-1 pr-2">{r.value}</td>
+                          <td className="py-1 text-right tabular-nums text-black/70">{r.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Panel>
+              ))}
+          </div>
+        )}
       </Section>
 
       <p className="text-xs text-black/45">
