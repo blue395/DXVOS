@@ -1774,3 +1774,30 @@ export function impactThemeOptions(playbookThemes: readonly string[]): string[] 
   const seen = new Set(playbookThemes.map((t) => t.trim().toLowerCase()));
   return [...playbookThemes, ...EXTRA_IMPACT_THEMES.filter((t) => !seen.has(t.toLowerCase()))];
 }
+
+// ── Investment assessments still to do (Dashboard, Blue 2026-10-28) ─────────
+
+/** Stages where a deal needs its investment assessment issued: the memo is the partners' basis at review and members see it from pitch selection. */
+export const ASSESSMENT_STAGES = ["PARTNER_REVIEW", "PITCH_SELECTION"] as const satisfies readonly Stage[];
+
+export type AssessmentStatus = "not-started" | "drafting" | "ai-draft" | "in-review";
+
+export const ASSESSMENT_STATUS_LABELS: Record<AssessmentStatus, string> = {
+  "not-started": "No assessment yet",
+  drafting: "AI draft being written",
+  "ai-draft": "AI draft ready to review",
+  "in-review": "DXV Review Draft in progress",
+};
+
+/**
+ * Where a deal's investment assessment stands, or null when it doesn't need one now (not at
+ * an assessment stage, or a DXV Review Issue has been issued). `aiDrafts` are effective
+ * statuses (effectiveDeckStatus(), so a timed-out job counts as failed).
+ */
+export function assessmentStatus(v: { currentStage: Stage; issued: boolean; hasReviewDraft: boolean; aiDrafts: { status: string }[] }): AssessmentStatus | null {
+  if (!(ASSESSMENT_STAGES as readonly Stage[]).includes(v.currentStage) || v.issued) return null;
+  if (v.hasReviewDraft) return "in-review";
+  if (v.aiDrafts.some((a) => a.status === "PENDING" || a.status === "PROCESSING")) return "drafting";
+  if (v.aiDrafts.some((a) => a.status === "COMPLETE")) return "ai-draft";
+  return "not-started";
+}
