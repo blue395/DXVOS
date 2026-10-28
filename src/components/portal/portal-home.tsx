@@ -6,6 +6,10 @@ import { CERTIFICATION_LABELS, profileAnswer, certState, canSeeLiveDeals, format
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
 import type { DealListItem } from "@/lib/portal-deals";
 import { PhaseBadge } from "./deal-room";
+import { formatWhen } from "./member-deal-parts";
+
+/** A pitch session or community event as members see it. */
+export type PortalEvent = { id: string; kind: "PITCH_SESSION" | "COMMUNITY"; title: string; startsAt: Date; location: string; lumaUrl: string | null; details: string | null };
 
 export type PortalAngel = {
   name: string;
@@ -30,6 +34,7 @@ export function PortalHome({
   deckHref = (id, download) => `/api/portal/documents/${id}${download ? "?download=1" : ""}`,
   boardRound = null,
   boardHref = "/portal/deals",
+  events = [],
   preview = false,
 }: {
   angel: PortalAngel;
@@ -43,6 +48,8 @@ export function PortalHome({
   boardRound?: number | null;
   /** Where the board link goes (null hides it, e.g. in the team's preview). */
   boardHref?: string | null;
+  /** Upcoming events, soonest first (pitch sessions only for members who can see deals). */
+  events?: PortalEvent[];
   preview?: boolean;
 }) {
   const state = certState(cert);
@@ -56,6 +63,8 @@ export function PortalHome({
       </div>
 
       <DealsPanel access={access} deals={deals} dealHref={dealHref} deckHref={deckHref} boardRound={boardRound} boardHref={boardHref} />
+
+      <EventsPanel events={events} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-4">
@@ -183,7 +192,7 @@ function DealsPanel({
                     key={d.id}
                     className="flex flex-wrap items-center gap-3 rounded-lg border border-black/10 p-3 transition hover:border-dxv-green hover:bg-dxv-green/[0.03]"
                   >
-                    <Link href={dealHref(d.id)} className="group min-w-0 flex-1">
+                    <Link href={dealHref(d.id)} className="group min-w-0 flex-1 basis-full sm:basis-0">
                       <span className="block font-semibold text-dxv-green group-hover:underline">{d.name}</span>
                       {d.oneLiner && <span className="block text-sm text-black/70">{d.oneLiner}</span>}
                       {d.sector && <span className="block text-sm text-black/55">{d.sector}</span>}
@@ -223,6 +232,67 @@ function DealsPanel({
         )}
       </div>
     </section>
+  );
+}
+
+/** The next pitch session or community event, with a button to book on Luma, and what else is coming up. */
+function EventsPanel({ events }: { events: PortalEvent[] }) {
+  const [next, ...later] = events;
+  return (
+    <section className="rounded-lg border border-black/10 bg-white p-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">Next pitch session and events</h2>
+      {!next ? (
+        <p className="mt-2 text-sm text-black/65">No session scheduled yet.</p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <EventDate d={next.startsAt} />
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-black/50">{next.kind === "PITCH_SESSION" ? "Pitch session" : "Community event"}</p>
+              <p className="text-base font-semibold">{next.title}</p>
+              <p className="text-black/70">
+                {formatWhen(next.startsAt)} · {next.location}
+              </p>
+              {next.details && <p className="text-black/60">{next.details}</p>}
+            </div>
+            {next.lumaUrl && (
+              <a href={next.lumaUrl} target="_blank" rel="noreferrer" className={`${buttonClass()} self-start sm:self-center`}>
+                Book on Luma ↗
+              </a>
+            )}
+          </div>
+          {later.length > 0 && (
+            <ul className="divide-y divide-black/10 border-t border-black/10 text-sm">
+              {later.slice(0, 3).map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2">
+                  <span className="min-w-0">
+                    <span className="font-medium">{e.title}</span>
+                    <span className="block text-xs text-black/60">
+                      {formatWhen(e.startsAt)} · {e.location}
+                    </span>
+                  </span>
+                  {e.lumaUrl && (
+                    <a href={e.lumaUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-dxv-green underline">
+                      Book ↗
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EventDate({ d }: { d: Date }) {
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { ...o, timeZone: "Europe/London" }).format(d);
+  return (
+    <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-dxv-green text-white" aria-hidden>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-dxv-yellow">{part({ month: "short" })}</span>
+      <span className="text-2xl font-semibold leading-none">{part({ day: "numeric" })}</span>
+    </span>
   );
 }
 

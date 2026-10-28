@@ -5,14 +5,16 @@ import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { latestCertification } from "@/lib/pipeline";
 import { angelHasDealAccess, listSharedDeals } from "@/lib/portal-deals";
+import { eventsFor, loadMemberEvents } from "@/lib/member-events";
 
 /** "View as angel": the portal home exactly as this angel sees it (spec §4). Admin only. */
 export default async function PreviewPage({ params }: PageProps<"/angels/[id]/preview">) {
   const { id } = await params;
-  const [angel, deals] = await requireAdminWith(() =>
+  const [angel, deals, events] = await requireAdminWith(() =>
     Promise.all([
       db.angel.findUnique({ where: { id }, include: { certifications: { select: { type: true, signedOn: true, expiresOn: true } } } }),
       listSharedDeals(),
+      loadMemberEvents(),
     ]),
   );
   if (!angel) notFound();
@@ -35,6 +37,7 @@ export default async function PreviewPage({ params }: PageProps<"/angels/[id]/pr
           dealHref={(dealId) => `/deals/${dealId}/angel-view`}
           deckHref={(docId, download) => `/api/documents/${docId}${download ? "?download=1" : ""}`}
           boardHref={null}
+          events={eventsFor(events, access)}
           preview
         />
       </div>

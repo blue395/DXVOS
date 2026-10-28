@@ -18,8 +18,15 @@ import {
   latestCertification,
   memberBoardCards,
   boardLastUpdated,
+  boardInvolvement,
+  eoiProgress,
   nextOnboardingStep,
+  preSelectionVotesUsed,
+  PRE_SELECTION_VOTE_LIMIT,
+  resolveAngelId,
   type AngelDealPhase,
+  type BoardInvolvement,
+  type EoiProgress,
 } from "@/lib/pipeline";
 import { issueNumbers, reviewIssueName } from "@/lib/memo-ai/render";
 import { memoSpec } from "@/lib/export/documents";
@@ -31,7 +38,10 @@ const VISIBLE_STAGES: Stage[] = ["PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT
 
 /** May this angel see deals right now? Onboarded, a current investor statement, and not "neither applies". */
 export async function angelHasDealAccess(angel: Pick<Angel, "id" | "status" | "archivedAt" | "restrictedDeclaredAt" | "profileConfirmedAt" | "onboardedAt">) {
-  const certs = await db.angelCertification.findMany({ where: { angelId: angel.id }, select: { signedOn: true, expiresOn: true } });
+  const certs = await db.angelCertification.findMany({
+    where: { angelId: angel.id },
+    select: { signedOn: true, expiresOn: true },
+  });
   const cert = latestCertification(certs);
   return nextOnboardingStep(angel, cert) === "done" && !angel.restrictedDeclaredAt && canSeeLiveDeals(angel, cert);
 }
@@ -55,7 +65,10 @@ export type DealListItem = {
 /** Every deal members can see now, newest share first; with `angelId`, that angel's own vote status on each. */
 export async function listSharedDeals(angelId: string | null = null): Promise<DealListItem[]> {
   const rows = await db.venture.findMany({
-    where: { sharedWithAngelsAt: { not: null }, currentStage: { in: VISIBLE_STAGES } },
+    where: {
+      sharedWithAngelsAt: { not: null },
+      currentStage: { in: VISIBLE_STAGES },
+    },
     orderBy: { sharedWithAngelsAt: "desc" },
     select: {
       id: true,
@@ -64,13 +77,29 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
       oneLiner: true,
       currentStage: true,
       sharedWithAngelsAt: true,
-      preSelectionVotes: angelId ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true } } : false,
+      preSelectionVotes: angelId
+        ? {
+            where: { angelId },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { interested: true },
+          }
+        : false,
       investmentVotes: angelId
-        ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true } }
+        ? {
+            where: { angelId, removedAt: null },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { interested: true, maxTicketGbp: true },
+          }
         : false,
       // The latest uploaded deck (members see it from Member Pitch Selection on, like the deal room).
       documents: {
-        where: { category: "DECK", uploadedAt: { not: null }, archivedAt: null },
+        where: {
+          category: "DECK",
+          uploadedAt: { not: null },
+          archivedAt: null,
+        },
         orderBy: { uploadedAt: "desc" },
         take: 1,
         select: { id: true, fileName: true, mimeType: true },
@@ -84,15 +113,81 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
     const pre = v.preSelectionVotes?.[0];
     const eoi = v.investmentVotes?.[0];
     const myAnswer =
-      voteKind === "pre-selection" && pre ? { interested: pre.interested, maxTicketGbp: null } : voteKind === "eoi" && eoi ? { interested: eoi.interested, maxTicketGbp: eoi.maxTicketGbp } : null;
-    return [{ id: v.id, name: v.name, sector: v.sector, oneLiner: v.oneLiner, phase, sharedAt: v.sharedWithAngelsAt!, voteKind, myAnswer, deck: v.documents[0] ?? null }];
+      voteKind === "pre-selection" && pre
+        ? { interested: pre.interested, maxTicketGbp: null }
+        : voteKind === "eoi" && eoi
+          ? { interested: eoi.interested, maxTicketGbp: eoi.maxTicketGbp }
+          : null;
+    return [
+      {
+        id: v.id,
+        name: v.name,
+        sector: v.sector,
+        oneLiner: v.oneLiner,
+        phase,
+        sharedAt: v.sharedWithAngelsAt!,
+        voteKind,
+        myAnswer,
+        deck: v.documents[0] ?? null,
+      },
+    ];
   });
 }
 
 /** The round DXV has opened to members' deals board (set on the Dashboard; null = none). */
 export async function currentMemberRound(): Promise<number | null> {
-  const latest = await db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, select: { round: true } });
+  const latest = await db.memberRound.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { round: true },
+  });
   return latest?.round ?? null;
+}
+
+const latestMemberRound = () =>
+  db.memberRound.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { round: true, votingClosesAt: true, createdAt: true },
+  });
+
+/** A member's pitch-selection votes on deals that belong to a round (for the 3-per-round limit). */
+const myRoundVotes = (angelId: string) =>
+  db.preSelectionVote.findMany({
+    where: { angelId, venture: { round: { not: null } } },
+    select: {
+      ventureId: true,
+      interested: true,
+      createdAt: true,
+      venture: { select: { round: true } },
+    },
+  });
+
+/** Where a member stands in one round's pitch-selection vote. */
+export type RoundVoting = {
+  round: number | null;
+  limit: number;
+  /** Deals they've said "yes" to in this round. */
+  used: Set<string>;
+  /** The deadline, when the team has set one for this round (the round open to members). */
+  closesAt: Date | null;
+};
+
+function roundVoting(
+  round: number | null,
+  votes: Awaited<ReturnType<typeof myRoundVotes>>,
+  latest: { round: number | null; votingClosesAt: Date | null } | null,
+): RoundVoting {
+  return {
+    round,
+    limit: PRE_SELECTION_VOTE_LIMIT,
+    used: round === null ? new Set() : preSelectionVotesUsed(votes.filter((v) => v.venture.round === round)),
+    closesAt: round !== null && latest?.round === round ? latest.votingClosesAt : null,
+  };
+}
+
+/** The voting state for one deal's round, for the vote action (checked on every vote). */
+export async function memberRoundVoting(angelId: string, round: number | null): Promise<RoundVoting> {
+  const [votes, latest] = await Promise.all([round === null ? Promise.resolve([]) : myRoundVotes(angelId), latestMemberRound()]);
+  return roundVoting(round, votes, latest);
 }
 
 export type MemberBoardCard = {
@@ -106,17 +201,26 @@ export type MemberBoardCard = {
   oneLiner: string | null;
   column: Stage;
   phase: AngelDealPhase | null;
+  /** This member's own involvement (their votes and tickets only). */
+  involvement: BoardInvolvement;
+  /** Members' combined interest towards the minimum (aggregate; hidden for small numbers). Expression-of-interest stages only. */
+  progress: EoiProgress | null;
 };
 
 /**
  * The members' read-only board: the offered round's live deals, name and sector only.
  * Only cards with a phase open into the deal room (shared, from Member Pitch Selection).
  */
-export async function loadMemberBoard(): Promise<{ round: number | null; cards: MemberBoardCard[]; updatedAt: Date | null }> {
-  // One round trip: the latest round choice and every live deal in any round, together
-  // (memberBoardCards() keeps the chosen round's). Saves a sequential query on every visit.
-  const [latest, rows] = await Promise.all([
-    db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, select: { round: true, createdAt: true } }),
+export async function loadMemberBoard(angelId: string): Promise<{
+  round: number | null;
+  cards: MemberBoardCard[];
+  updatedAt: Date | null;
+  voting: RoundVoting;
+}> {
+  // One round trip: the latest round choice, every live deal in any round (memberBoardCards()
+  // keeps the chosen round's) and this member's own votes and tickets, together.
+  const [latest, rows, myVotes, eois, finals, aliases] = await Promise.all([
+    latestMemberRound(),
     db.venture.findMany({
       where: { round: { not: null }, currentStage: { not: "PASSED" } },
       orderBy: { stageEnteredAt: "asc" },
@@ -133,27 +237,78 @@ export async function loadMemberBoard(): Promise<{ round: number | null; cards: 
         updatedAt: true,
       },
     }),
+    myRoundVotes(angelId),
+    // Live expressions of interest on round deals: this member's own, and the totals (never shown per person).
+    db.investmentVote.findMany({
+      where: {
+        removedAt: null,
+        venture: { round: { not: null }, currentStage: { not: "PASSED" } },
+      },
+      select: {
+        ventureId: true,
+        angelId: true,
+        angelName: true,
+        interested: true,
+        maxTicketGbp: true,
+        createdAt: true,
+      },
+    }),
+    db.finalInvestment.findMany({
+      where: {
+        removedAt: null,
+        venture: { round: { not: null }, currentStage: { not: "PASSED" } },
+      },
+      select: { ventureId: true, angelId: true, angelName: true, paidAt: true },
+    }),
+    aliasMap(),
   ]);
   const round = latest?.round ?? null;
   const cards = memberBoardCards(rows, round);
+  const voting = roundVoting(round, myVotes, latest);
+  const votedYes = preSelectionVotesUsed(myVotes);
   return {
     round,
-    updatedAt: round === null ? null : boardLastUpdated(latest?.createdAt ?? null, cards.map((c) => c.updatedAt)),
-    cards: cards.map((c) => ({
-      id: c.id,
-      name: c.name,
-      sector: c.sector,
-      companyStage: c.companyStage,
-      round: c.round,
-      raiseAmountGbp: c.raiseAmountGbp,
-      oneLiner: c.oneLiner,
-      column: c.column,
-      phase: c.phase,
-    })),
+    voting,
+    updatedAt:
+      round === null
+        ? null
+        : boardLastUpdated(
+            latest?.createdAt ?? null,
+            cards.map((c) => c.updatedAt),
+          ),
+    cards: cards.map((c) => {
+      const dealEois = eois.filter((e) => e.ventureId === c.id);
+      const dealFinals = finals.filter((f) => f.ventureId === c.id);
+      const mine = dealFinals.filter((f) => resolveAngelId(f, aliases) === angelId);
+      return {
+        id: c.id,
+        name: c.name,
+        sector: c.sector,
+        companyStage: c.companyStage,
+        round: c.round,
+        raiseAmountGbp: c.raiseAmountGbp,
+        oneLiner: c.oneLiner,
+        column: c.column,
+        phase: c.phase,
+        involvement: boardInvolvement({
+          paidTicket: mine.some((f) => f.paidAt),
+          committed: committedAngelIds(dealEois, dealFinals, aliases).has(angelId),
+          votedYes: votedYes.has(c.id),
+        }),
+        progress: c.phase && angelVoteKind(c.currentStage) === "eoi" ? eoiProgress(dealEois) : null,
+      };
+    }),
   };
 }
 
-export type DealRoomDoc = { id: string; fileName: string; mimeType: string; sizeBytes: number; category: DocumentCategory; uploadedAt: Date | null };
+export type DealRoomDoc = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  category: DocumentCategory;
+  uploadedAt: Date | null;
+};
 
 export type DealRoom = {
   id: string;
@@ -165,6 +320,8 @@ export type DealRoom = {
   raiseAmountGbp: number | null;
   website: string | null;
   summary: string | null;
+  /** The DXV round the deal belongs to (votes are limited per round). */
+  round: number | null;
   phase: AngelDealPhase;
   deck: DealRoomDoc | null;
   memo: { id: string; name: string; spec: DocSpec } | null;
@@ -175,8 +332,21 @@ export type DealRoom = {
   ddOpen: boolean;
   committed: boolean;
   voteKind: "pre-selection" | "eoi" | null;
-  myPreSelection: { interested: boolean; note: string | null; createdAt: Date } | null;
-  myEoi: { interested: boolean; maxTicketGbp: number; note: string | null; createdAt: Date } | null;
+  myPreSelection: {
+    interested: boolean;
+    note: string | null;
+    createdAt: Date;
+  } | null;
+  myEoi: {
+    interested: boolean;
+    maxTicketGbp: number;
+    note: string | null;
+    createdAt: Date;
+  } | null;
+  /** Pitch selection: this member's votes in the deal's round (null for other stages or the team's preview). */
+  voting: RoundVoting | null;
+  /** Expressions of interest: members' combined interest towards the minimum (aggregate only). */
+  progress: EoiProgress | null;
 };
 
 const docSelect = {
@@ -197,7 +367,7 @@ const docSelect = {
  * ask to see it as a committed member).
  */
 export async function loadDealRoom(ventureId: string, angelId: string | null, opts: { previewCommitted?: boolean } = {}): Promise<DealRoom | null> {
-  const [v, eois, finals, aliases] = await Promise.all([
+  const [v, eois, finals, aliases, myVotes, latestRound] = await Promise.all([
     db.venture.findUnique({
       where: { id: ventureId },
       select: {
@@ -210,25 +380,62 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
         website: true,
         angelSummary: true,
         currentStage: true,
+        round: true,
         sharedWithAngelsAt: true,
-        documents: { where: { uploadedAt: { not: null }, archivedAt: null }, orderBy: { uploadedAt: "desc" }, select: docSelect },
+        documents: {
+          where: { uploadedAt: { not: null }, archivedAt: null },
+          orderBy: { uploadedAt: "desc" },
+          select: docSelect,
+        },
         memoVersions: {
           where: { kind: "REVIEWED_MEMO" },
           orderBy: { version: "desc" },
           select: { id: true, version: true, content: true, createdAt: true },
         },
         preSelectionVotes: angelId
-          ? { where: { angelId }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, note: true, createdAt: true } }
+          ? {
+              where: { angelId },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { interested: true, note: true, createdAt: true },
+            }
           : false,
         investmentVotes: angelId
-          ? { where: { angelId, removedAt: null }, orderBy: { createdAt: "desc" }, take: 1, select: { interested: true, maxTicketGbp: true, note: true, createdAt: true } }
+          ? {
+              where: { angelId, removedAt: null },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                interested: true,
+                maxTicketGbp: true,
+                note: true,
+                createdAt: true,
+              },
+            }
           : false,
       },
     }),
-    // Who committed (read here, never returned): their latest EOI on this deal, or a final ticket.
-    angelId ? db.investmentVote.findMany({ where: { ventureId, removedAt: null }, select: { angelId: true, angelName: true, interested: true, createdAt: true } }) : [],
-    angelId ? db.finalInvestment.findMany({ where: { ventureId, removedAt: null }, select: { angelId: true, angelName: true } }) : [],
+    // Who committed and the members' combined total (read here, never returned per person):
+    // the latest EOIs on this deal, and final tickets.
+    db.investmentVote.findMany({
+      where: { ventureId, removedAt: null },
+      select: {
+        angelId: true,
+        angelName: true,
+        interested: true,
+        maxTicketGbp: true,
+        createdAt: true,
+      },
+    }),
+    angelId
+      ? db.finalInvestment.findMany({
+          where: { ventureId, removedAt: null },
+          select: { angelId: true, angelName: true },
+        })
+      : [],
     angelId ? aliasMap() : new Map<string, string>(),
+    angelId ? myRoundVotes(angelId) : [],
+    latestMemberRound(),
   ]);
   if (!v) return null;
   const phase = angelDealVisibility(v);
@@ -255,9 +462,20 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
   if (angelSeesMemo(phase) && issue) {
     const name = reviewIssueName(issueNumbers(v.memoVersions).get(issue.id)!);
     const footer = `${name}, issued by DXV on ${formatLongDate(issue.createdAt)}. Confidential: for DXV members considering this investment.`;
-    memo = { id: issue.id, name, spec: memoSpec(issue.content as MemoContent, { name, ventureName: v.name, banner: false, footer, date: issue.createdAt }) };
+    memo = {
+      id: issue.id,
+      name,
+      spec: memoSpec(issue.content as MemoContent, {
+        name,
+        ventureName: v.name,
+        banner: false,
+        footer,
+        date: issue.createdAt,
+      }),
+    };
   }
 
+  const voteKind = angelVoteKind(v.currentStage);
   return {
     id: v.id,
     name: v.name,
@@ -267,6 +485,7 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
     raiseAmountGbp: v.raiseAmountGbp,
     website: v.website,
     summary: v.angelSummary,
+    round: v.round,
     phase,
     deck: deck && strip(deck),
     memo,
@@ -274,7 +493,9 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
     ddDocuments,
     ddOpen: dd.open,
     committed,
-    voteKind: angelVoteKind(v.currentStage),
+    voteKind,
+    voting: voteKind === "pre-selection" && angelId ? roundVoting(v.round, myVotes, latestRound) : null,
+    progress: voteKind === "eoi" ? eoiProgress(eois) : null,
     myPreSelection: v.preSelectionVotes?.[0] ?? null,
     myEoi: v.investmentVotes?.[0] ?? null,
   };
@@ -282,7 +503,10 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
 
 /** Whether this angel may open this document: the deal's current deck, or a document shared with them for the deal's phase. */
 export async function angelMayOpenDocument(documentId: string, angelId: string) {
-  const doc = await db.document.findUnique({ where: { id: documentId }, select: { ventureId: true } });
+  const doc = await db.document.findUnique({
+    where: { id: documentId },
+    select: { ventureId: true },
+  });
   if (!doc) return null;
   const room = await loadDealRoom(doc.ventureId, angelId);
   if (!room) return null;
@@ -293,8 +517,19 @@ export async function angelMayOpenDocument(documentId: string, angelId: string) 
 /** The members who could open a shared deal right now (signed up, onboarded, statement current). For the team's view. */
 export async function angelIdsWithDealAccess(now = new Date()): Promise<Set<string>> {
   const angels = await db.angel.findMany({
-    where: { status: "MEMBER", archivedAt: null, onboardedAt: { not: null }, restrictedDeclaredAt: null, user: { is: { disabledAt: null } } },
-    select: { id: true, status: true, archivedAt: true, certifications: { select: { signedOn: true, expiresOn: true } } },
+    where: {
+      status: "MEMBER",
+      archivedAt: null,
+      onboardedAt: { not: null },
+      restrictedDeclaredAt: null,
+      user: { is: { disabledAt: null } },
+    },
+    select: {
+      id: true,
+      status: true,
+      archivedAt: true,
+      certifications: { select: { signedOn: true, expiresOn: true } },
+    },
   });
   return new Set(angels.filter((a) => canSeeLiveDeals(a, latestCertification(a.certifications), now)).map((a) => a.id));
 }

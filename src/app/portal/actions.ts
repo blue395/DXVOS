@@ -11,9 +11,9 @@ import { z } from "zod";
 import { requireAngel } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
-import { certificationExpiry, cleanPhone, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, withoutDiversityTags, TICKET_RANGES } from "@/lib/pipeline";
+import { BIO_MAX, certificationExpiry, cleanPhone, preSelectionVoteRefusal, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, withoutDiversityTags, TICKET_RANGES } from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
-import { angelHasDealAccess, loadDealRoom } from "@/lib/portal-deals";
+import { angelHasDealAccess, loadDealRoom, memberRoundVoting } from "@/lib/portal-deals";
 
 const text = (max: number) =>
   z
@@ -29,7 +29,7 @@ const ProfileSchema = z.object({
   phone: text(40).transform(cleanPhone),
   location: text(120),
   linkedinUrl: text(300).refine((s) => !s || /^https?:\/\//.test(s), "LinkedIn links start with https://"),
-  bio: text(2000),
+  bio: text(BIO_MAX),
   source: text(200),
   ticketRange: z.enum([...TICKET_RANGES, ""]).optional(),
   experience: z.enum([...EXPERIENCE_LEVELS, ""]).optional(),
@@ -165,6 +165,10 @@ export async function castPreSelectionVote(ventureId: string, _prev: ActionResul
   const ctx = await votableDeal(ventureId, "pre-selection");
   if ("error" in ctx) return { error: ctx.error };
   const interested = parsed.data.interested === "yes";
+  // At most 3 "yes" votes per round, and none after the round's deadline (checked here, not just in the page).
+  const voting = await memberRoundVoting(ctx.angel.id, ctx.room.round);
+  const refusal = preSelectionVoteRefusal({ ventureId, interested }, voting.used, { number: voting.round, closesAt: voting.closesAt });
+  if (refusal) return { error: refusal };
   await db.$transaction([
     db.preSelectionVote.create({
       data: { ventureId, angelName: ctx.angel.name, angelId: ctx.angel.id, interested, note: parsed.data.note, recordedById: ctx.user.id },

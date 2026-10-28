@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { GATE_LABELS, daysSince, dashboardBands, dashboardMetrics, formatGbp, formatGbpCompact, memberBoardCards, stagePhase, type DashboardBand } from "@/lib/pipeline";
+import { GATE_LABELS, dateToLondonLocal, daysSince, dashboardBands, dashboardMetrics, formatGbp, formatGbpCompact, memberBoardCards, stagePhase, type DashboardBand } from "@/lib/pipeline";
 import { PHASE_STYLE } from "@/lib/board-style";
 import { MemberRoundSelect } from "./member-round-select";
+import { VotingDeadlineForm } from "./voting-deadline-form";
 import { Card, formatDate } from "@/components/ui";
 import { loadAngelRows } from "@/lib/angels";
 
@@ -95,6 +96,15 @@ export default async function DashboardPage() {
                 : `Members see Round ${offeredRound}'s ${boardCards.length} live deal${boardCards.length === 1 ? "" : "s"} on a read-only board; ${boardCards.filter((c) => c.phase).length} open with details (shared, from Member Pitch Selection on).`}
               {memberRound && ` Set by ${memberRound.by.name}, ${formatDate(memberRound.createdAt)}.`}
             </p>
+            {offeredRound !== null && (
+              // Keyed by the saved value so the box shows the latest deadline after a save or round change.
+              <div className="pt-2">
+                <VotingDeadlineForm
+                  key={memberRound?.id}
+                  current={memberRound?.votingClosesAt ? dateToLondonLocal(memberRound.votingClosesAt) : ""}
+                />
+              </div>
+            )}
           </div>
         </Card>
 
