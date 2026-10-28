@@ -15,14 +15,17 @@ import { Spinner } from "@/components/ui";
 import { Markdown } from "./markdown";
 
 const POLL_MS = 1000;
-const STORE_KEY = "dxv-brain"; // this browser only: whether it's open and which chat
+// This tab only (sessionStorage): the open chat survives moving between pages and reloads,
+// but every new visit starts a fresh chat (Blue, 2026-10-28). Old chats stay in the history.
+const STORE_KEY = "dxv-brain";
 
 const DEAL_PROMPTS = ["Summarise where this deal stands and what's next", "What are the biggest risks, and what should DD focus on?", "What should we ask the founder next?"];
 const GENERAL_PROMPTS = ["What's in due diligence right now, and what's outstanding?", "What moved in the pipeline this week?", "Which of our lessons apply to healthtech deals?"];
 
 function load(): { open: boolean; chatId: string | null } {
   try {
-    const v = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}");
+    localStorage.removeItem(STORE_KEY); // the old, permanent copy (before 2026-10-28)
+    const v = JSON.parse(sessionStorage.getItem(STORE_KEY) ?? "{}");
     return { open: !!v.open, chatId: typeof v.chatId === "string" ? v.chatId : null };
   } catch {
     return { open: false, chatId: null };
@@ -30,7 +33,7 @@ function load(): { open: boolean; chatId: string | null } {
 }
 function store(v: { open: boolean; chatId: string | null }) {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(v));
+    sessionStorage.setItem(STORE_KEY, JSON.stringify(v));
   } catch {
     // private window or blocked storage: the panel still works, it just won't remember
   }

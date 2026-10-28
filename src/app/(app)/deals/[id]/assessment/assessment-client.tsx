@@ -66,7 +66,7 @@ export function MemoTextForm({
   draftId: string;
   m: MemoContent;
   version: string;
-  /** The current Playbook's impact themes (the pills on offer). */
+  /** The impact theme pills on offer (impactThemeOptions()). */
   impactThemes: string[];
   /** The deal's one-line description (Venture.oneLiner), shown read-only above the business model. */
   oneLiner: React.ReactNode;
@@ -102,7 +102,7 @@ export function MemoTextForm({
             options={impactThemes}
             value={m.header.impactThemes}
             label="Impact themes"
-            hint="DXV's impact themes (from the Playbook)."
+            hint="The Playbook's impact themes (the ones the AI uses) and DXV's wider impact areas."
           />
         </div>
         <div className="sm:col-span-2">

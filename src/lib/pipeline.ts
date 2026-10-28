@@ -1750,3 +1750,27 @@ export function reliefDisplay(s: { reliefMinor: number; reliefUnknown: number })
 
 /** The longest "About you" a member can write on their profile. */
 export const BIO_MAX = 2000;
+
+/**
+ * Impact themes the team can tick on a memo besides the Playbook's own (Blue, 2026-10-28):
+ * impact areas behind the platform's sectors (Edtech → Education, HR tech → Future of Work…).
+ * The AI tags only the Playbook's themes; add one to the Playbook for the AI to use it too.
+ */
+export const EXTRA_IMPACT_THEMES = [
+  "Education",
+  "Future of Work",
+  "Food & Agriculture",
+  "Housing",
+  "Sustainable Mobility",
+  "Creative Economy",
+  "Sport & Wellbeing",
+  "Care",
+  "Inclusion & Accessibility",
+  "Access to Justice",
+] as const;
+
+/** The impact theme pills: the Playbook's themes first, then DXV's extra ones not already there (ignoring case). */
+export function impactThemeOptions(playbookThemes: readonly string[]): string[] {
+  const seen = new Set(playbookThemes.map((t) => t.trim().toLowerCase()));
+  return [...playbookThemes, ...EXTRA_IMPACT_THEMES.filter((t) => !seen.has(t.toLowerCase()))];
+}
