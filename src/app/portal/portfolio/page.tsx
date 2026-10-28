@@ -16,7 +16,6 @@ import {
   nextOnboardingStep,
   portfolioSummary,
   reliefDisplay,
-  shareCertExpectedBy,
   stageLabel,
 } from "@/lib/pipeline";
 import { loadPortfolio, type PortfolioRow } from "@/lib/portfolio";
@@ -226,14 +225,13 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
   );
 }
 
-/** Share certificate: received, or (DXV investments) when to expect it, with a way to ask. */
+/** Share certificate: received, or (DXV investments) requested, with a way to ask. Issuing can take several months, so no date is promised. */
 function ShareCert({ r }: { r: PortfolioRow }) {
   if (r.shareCertificateReceived) return <>✓ Received</>;
   if (r.source !== "DXV") return <span className="text-black/50">Not received yet</span>;
-  const by = shareCertExpectedBy(r.investedOn);
   return (
     <span className="block min-w-[9rem] text-xs text-black/60">
-      {by ? `Expected by ${formatDate(by)}, or contact the team` : "Requested from the founder; contact the team"}
+      Requested from the founder. This can take several months; contact the team with any questions.
       <Link href="/portal/help#contact" className="mt-0.5 block font-medium text-dxv-green underline">
         Help
       </Link>
