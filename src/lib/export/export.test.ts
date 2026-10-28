@@ -71,3 +71,12 @@ describe("exports", () => {
     expect(exportFileName("DXV Review Issue 2", "Papcup / Ltd.", date, "pdf")).toBe("DXV Review Issue 2 - Papcup Ltd - 2026-09-29.pdf");
   });
 });
+
+describe("memo one-line description", () => {
+  it("sits above the business model when the deal has one", () => {
+    const spec = memoSpec(sampleMemo("Kora Health"), { name: "AI Draft 1", ventureName: "Kora Health", banner: true, date, oneLiner: "Faster GP triage." });
+    const keys = spec.summary!.map(([k]) => k);
+    expect(keys.indexOf("One-line description")).toBe(keys.indexOf("Business model") - 1);
+    expect(memoSpec(sampleMemo("Kora Health"), { name: "AI Draft 1", ventureName: "Kora Health", banner: true, date }).summary!.map(([k]) => k)).not.toContain("One-line description");
+  });
+});

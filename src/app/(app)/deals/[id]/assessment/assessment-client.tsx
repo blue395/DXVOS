@@ -8,6 +8,8 @@ import { Field, inputClass } from "@/components/ui";
 import type { MemoContent, MemoScore } from "@/lib/memo-ai/schema";
 import { finaliseMemo, generateAssessment, reviseIssue, saveMemoScore, saveMemoText, startReview } from "../../memo-actions";
 import { ScoreBadge } from "./memo-view";
+import { ThemePills } from "@/components/theme-pills";
+import { FounderDiversityField } from "@/components/founder-diversity-field";
 
 export function GenerateButton({ ventureId, again }: { ventureId: string; again: boolean }) {
   return (
@@ -54,10 +56,22 @@ export function ReviseIssueButton({ memoVersionId, draftName }: { memoVersionId:
 const joinLines = (items: string[]) => items.join("\n");
 
 /** Every text section of the review copy. One line per bullet; commas between tags. */
-export function MemoTextForm({ draftId, m, version }: { draftId: string; m: MemoContent; version: string }) {
-  const area = (name: string, value: string, rows = 3) => (
-    <textarea name={name} defaultValue={value} rows={rows} className={inputClass} />
-  );
+export function MemoTextForm({
+  draftId,
+  m,
+  version,
+  impactThemes,
+  oneLiner,
+}: {
+  draftId: string;
+  m: MemoContent;
+  version: string;
+  /** The current Playbook's impact themes (the pills on offer). */
+  impactThemes: string[];
+  /** The deal's one-line description (Venture.oneLiner), shown read-only above the business model. */
+  oneLiner: React.ReactNode;
+}) {
+  const area = (name: string, value: string, rows = 3) => <textarea name={name} defaultValue={value} rows={rows} className={inputClass} />;
   return (
     <ActionForm key={version} action={saveMemoText.bind(null, draftId)} resetOnSuccess={false} className="space-y-5">
       <fieldset className="grid gap-3 rounded-lg border border-black/10 bg-dxv-green/[0.03] p-4 sm:grid-cols-2">
@@ -71,6 +85,10 @@ export function MemoTextForm({ draftId, m, version }: { draftId: string; m: Memo
         <Field label="Stage">
           <input name="stage" defaultValue={m.header.stage} className={inputClass} />
         </Field>
+        <div className="space-y-1 sm:col-span-2">
+          <span className="block text-xs font-medium text-black/70">One-line description</span>
+          {oneLiner}
+        </div>
         <Field label="Business model">
           <input name="businessModel" defaultValue={m.header.businessModel} className={inputClass} />
         </Field>
@@ -78,12 +96,23 @@ export function MemoTextForm({ draftId, m, version }: { draftId: string; m: Memo
           {area("sdgs", joinLines(m.header.sdgs), 2)}
         </Field>
         <Field label="Impact thesis">{area("impactThesis", m.header.impactThesis, 2)}</Field>
-        <Field label="Impact themes" hint="Comma-separated, e.g. Health, Social Mobility">
-          <input name="impactThemes" defaultValue={m.header.impactThemes.join(", ")} className={inputClass} />
-        </Field>
-        <Field label="Diversity themes" hint="Only where the founder has stated it. Comma-separated. Issuing the memo fills the deal's Founder diversity (in Details) if it's empty; that's what the portfolios use.">
-          <input name="diversityThemes" defaultValue={m.header.diversityThemes.join(", ")} className={inputClass} />
-        </Field>
+        <div className="sm:col-span-2">
+          <ThemePills
+            name="impactThemes"
+            options={impactThemes}
+            value={m.header.impactThemes}
+            label="Impact themes"
+            hint="DXV's impact themes (from the Playbook)."
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <FounderDiversityField
+            name="diversityThemes"
+            label="Diversity themes"
+            value={m.header.diversityThemes}
+            hint="Issuing the memo fills the deal's Founder diversity (in Details) if it's empty; that's what the portfolios use."
+          />
+        </div>
       </fieldset>
 
       <Field label="Executive summary">{area("executiveSummary", m.executiveSummary, 5)}</Field>
@@ -146,7 +175,9 @@ export function ScoreRow({ draftId, s, ai, version }: { draftId: string; s: Memo
         <textarea name="justification" defaultValue={s.justification} rows={2} className={inputClass} aria-label={`${s.criterion} justification`} />
         <div className="flex flex-wrap items-center gap-2">
           <input name="reason" placeholder="Reason for change (optional, logged)" className={`${inputClass} flex-1`} />
-          <SubmitButton variant="secondary" doneLabel="Score saved">Save score</SubmitButton>
+          <SubmitButton variant="secondary" doneLabel="Score saved">
+            Save score
+          </SubmitButton>
         </div>
       </ActionForm>
     </li>

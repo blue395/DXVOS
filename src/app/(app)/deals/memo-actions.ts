@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { themesFrom } from "@/components/theme-pills";
 import { aiContextFor } from "@/lib/playbook/current";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { db } from "@/lib/db";
@@ -125,11 +126,6 @@ const lines = (s: string) =>
     .split("\n")
     .map((l) => l.replace(/^\s*[-*•]\s*/, "").trim())
     .filter(Boolean);
-const commaList = (s: string) =>
-  s
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
 
 const TextSchema = z.object({
   businessName: z.string().trim().min(1, "Business name is required"),
@@ -138,8 +134,6 @@ const TextSchema = z.object({
   businessModel: z.string().trim(),
   sdgs: z.string(),
   impactThesis: z.string().trim(),
-  impactThemes: z.string(),
-  diversityThemes: z.string(),
   executiveSummary: z.string().trim(),
   investmentCase: z.string(),
   conclusion: z.string().trim(),
@@ -168,8 +162,9 @@ export async function saveMemoText(draftId: string, _prev: ActionResult, formDat
       businessModel: f.businessModel,
       sdgs: lines(f.sdgs),
       impactThesis: f.impactThesis,
-      impactThemes: commaList(f.impactThemes),
-      diversityThemes: commaList(f.diversityThemes),
+      // Pills plus "Other" (several values per field, so read from formData, not the parsed object).
+      impactThemes: themesFrom(formData, "impactThemes"),
+      diversityThemes: themesFrom(formData, "diversityThemes"),
     },
     executiveSummary: f.executiveSummary,
     investmentCase: lines(f.investmentCase),
