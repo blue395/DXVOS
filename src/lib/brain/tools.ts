@@ -12,6 +12,7 @@ import { renderMemo } from "../memo-ai/render";
 import { ALL_STAGES, formatGbp, PASS_REASON_LABELS, stageLabel } from "../pipeline";
 import type { PassReason, Stage } from "../../generated/prisma/enums";
 import { renderRoundSummary } from "../round-summary/build";
+import { loadFounderInfo, renderFounderInfo } from "../founder-info";
 import type { RoundSummaryContent } from "../round-summary/schema";
 
 type Tool = Anthropic.Beta.BetaTool;
@@ -231,7 +232,7 @@ async function listDeals(pool: Pool, input: Record<string, unknown>): Promise<st
 async function getDeal(pool: Pool, deal: DealRow): Promise<string> {
   const id = deal.id;
   const q = <T extends object>(sql: string) => pool.query<T>(sql, [id]).then((r) => r.rows);
-  const [[v], history, screens, reviews, memos, preVotes, eois, finals, ddItems, comms, docs, lessons] = await Promise.all([
+  const [[v], history, screens, reviews, memos, preVotes, eois, finals, ddItems, comms, docs, lessons, founderInfo] = await Promise.all([
     q<Record<string, unknown>>(`SELECT * FROM "Venture" WHERE id = $1`),
     q<{ fromStage: Stage | null; toStage: Stage; note: string | null; passReason: PassReason | null; changedAt: Date; by: string | null }>(
       `SELECT s."fromStage", s."toStage", s.note, s."passReason", s."changedAt", u.name AS by FROM "StageChange" s LEFT JOIN "User" u ON u.id = s."changedById" WHERE s."ventureId" = $1 ORDER BY s."changedAt"`,
@@ -267,6 +268,7 @@ async function getDeal(pool: Pool, deal: DealRow): Promise<string> {
       `SELECT "fileName", category, "uploadedAt" FROM "Document" WHERE "ventureId" = $1 AND "archivedAt" IS NULL AND "uploadedAt" IS NOT NULL ORDER BY "uploadedAt"`,
     ),
     q<{ title: string; body: string; status: string }>(`SELECT title, body, status FROM "Lesson" WHERE "ventureId" = $1 AND status <> 'ARCHIVED'`),
+    loadFounderInfo(pool, id).then(renderFounderInfo),
   ]);
 
   const lines: string[] = [`# ${v.name} (id ${id})`];
@@ -289,6 +291,7 @@ async function getDeal(pool: Pool, deal: DealRow): Promise<string> {
   field("Lead angel", v.leadAngel);
   field("Description", v.description);
   field("Added", d(v.createdAt as Date));
+  if (founderInfo) lines.push("", "## What the founders told DXV", founderInfo);
 
   lines.push("", "## Stage history");
   for (const h of history)

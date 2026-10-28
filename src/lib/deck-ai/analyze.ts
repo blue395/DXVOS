@@ -26,6 +26,8 @@ export async function analyzeDeck(
   pdf: Buffer,
   fileName: string,
   ai?: AiContextSnapshot<EligibilityPlaybook> | null,
+  /** What the founders told DXV directly (application form, founder diversity): renderFounderInfo(). */
+  founderInfo?: string | null,
 ): Promise<DeckAnalysisResult> {
   const playbook = ai?.playbook ?? DEFAULT_ELIGIBILITY;
   const response = await client.messages.parse({
@@ -36,6 +38,7 @@ export async function analyzeDeck(
       {
         role: "user",
         content: [
+          ...(founderInfo ? [{ type: "text" as const, text: founderInfo }] : []),
           {
             type: "document",
             source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") },
