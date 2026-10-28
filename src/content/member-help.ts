@@ -3,7 +3,7 @@
 // for Blue and Kevin to check; the S/EIS answers in particular need Kevin's word.
 // The numbers (votes per round, the £25k minimum) come from pipeline.ts, so they can't drift.
 
-import { EOI_MINIMUM_GBP, EOI_PROGRESS_MIN_INTERESTED, PRE_SELECTION_VOTE_LIMIT, SHARE_CERT_EXPECTED_WEEKS, formatGbp } from "@/lib/pipeline";
+import { EOI_MINIMUM_GBP, EOI_PROGRESS_MIN_INTERESTED, PRE_SELECTION_VOTE_LIMIT, formatGbp } from "@/lib/pipeline";
 
 const MINIMUM = formatGbp(EOI_MINIMUM_GBP);
 
@@ -118,7 +118,7 @@ export const FAQ: FaqSection[] = [
       {
         q: "When will I get my share certificate?",
         a: [
-          `The company issues share certificates after the round completes, usually within about ${SHARE_CERT_EXPECTED_WEEKS} weeks of investing (My portfolio shows the expected date). DXV requests them from the founders for you. If yours hasn't arrived by then, contact the team.`,
+          "The company issues share certificates after the round completes. DXV requests them from the founders for you, and it can take several months. If you have questions about yours, contact the team.",
         ],
       },
       {

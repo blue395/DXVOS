@@ -129,11 +129,6 @@ describe("portfolio tidy-ups", () => {
     expect(reliefDisplay({ reliefMinor: 0, reliefUnknown: 0 }).value).toBe("£0");
     expect(reliefDisplay({ reliefMinor: 150_000, reliefUnknown: 1 })).toEqual({ value: "£1,500", note: "1 investment without a scheme not included" });
   });
-  it("expects a share certificate about 8 weeks after investing", async () => {
-    const { shareCertExpectedBy } = await import("./pipeline");
-    expect(shareCertExpectedBy(t("2026-11-01T00:00:00Z"))?.toISOString()).toBe("2026-12-27T00:00:00.000Z");
-    expect(shareCertExpectedBy(null)).toBeNull();
-  });
 });
 
 describe("eoiProgress counts members by record", () => {

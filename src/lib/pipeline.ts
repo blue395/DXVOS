@@ -1748,12 +1748,5 @@ export function reliefDisplay(s: { reliefMinor: number; reliefUnknown: number })
   return { value: formatMoneyMinor(s.reliefMinor), note };
 }
 
-/** When a DXV member can expect their share certificate (an assumption for Blue to confirm: about 8 weeks after investing). */
-export const SHARE_CERT_EXPECTED_WEEKS = 8;
-
-export function shareCertExpectedBy(investedOn: Date | null): Date | null {
-  return investedOn ? new Date(investedOn.getTime() + SHARE_CERT_EXPECTED_WEEKS * 7 * DAY_MS) : null;
-}
-
 /** The longest "About you" a member can write on their profile. */
 export const BIO_MAX = 2000;
