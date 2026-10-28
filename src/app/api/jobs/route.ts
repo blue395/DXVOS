@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
 import { JOB_WINDOW_MS, type Job } from "@/lib/jobs";
 import { aiDraftName } from "@/lib/memo-ai/render";
+import { summaryName } from "@/lib/round-summary/build";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -12,7 +13,7 @@ export async function GET() {
 
   const since = new Date(Date.now() - JOB_WINDOW_MS);
   const common = { createdAt: true, startedAt: true, status: true, error: true } as const;
-  const [decks, memos, dds] = await Promise.all([
+  const [decks, memos, dds, summaries] = await Promise.all([
     // PENDING decks are still uploading (the uploader shows that itself).
     db.deckAnalysis.findMany({
       where: { createdAt: { gte: since }, status: { not: "PENDING" } },
@@ -26,6 +27,7 @@ export async function GET() {
       where: { createdAt: { gte: since } },
       select: { id: true, ventureId: true, venture: { select: { name: true } }, document: { select: { fileName: true } }, ...common },
     }),
+    db.roundSummary.findMany({ where: { createdAt: { gte: since } }, select: { id: true, round: true, number: true, ...common } }),
   ]);
 
   const jobs: Job[] = [
@@ -55,6 +57,15 @@ export async function GET() {
       ...effectiveDeckStatus(j),
       startedAt: (j.startedAt ?? j.createdAt).toISOString(),
       result: j.document ? "DD document ready" : null,
+    })),
+    ...summaries.map((r) => ({
+      id: r.id,
+      kind: "round-summary" as const,
+      ventureName: `Round ${r.round}`,
+      href: `/deals/round-summary?round=${r.round}&v=${r.number}`,
+      ...effectiveDeckStatus(r),
+      startedAt: (r.startedAt ?? r.createdAt).toISOString(),
+      result: `${summaryName(r.number)} ready`,
     })),
   ].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 

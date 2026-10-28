@@ -63,6 +63,8 @@ model User {
   documentsUploaded       Document[]           @relation("DocumentUploadedBy")
   documentsArchived       Document[]           @relation("DocumentArchivedBy")
   ddReportJobs            DDReportJob[]
+  roundSummaries          RoundSummary[]       @relation("RoundSummaryCreatedBy")
+  roundSummaryEdits       RoundSummary[]       @relation("RoundSummaryUpdatedBy")
   investmentVotesRemoved  InvestmentVote[]     @relation("InvestmentVoteRemovedBy")
   finalInvestmentsCreated FinalInvestment[]    @relation("FinalInvestmentCreatedBy")
   finalInvestmentsPaid    FinalInvestment[]    @relation("FinalInvestmentPaidBy")
@@ -597,6 +599,36 @@ model DDReportJob {
   completedAt  DateTime?
 
   @@index([ventureId, createdAt])
+}
+
+// Partner Review round summary (Blue, 2026-10-28): one document covering every deal at
+// DXV Partner Review in a round, for the partners to choose who pitches. Team only.
+// Each generation is a new numbered version (never overwritten); `aiOutput` is the AI's
+// text as written (never edited), `content` the partners' working copy (edited, with
+// their view and "Take to pitch?" per deal).
+model RoundSummary {
+  id           String             @id @default(cuid())
+  round        Int
+  number       Int // version per round: Summary 1, 2...
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  context      Json // per deal: details, eligibility screen and decisions, memo, deck location
+  aiOutput     Json? // per deal: the AI's summary, or why it failed
+  content      Json? // the working copy (from aiOutput, then edited)
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation("RoundSummaryCreatedBy", fields: [createdById], references: [id])
+  updatedById  String?
+  updatedBy    User?              @relation("RoundSummaryUpdatedBy", fields: [updatedById], references: [id])
+  editedAt     DateTime?
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  @@unique([round, number])
+  @@index([createdAt])
 }
 
 // ── Playbook: DXV's criteria and lessons (feeds the AI; later, the DXV Brain) ──

@@ -17,8 +17,9 @@ export type BrainLesson = { title: string; body: string; scope: string };
  * Claude rejects a follow-up if the instructions or tools changed mid-chat, so a change
  * applies to new chats only. Bump this, and branch on it, whenever either changes.
  * 1: first release (5 searches a question). 2 (2026-10-02): 12 searches, search guidance.
+ * 3 (2026-10-28): the get_round_summary tool (brainTools()); instructions unchanged.
  */
-export const BRAIN_SETUP_VERSION = 2;
+export const BRAIN_SETUP_VERSION = 3;
 
 /** Web searches allowed per question, by setup version. */
 export const brainSearchLimit = (setup: number) => (setup >= 2 ? 12 : 5);

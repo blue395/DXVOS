@@ -11,6 +11,8 @@ import type { MemoContent } from "../memo-ai/schema";
 import { renderMemo } from "../memo-ai/render";
 import { ALL_STAGES, formatGbp, PASS_REASON_LABELS, stageLabel } from "../pipeline";
 import type { PassReason, Stage } from "../../generated/prisma/enums";
+import { renderRoundSummary } from "../round-summary/build";
+import type { RoundSummaryContent } from "../round-summary/schema";
 
 type Tool = Anthropic.Beta.BetaTool;
 type ToolContent = string | Anthropic.Beta.BetaToolResultBlockParam["content"];
@@ -76,6 +78,21 @@ export const BRAIN_TOOLS: Tool[] = [
   },
 ];
 
+/** Added in setup 3 (2026-10-28): the partners' Partner Review round summaries (team-only documents). */
+export const ROUND_SUMMARY_TOOL: Tool = {
+  name: "get_round_summary",
+  description:
+    "The partners' Partner Review round summary: a short entry per deal at DXV Partner Review in a round (headline, deal terms, strengths, concerns, DXV fit, key question), with each partner view and Take to pitch? choice (Strong Yes / Yes / Maybe / No). The latest version for the round, or the latest summary of any round if no round is given.",
+  input_schema: {
+    type: "object",
+    properties: { round: { type: "integer", description: "Optional: DXV round number." } },
+    additionalProperties: false,
+  },
+};
+
+/** The Brain's DXV OS tools for a chat's setup version (fixed for the whole chat). */
+export const brainTools = (setup: number): Tool[] => (setup >= 3 ? [...BRAIN_TOOLS, ROUND_SUMMARY_TOOL] : BRAIN_TOOLS);
+
 /** A short label for the chat while a tool runs. */
 export function toolActivity(name: string): string {
   switch (name) {
@@ -93,6 +110,8 @@ export function toolActivity(name: string): string {
       return "Checking pipeline totals";
     case "recent_activity":
       return "Checking recent activity";
+    case "get_round_summary":
+      return "Reading the round summary";
     case "web_search":
       return "Searching the web";
     default:
@@ -143,6 +162,8 @@ export async function runBrainTool(name: string, input: Record<string, unknown>,
       return pipelineOverview(deps.pool);
     case "recent_activity":
       return recentActivity(deps.pool, Number(input.days) || 14);
+    case "get_round_summary":
+      return getRoundSummary(deps.pool, Number.isInteger(input.round) ? (input.round as number) : null);
     default:
       throw new BrainToolError(`Unknown tool ${name}.`);
   }
@@ -407,4 +428,17 @@ async function recentActivity(pool: Pool, days: number): Promise<string> {
   return rows
     .map((r) => `- ${d(r.changedAt)}: ${r.name} ${r.fromStage ? `${stageLabel(r.fromStage)} to ` : "created at "}${stageLabel(r.toStage)}${r.by ? ` by ${r.by}` : ""}${r.note ? `. "${r.note}"` : ""}`)
     .join("\n");
+}
+
+async function getRoundSummary(pool: Pool, round: number | null): Promise<ToolContent> {
+  const r = await pool.query<{ round: number; number: number; content: RoundSummaryContent; completedAt: Date; editedAt: Date | null; editor: string | null }>(
+    `SELECT s.round, s.number, s.content, s."completedAt", s."editedAt", u.name AS editor
+     FROM "RoundSummary" s LEFT JOIN "User" u ON u.id = s."updatedById"
+     WHERE s.status = 'COMPLETE' AND s.content IS NOT NULL AND ($1::int IS NULL OR s.round = $1)
+     ORDER BY s.round DESC, s.number DESC LIMIT 1`,
+    [round],
+  );
+  const s = r.rows[0];
+  if (!s) throw new BrainToolError(round ? `There's no Partner Review summary for Round ${round} yet.` : "There are no Partner Review summaries yet.");
+  return renderRoundSummary(s.content, { round: s.round, number: s.number, date: s.editedAt ?? s.completedAt, editedBy: s.editor, aiOnly: !s.editedAt });
 }
