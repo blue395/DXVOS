@@ -66,7 +66,7 @@ src/lib/deck-worker.ts        Runs one analysis (claim job, read deck, call Clau
 src/lib/deck-storage.ts       Supabase Storage (prod) / .data/<bucket> (dev), for decks and documents
 src/lib/documents.ts          Document rules: allowed types (PDF/Word/Excel), 50 MB limit, categories
 src/app/(app)/deals/document-actions.ts   Upload, confirm, archive documents
-netlify/functions/            analyze-deck-background, analyze-memo-background, generate-dd-background, suggest-lessons-background, brain-reply-background: the long-running workers
+netlify/functions/            analyze-deck-background, analyze-memo-background, generate-dd-background, round-summary-background, suggest-lessons-background, brain-reply-background: the long-running workers
 src/lib/memo-ai/              AI memo: prompt (edit here), schema + scoring criteria, rendering, context, mock
 src/lib/memo-worker.ts        Runs one memo assessment
 src/lib/dd-doc/               DD document: prompt (edit here), schema, context, Word builder (docx), mock

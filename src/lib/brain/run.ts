@@ -5,7 +5,7 @@
 // Shared with the Netlify worker: relative imports only.
 import type Anthropic from "@anthropic-ai/sdk";
 import { BRAIN_MODEL, brainSearchLimit } from "./prompt";
-import { BRAIN_TOOLS, BrainToolError, toolActivity, webSearchTool } from "./tools";
+import { brainTools, BrainToolError, toolActivity, webSearchTool } from "./tools";
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
 type Message = Anthropic.Beta.BetaMessage;
@@ -40,7 +40,7 @@ export function brainParams(system: string, messages: MessageParam[], setup = 1)
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }], // same all chat: cached
     cache_control: { type: "ephemeral" }, // and the conversation so far
     messages,
-    tools: [...BRAIN_TOOLS, webSearchTool(brainSearchLimit(setup))],
+    tools: [...brainTools(setup), webSearchTool(brainSearchLimit(setup))],
     output_config: { effort: "medium" },
     // If Claude's safety filters decline (e.g. a false positive on a biotech deck), the API
     // retries on the model Anthropic designates, within the same call.

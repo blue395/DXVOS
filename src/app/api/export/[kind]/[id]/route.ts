@@ -4,6 +4,7 @@
 //   /api/export/draft/<memoDraftId>        DXV Review Draft N (with the review banner)
 //   /api/export/issue/<memoVersionId>      DXV Review Issue N (locked memo)
 //   /api/export/dd/<ddReportJobId>         DD report
+//   /api/export/round-summary/<id>         Partner Review round summary (team only)
 // ?format=pdf (default) or ?format=docx
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -18,6 +19,8 @@ import { DOCX_MIME, exportFileName, formatLongDate, PDF_MIME, type DocSpec } fro
 import { aiDraftName, issueNumbers, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import type { MemoContent } from "@/lib/memo-ai/schema";
 import { ELIGIBILITY_DECISION_LABELS, PASS_REASON_LABELS } from "@/lib/pipeline";
+import { roundSummarySpec } from "@/lib/round-summary/build";
+import type { RoundSummaryContent } from "@/lib/round-summary/schema";
 
 type Loaded = { spec: DocSpec; docName: string; ventureName: string; date: Date } | null;
 
@@ -93,6 +96,13 @@ async function load(kind: string, id: string): Promise<Loaded> {
       const ctx = j.context as DDContext;
       const date = j.completedAt ?? j.createdAt;
       return { spec: ddSpec(ctx, j.output as DDPlan, date), docName: "DXV DD Report", ventureName: ctx.ventureName, date };
+    }
+    case "round-summary": {
+      const r = await db.roundSummary.findUnique({ where: { id }, include: { updatedBy: { select: { name: true } } } });
+      if (!r || r.status !== "COMPLETE" || !r.content) return null;
+      const date = r.editedAt ?? r.completedAt ?? r.createdAt;
+      const spec = roundSummarySpec(r.content as RoundSummaryContent, { round: r.round, number: r.number, date, editedBy: r.updatedBy?.name ?? null, aiOnly: !r.editedAt });
+      return { spec, docName: "DXV Partner Review summary", ventureName: `Round ${r.round}`, date };
     }
     default:
       return null;

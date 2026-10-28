@@ -6,7 +6,7 @@ import { fakeBrainCall } from "./mock";
 import { chatTitle, dealIdFromPath } from "./page";
 import { BRAIN_MODEL, BRAIN_SETUP_VERSION, brainSearchLimit, buildBrainSystem, questionNote, type BrainContext } from "./prompt";
 import { brainParams, BrainError, runBrainTurn, type BrainModelCall } from "./run";
-import { BRAIN_TOOLS, DECK_MARKER } from "./tools";
+import { BRAIN_TOOLS, brainTools, DECK_MARKER } from "./tools";
 
 type Msg = Anthropic.Beta.BetaMessage;
 const ctx: BrainContext = {
@@ -40,7 +40,7 @@ describe("Brain instructions", () => {
     const search = (setup?: number) => (brainParams("s", ask("q"), setup).tools ?? []).find((t) => "name" in t && t.name === "web_search") as { max_uses: number };
     expect(search().max_uses).toBe(5);
     expect(search(2).max_uses).toBe(12);
-    expect(BRAIN_SETUP_VERSION).toBe(2);
+    expect(BRAIN_SETUP_VERSION).toBe(3);
     expect(brainSearchLimit(BRAIN_SETUP_VERSION)).toBe(12);
   });
 
@@ -158,5 +158,13 @@ describe("decks in stored chats", () => {
     });
     expect(paths).toEqual(["abc/Kora.pdf"]);
     expect(replayed).toEqual(turns);
+  });
+});
+
+describe("setup 3: round summaries", () => {
+  it("adds get_round_summary to new chats only, so older chats keep their tools", () => {
+    expect(brainTools(2)).toBe(BRAIN_TOOLS);
+    expect(brainTools(3).map((t) => t.name)).toEqual([...BRAIN_TOOLS.map((t) => t.name), "get_round_summary"]);
+    expect(brainTools(3).map((t) => t.name).filter((n) => /^(create|update|delete|move|set|record|add)/.test(n))).toEqual([]);
   });
 });
