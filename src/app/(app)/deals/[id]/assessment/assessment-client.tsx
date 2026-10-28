@@ -8,7 +8,8 @@ import { Field, inputClass } from "@/components/ui";
 import type { MemoContent, MemoScore } from "@/lib/memo-ai/schema";
 import { finaliseMemo, generateAssessment, reviseIssue, saveMemoScore, saveMemoText, startReview } from "../../memo-actions";
 import { ScoreBadge } from "./memo-view";
-import { ThemePills } from "@/components/theme-pills";
+import { ChoicePills, ThemePills } from "@/components/theme-pills";
+import { COMPANY_STAGES, normaliseCompanyStage } from "@/lib/pipeline";
 import { FounderDiversityField } from "@/components/founder-diversity-field";
 
 export function GenerateButton({ ventureId, again }: { ventureId: string; again: boolean }) {
@@ -61,6 +62,7 @@ export function MemoTextForm({
   m,
   version,
   impactThemes,
+  roundOptions,
   oneLiner,
 }: {
   draftId: string;
@@ -68,6 +70,8 @@ export function MemoTextForm({
   version: string;
   /** The impact theme pills on offer (impactThemeOptions()). */
   impactThemes: string[];
+  /** "Not assigned", then "Round 1"... (memoRoundOptions()). */
+  roundOptions: string[];
   /** The deal's one-line description (Venture.oneLiner), shown read-only above the business model. */
   oneLiner: React.ReactNode;
 }) {
@@ -79,12 +83,12 @@ export function MemoTextForm({
         <Field label="Business name">
           <input name="businessName" defaultValue={m.header.businessName} className={inputClass} />
         </Field>
-        <Field label="Round">
-          <input name="round" defaultValue={m.header.round} className={inputClass} />
-        </Field>
-        <Field label="Stage">
-          <input name="stage" defaultValue={m.header.stage} className={inputClass} />
-        </Field>
+        <div className="sm:col-span-2">
+          <ChoicePills name="round" options={roundOptions} value={m.header.round} label="Round" />
+        </div>
+        <div className="sm:col-span-2">
+          <ChoicePills name="stage" options={COMPANY_STAGES} value={normaliseCompanyStage(m.header.stage)} label="Stage" allowOther />
+        </div>
         <div className="space-y-1 sm:col-span-2">
           <span className="block text-xs font-medium text-black/70">One-line description</span>
           {oneLiner}
