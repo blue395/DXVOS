@@ -11,6 +11,8 @@ export type SummaryDealContext = {
   eligibilityScreen: string | null;
   eligibilityDecisions: string[];
   memo: { name: string; text: string } | null; // latest issue, review draft or AI draft
+  /** What the founders told DXV directly: application form and founder diversity (renderFounderInfo()). */
+  founderInfo?: string | null;
   deck: { storagePath: string; fileName: string } | null;
 };
 
@@ -37,6 +39,7 @@ export function renderDealContext(round: number, d: SummaryDealContext): string 
     ...(d.eligibilityDecisions.length ? d.eligibilityDecisions.map((x) => `- ${x}`) : ["None on record."]),
     "",
     d.memo ? `Investment memo so far (${d.memo.name}):\n${d.memo.text}` : "Investment memo: none yet.",
+    ...(d.founderInfo ? ["", d.founderInfo] : []),
     ...(d.deck ? [] : ["", "No pitch deck is stored for this deal: summarise from the records above and say the deck is missing."]),
   ].join("\n");
 }

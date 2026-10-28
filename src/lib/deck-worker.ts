@@ -13,6 +13,7 @@ import { readDeckIntake } from "./deck-ai/intake";
 import { fakeAnthropicClient } from "./deck-ai/mock";
 import { sslOptions } from "./db-ssl";
 import { readDeck } from "./deck-storage";
+import { loadFounderInfo, renderFounderInfo } from "./founder-info";
 
 export type WorkerDeps = {
   pool?: Pool;
@@ -55,11 +56,15 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
         await finishIntake(pool, analysisId, job.ventureId, await readDeckIntake(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName));
         return;
       }
-      const result = await analyzeDeck(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName, job.aiContext);
+      // The founders' own application answers and founder diversity, read now (the deal may
+      // have been filed moments ago) and recorded with the screen as part of what the AI was given.
+      const founderInfo = job.ventureId ? renderFounderInfo(await loadFounderInfo(pool, job.ventureId)) : null;
+      const result = await analyzeDeck(deps.anthropic ?? defaultAnthropic(), pdf, job.fileName, job.aiContext, founderInfo);
       await pool.query(
         `UPDATE "DeckAnalysis"
          SET status = 'COMPLETE', model = $2, extracted = $3::jsonb, screen = $4::jsonb,
-             "inputTokens" = $5, "outputTokens" = $6, "completedAt" = now()
+             "inputTokens" = $5, "outputTokens" = $6, "completedAt" = now(),
+             "aiContext" = CASE WHEN "aiContext" IS NULL OR $7::text IS NULL THEN "aiContext" ELSE "aiContext" || jsonb_build_object('founderInfo', $7::text) END
          WHERE id = $1`,
         [
           analysisId,
@@ -68,6 +73,7 @@ export async function runDeckAnalysis(analysisId: string, deps: WorkerDeps = {})
           JSON.stringify(result.output.screen),
           result.inputTokens,
           result.outputTokens,
+          founderInfo,
         ],
       );
     } catch (e) {

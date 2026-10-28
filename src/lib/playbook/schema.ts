@@ -56,4 +56,6 @@ export type AiContextSnapshot<T extends PlaybookContent = PlaybookContent> = {
   playbookVersion: number; // 0 = built-in default
   playbook: T;
   lessons: LessonForAI[];
+  /** Eligibility screens: what the founders told DXV directly, as given to the AI (renderFounderInfo()). */
+  founderInfo?: string;
 };

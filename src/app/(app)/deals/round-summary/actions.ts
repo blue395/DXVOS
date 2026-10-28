@@ -19,6 +19,7 @@ import type { RoundSummaryContext, SummaryDealContext } from "@/lib/round-summar
 import type { RoundSummaryContent } from "@/lib/round-summary/schema";
 import { ROUND_SUMMARY_JOB_PREFIX, runRoundSummary } from "@/lib/round-summary-worker";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
+import { FOUNDER_SUBMISSIONS_INCLUDE, founderInfoFrom, renderFounderInfo } from "@/lib/founder-info";
 import type { ActionResult } from "@/lib/action-result";
 
 const PAGE = "/deals/round-summary";
@@ -36,6 +37,7 @@ export async function generateRoundSummary(round: number): Promise<ActionResult>
         memoVersions: { where: { kind: "REVIEWED_MEMO" }, orderBy: { version: "desc" }, select: { id: true, version: true, content: true } },
         memoDrafts: { where: { archivedAt: null }, take: 1, select: { number: true, content: true } },
         memoAnalyses: { where: { status: "COMPLETE" }, orderBy: { number: "desc" }, take: 1, select: { number: true, output: true } },
+        founderSubmissions: FOUNDER_SUBMISSIONS_INCLUDE,
       },
     }),
     db.roundSummary.findFirst({ where: { round, status: { in: ["PENDING", "PROCESSING"] } }, select: { id: true } }),
@@ -77,6 +79,7 @@ export async function generateRoundSummary(round: number): Promise<ActionResult>
           (r.note ? `: ${r.note}` : ""),
       ),
       memo: memo ? { name: memo.name, text: renderMemo(memo.content, { banner: false }) } : null,
+      founderInfo: renderFounderInfo(founderInfoFrom(v)),
       deck: deck ? { storagePath: deck.storagePath, fileName: deck.fileName } : null,
     };
   });

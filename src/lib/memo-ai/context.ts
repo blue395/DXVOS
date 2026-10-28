@@ -11,6 +11,8 @@ export type MemoContext = {
   eligibilityScreen: string | null; // rendered eligibility screen text
   eligibilityDecisions: string[]; // partner decisions and notes
   founderCommsNotes: string[];
+  /** What the founders told DXV directly: application form and founder diversity (renderFounderInfo(); absent on older jobs). */
+  founderInfo?: string | null;
   deck: { storagePath: string; fileName: string } | null;
   /** Playbook version and approved lessons given to the AI (absent on jobs before 2026-09-30: defaults). */
   ai?: AiContextSnapshot<AssessmentPlaybook>;
@@ -33,6 +35,7 @@ export function renderContext(c: MemoContext): string {
     "",
     "Founder correspondence notes:",
     ...(c.founderCommsNotes.length ? c.founderCommsNotes.map((d) => `- ${d}`) : ["None on record."]),
+    ...(c.founderInfo ? ["", c.founderInfo] : []),
   ];
   return lines.join("\n");
 }

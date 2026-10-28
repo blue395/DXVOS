@@ -19,6 +19,7 @@ import type { MemoContent } from "@/lib/memo-ai/schema";
 import { MEMO_JOB_PREFIX, runMemoAnalysis } from "@/lib/memo-worker";
 import { canGenerateAssessment, formatGbp, PASS_REASON_LABELS } from "@/lib/pipeline";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
+import { FOUNDER_SUBMISSIONS_INCLUDE, founderInfoFrom, renderFounderInfo } from "@/lib/founder-info";
 import type { ActionResult } from "@/lib/action-result";
 
 function revalidateAssessment(ventureId: string) {
@@ -36,6 +37,7 @@ export async function generateAssessment(ventureId: string): Promise<ActionResul
       deckAnalyses: { orderBy: { createdAt: "desc" } },
       eligibilityReviews: { orderBy: { decidedAt: "asc" }, include: { decidedBy: { select: { name: true } } } },
       founderComms: { where: { note: { not: null } }, orderBy: { createdAt: "asc" } },
+      founderSubmissions: FOUNDER_SUBMISSIONS_INCLUDE,
     },
   });
   if (!v) return { error: "Venture not found." };
@@ -70,6 +72,7 @@ export async function generateAssessment(ventureId: string): Promise<ActionResul
         (r.note ? `: ${r.note}` : ""),
     ),
     founderCommsNotes: v.founderComms.map((c) => `${c.decision}: ${c.note}`),
+    founderInfo: renderFounderInfo(founderInfoFrom(v)), // the founders' application answers and stated diversity
     deck: { storagePath: deck.storagePath, fileName: deck.fileName },
     ai: await aiContextFor("ASSESSMENT"), // the Playbook version and approved lessons this draft uses
   };
