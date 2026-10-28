@@ -15,7 +15,7 @@ const list = (items: string[]) => (items.length ? items.join(", ") : "None");
  * Plain text in the template's order, for pasting into a document.
  * `banner`: true for AI drafts and drafts under review; false once finalised.
  */
-export function renderMemo(m: MemoContent, opts: { banner: boolean; footer?: string }): string {
+export function renderMemo(m: MemoContent, opts: { banner: boolean; footer?: string; oneLiner?: string | null }): string {
   const h = m.header;
   const parts = [
     ...(opts.banner ? [REVIEW_BANNER.join("\n")] : []),
@@ -23,6 +23,7 @@ export function renderMemo(m: MemoContent, opts: { banner: boolean; footer?: str
       `Business name: ${h.businessName}`,
       `Round: ${h.round}`,
       `Stage: ${h.stage}`,
+      ...(opts.oneLiner ? [`One-line description: ${opts.oneLiner}`] : []),
       `Business model: ${h.businessModel}`,
       `SDGs: ${list(h.sdgs)}`,
       `Impact thesis: ${h.impactThesis}`,

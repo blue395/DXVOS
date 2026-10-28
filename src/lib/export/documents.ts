@@ -31,9 +31,17 @@ export function screenSpec(
     { kind: "heading", text: "Next step" },
     { kind: "paragraph", text: s.nextStep },
     ...((s.otherCriteria ?? []).length
-      ? ([{ kind: "heading", text: "Additional DXV criteria" }, { kind: "keyValue", rows: s.otherCriteria.map((c) => [c.criterion, c.assessment]) }] as Block[])
+      ? ([
+          { kind: "heading", text: "Additional DXV criteria" },
+          { kind: "keyValue", rows: s.otherCriteria.map((c) => [c.criterion, c.assessment]) },
+        ] as Block[])
       : []),
-    ...(meta.decisions.length ? ([{ kind: "heading", text: "DXV decisions" }, { kind: "bullets", items: meta.decisions }] as Block[]) : []),
+    ...(meta.decisions.length
+      ? ([
+          { kind: "heading", text: "DXV decisions" },
+          { kind: "bullets", items: meta.decisions },
+        ] as Block[])
+      : []),
   ];
   return {
     title: "Eligibility Screen",
@@ -57,7 +65,17 @@ export function screenSpec(
  * under review (the app-rendered review banner, never model-generated); issues have
  * a footer instead.
  */
-export function memoSpec(m: MemoContent, meta: { name: string; ventureName: string; banner: boolean; footer?: string; date: Date }): DocSpec {
+export function memoSpec(
+  m: MemoContent,
+  meta: {
+    name: string;
+    ventureName: string;
+    banner: boolean;
+    footer?: string;
+    date: Date;
+    /** The deal's one-line description (Venture.oneLiner). */ oneLiner?: string | null;
+  },
+): DocSpec {
   const h = m.header;
   const total = totalScore(m.scores);
   const max = maxScore(m.scores);
@@ -97,6 +115,7 @@ export function memoSpec(m: MemoContent, meta: { name: string; ventureName: stri
       ["Business name", h.businessName],
       ["Round", h.round],
       ["Stage", h.stage],
+      ...(meta.oneLiner ? ([["One-line description", meta.oneLiner]] as [string, string][]) : []),
       ["Business model", h.businessModel],
       ["SDGs", list(h.sdgs)],
       ["Impact thesis", h.impactThesis],

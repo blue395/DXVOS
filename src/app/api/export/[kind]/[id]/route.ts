@@ -27,7 +27,7 @@ async function load(kind: string, id: string): Promise<Loaded> {
       const a = await db.deckAnalysis.findUnique({
         where: { id },
         include: {
-          venture: { select: { name: true } },
+          venture: { select: { name: true, oneLiner: true } },
           reviews: { orderBy: { decidedAt: "asc" }, include: { decidedBy: { select: { name: true } } } },
         },
       });
@@ -49,23 +49,23 @@ async function load(kind: string, id: string): Promise<Loaded> {
       };
     }
     case "ai-draft": {
-      const a = await db.memoAnalysis.findUnique({ where: { id }, include: { venture: { select: { name: true } } } });
+      const a = await db.memoAnalysis.findUnique({ where: { id }, include: { venture: { select: { name: true, oneLiner: true } } } });
       if (!a || a.status !== "COMPLETE" || !a.output) return null;
       const name = aiDraftName(a.number);
       const date = a.completedAt ?? a.createdAt;
       return {
-        spec: memoSpec(a.output as MemoContent, { name, ventureName: a.venture.name, banner: true, date }),
+        spec: memoSpec(a.output as MemoContent, { name, ventureName: a.venture.name, banner: true, date, oneLiner: a.venture.oneLiner }),
         docName: name,
         ventureName: a.venture.name,
         date,
       };
     }
     case "draft": {
-      const d = await db.memoDraft.findUnique({ where: { id }, include: { venture: { select: { name: true } } } });
+      const d = await db.memoDraft.findUnique({ where: { id }, include: { venture: { select: { name: true, oneLiner: true } } } });
       if (!d) return null;
       const name = reviewDraftName(d.number);
       return {
-        spec: memoSpec(d.content as MemoContent, { name, ventureName: d.venture.name, banner: true, date: d.updatedAt }),
+        spec: memoSpec(d.content as MemoContent, { name, ventureName: d.venture.name, banner: true, date: d.updatedAt, oneLiner: d.venture.oneLiner }),
         docName: name,
         ventureName: d.venture.name,
         date: d.updatedAt,
@@ -74,14 +74,14 @@ async function load(kind: string, id: string): Promise<Loaded> {
     case "issue": {
       const v = await db.memoVersion.findUnique({
         where: { id },
-        include: { venture: { select: { name: true } }, createdBy: { select: { name: true } } },
+        include: { venture: { select: { name: true, oneLiner: true } }, createdBy: { select: { name: true } } },
       });
       if (!v || v.kind !== "REVIEWED_MEMO" || !v.content) return null;
       const issues = await db.memoVersion.findMany({ where: { ventureId: v.ventureId, kind: "REVIEWED_MEMO" }, select: { id: true, version: true } });
       const name = reviewIssueName(issueNumbers(issues).get(v.id)!);
       const footer = `${name}, issued by ${v.createdBy.name} on ${formatLongDate(v.createdAt)}.${v.summary ? ` ${v.summary}` : ""}`;
       return {
-        spec: memoSpec(v.content as MemoContent, { name, ventureName: v.venture.name, banner: false, footer, date: v.createdAt }),
+        spec: memoSpec(v.content as MemoContent, { name, ventureName: v.venture.name, banner: false, footer, date: v.createdAt, oneLiner: v.venture.oneLiner }),
         docName: name,
         ventureName: v.venture.name,
         date: v.createdAt,

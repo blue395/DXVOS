@@ -46,12 +46,14 @@ export function TotalScore({ scores }: { scores: MemoScore[] }) {
   );
 }
 
-export function MemoHeader({ m }: { m: MemoContent }) {
+/** `oneLiner`: the deal's one-line description (Venture.oneLiner, from Details), shown above the business model when given. */
+export function MemoHeader({ m, oneLiner }: { m: MemoContent; oneLiner?: React.ReactNode }) {
   const h = m.header;
-  const rows: [string, string][] = [
+  const rows: [string, React.ReactNode][] = [
     ["Business name", h.businessName],
     ["Round", h.round],
     ["Stage", h.stage],
+    ...(oneLiner !== undefined ? ([["One-line description", oneLiner]] as [string, React.ReactNode][]) : []),
     ["Business model", h.businessModel],
     ["SDGs", h.sdgs.join("; ") || "None"],
     ["Impact thesis", h.impactThesis],
@@ -90,10 +92,10 @@ export function SwotGrid({ m }: { m: MemoContent }) {
 }
 
 /** The full memo, read-only. `aiScores` (optional) shows the AI's original score beside each. */
-export function MemoView({ m, aiScores }: { m: MemoContent; aiScores?: MemoScore[] }) {
+export function MemoView({ m, aiScores, oneLiner }: { m: MemoContent; aiScores?: MemoScore[]; oneLiner?: React.ReactNode }) {
   return (
     <div className="space-y-6">
-      <MemoHeader m={m} />
+      <MemoHeader m={m} oneLiner={oneLiner} />
       <Section title="Executive summary">
         <p className="whitespace-pre-wrap text-sm">{m.executiveSummary}</p>
       </Section>
