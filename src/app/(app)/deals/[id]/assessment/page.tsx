@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
 import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { maxScore, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
-import { canGenerateAssessment } from "@/lib/pipeline";
+import { canGenerateAssessment, impactThemeOptions } from "@/lib/pipeline";
 import { AiTag, Card, ExportLinks, formatDateTime, StageBadge } from "@/components/ui";
 import { CopyButton } from "../eligibility-client";
 import { FinaliseForm, GenerateButton, MemoTextForm, ReviseIssueButton, ScoreRow, StartReviewButton } from "./assessment-client";
@@ -210,7 +210,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
               </p>
 
               <Card title="Memo text">
-                <MemoTextForm draftId={draft.id} m={m} version={version} impactThemes={playbook.content.impactThemes} oneLiner={oneLiner} />
+                <MemoTextForm draftId={draft.id} m={m} version={version} impactThemes={impactThemeOptions(playbook.content.impactThemes)} oneLiner={oneLiner} />
               </Card>
 
               <Card title="Scoring" actions={<TotalScore scores={m.scores} />}>

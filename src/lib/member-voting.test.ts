@@ -138,3 +138,13 @@ describe("eoiProgress counts members by record", () => {
     expect(eoiProgress(votes)).toMatchObject({ show: true, interestedCount: 5, totalGbp: 25_000, reached: true });
   });
 });
+
+describe("impactThemeOptions", () => {
+  it("puts the Playbook's themes first and adds DXV's wider ones once", async () => {
+    const { impactThemeOptions } = await import("./pipeline");
+    const out = impactThemeOptions(["FemTech", "Health", "education"]);
+    expect(out.slice(0, 3)).toEqual(["FemTech", "Health", "education"]);
+    expect(out).toContain("Future of Work");
+    expect(out.filter((t) => t.toLowerCase() === "education")).toHaveLength(1);
+  });
+});
