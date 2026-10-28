@@ -7,13 +7,14 @@ import { MemberRoundSelect } from "./member-round-select";
 import { VotingDeadlineForm } from "./voting-deadline-form";
 import { Card, formatDate } from "@/components/ui";
 import { loadAngelRows } from "@/lib/angels";
+import { loadAssessmentQueue } from "@/lib/assessments";
 
 // Admin-only (spec: angels must never see the Dashboard or Activity, even once they
 // can log in). requireAdmin() below enforces that; don't loosen it for angel roles.
 export default async function DashboardPage() {
   const now = new Date();
 
-  const [ventures, awaiting, angels, memberRound] = await requireAdminWith(() =>
+  const [ventures, awaiting, angels, memberRound, assessmentQueue] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findMany({
         select: {
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
       }),
       loadAngelRows(),
       db.memberRound.findFirst({ orderBy: { createdAt: "desc" }, include: { by: { select: { name: true } } } }),
+      loadAssessmentQueue(),
     ]),
   );
   // The members' deals board: which round, and how much of it members can open.
@@ -67,7 +69,23 @@ export default async function DashboardPage() {
       </Link>
 
       {/* 2-4. Where live deals are, in the order they move. */}
-      <Band title="Pipeline" note="New deals being screened and reviewed by the partners" band={bands.pipeline} />
+      <Band
+        title="Pipeline"
+        note="New deals being screened and reviewed by the partners"
+        band={bands.pipeline}
+        // Not a stage: the deals at DXV Partner Review or Member Pitch Selection whose memo isn't issued yet.
+        extra={{
+          after: "ELIGIBILITY_SCREEN",
+          label: "Investment Assessment",
+          count: assessmentQueue.length,
+          href: "/deals/assessments",
+          title: "Deals at DXV Partner Review or Member Pitch Selection without an issued DXV Review Issue",
+          note: (() => {
+            const later = assessmentQueue.filter((r) => r.currentStage === "PITCH_SELECTION").length;
+            return later ? `incl. ${later} at Member Pitch Selection` : "memo not issued yet";
+          })(),
+        }}
+      />
       <Band title="Syndicate decision" note="With members: pitch selection, investment votes and commitments" band={bands.syndicate} />
       <Band title="In DD" note="Due diligence before the final investment" band={bands.dd} />
 
@@ -156,7 +174,9 @@ function HeroFigure({ label, value, note, divider }: { label: string; value: num
 }
 
 /** A dealflow band: its total, then a tile per stage in the board's phase colours. */
-function Band({ title, note, band }: { title: string; note: string; band: DashboardBand }) {
+type ExtraTile = { after: string; label: string; count: number; href: string; title: string; note?: string };
+
+function Band({ title, note, band, extra }: { title: string; note: string; band: DashboardBand; extra?: ExtraTile }) {
   const single = band.stages.length === 1;
   return (
     <section className="rounded-xl border border-black/10 bg-white p-4 sm:p-5">
@@ -169,10 +189,10 @@ function Band({ title, note, band }: { title: string; note: string; band: Dashbo
         <p className="mt-1 text-sm text-black/55">{note}</p>
       </Link>
       {!single && (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className={`mt-4 grid gap-2 ${extra ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
           {band.stages.map((s) => {
             const style = PHASE_STYLE[stagePhase(s.key)];
-            return (
+            return [
               <Link
                 key={s.key}
                 href="/deals"
@@ -183,8 +203,25 @@ function Band({ title, note, band }: { title: string; note: string; band: Dashbo
                   {s.label}
                 </span>
                 <span className="text-xl font-semibold tabular-nums text-dxv-green">{s.count}</span>
-              </Link>
-            );
+              </Link>,
+              extra?.after === s.key && (
+                <Link
+                  key="extra"
+                  href={extra.href}
+                  title={extra.title}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-dxv-green/40 bg-white px-3 py-2.5 transition hover:-translate-y-px hover:shadow-sm"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium text-black/80">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-dxv-green" aria-hidden />
+                    <span>
+                      {extra.label}
+                      {extra.note && <span className="block text-xs font-normal text-black/50">{extra.note}</span>}
+                    </span>
+                  </span>
+                  <span className="text-xl font-semibold tabular-nums text-dxv-green">{extra.count}</span>
+                </Link>
+              ),
+            ];
           })}
         </div>
       )}

@@ -148,3 +148,22 @@ describe("impactThemeOptions", () => {
     expect(out.filter((t) => t.toLowerCase() === "education")).toHaveLength(1);
   });
 });
+
+describe("assessmentStatus (Dashboard: Investment Assessment)", () => {
+  it("only counts deals at Partner Review or Pitch Selection without an issued memo", async () => {
+    const { assessmentStatus } = await import("./pipeline");
+    const v = { currentStage: "PARTNER_REVIEW" as const, issued: false, hasReviewDraft: false, aiDrafts: [] as { status: string }[] };
+    expect(assessmentStatus(v)).toBe("not-started");
+    expect(assessmentStatus({ ...v, currentStage: "PITCH_SELECTION" })).toBe("not-started");
+    expect(assessmentStatus({ ...v, currentStage: "ELIGIBILITY_SCREEN" })).toBeNull();
+    expect(assessmentStatus({ ...v, issued: true })).toBeNull();
+  });
+  it("says where it stands: review draft, then drafting, then AI draft ready; failed drafts count as not started", async () => {
+    const { assessmentStatus } = await import("./pipeline");
+    const v = { currentStage: "PARTNER_REVIEW" as const, issued: false, hasReviewDraft: false };
+    expect(assessmentStatus({ ...v, hasReviewDraft: true, aiDrafts: [{ status: "COMPLETE" }] })).toBe("in-review");
+    expect(assessmentStatus({ ...v, aiDrafts: [{ status: "PROCESSING" }, { status: "COMPLETE" }] })).toBe("drafting");
+    expect(assessmentStatus({ ...v, aiDrafts: [{ status: "COMPLETE" }] })).toBe("ai-draft");
+    expect(assessmentStatus({ ...v, aiDrafts: [{ status: "FAILED" }] })).toBe("not-started");
+  });
+});
