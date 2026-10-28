@@ -1801,3 +1801,10 @@ export function assessmentStatus(v: { currentStage: Stage; issued: boolean; hasR
   if (v.aiDrafts.some((a) => a.status === "COMPLETE")) return "ai-draft";
   return "not-started";
 }
+
+/** The memo's Round pills: "Not assigned", every round up to the latest in use plus the next one, and the memo's own value if it's beyond. */
+export function memoRoundOptions(maxRound: number | null, current?: string | null): string[] {
+  const fromCurrent = Number(/^Round (\d+)$/.exec(current ?? "")?.[1] ?? 0);
+  const top = Math.max((maxRound ?? 0) + 1, fromCurrent, 1);
+  return ["Not assigned", ...Array.from({ length: top }, (_, i) => `Round ${i + 1}`)];
+}

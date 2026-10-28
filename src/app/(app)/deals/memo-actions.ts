@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { themesFrom } from "@/components/theme-pills";
+import { choiceFrom, themesFrom } from "@/components/theme-pills";
 import { aiContextFor } from "@/lib/playbook/current";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { db } from "@/lib/db";
@@ -132,8 +132,8 @@ const lines = (s: string) =>
 
 const TextSchema = z.object({
   businessName: z.string().trim().min(1, "Business name is required"),
-  round: z.string().trim(),
-  stage: z.string().trim(),
+  round: z.string().trim().default(""),
+  stage: z.string().trim().default(""),
   businessModel: z.string().trim(),
   sdgs: z.string(),
   impactThesis: z.string().trim(),
@@ -160,8 +160,9 @@ export async function saveMemoText(draftId: string, _prev: ActionResult, formDat
     ...draft.content,
     header: {
       businessName: f.businessName,
-      round: f.round,
-      stage: f.stage,
+      // Pills (Round, Stage with "Other"): read from formData so "Other" gives its text.
+      round: choiceFrom(formData, "round") ?? f.round,
+      stage: choiceFrom(formData, "stage") ?? f.stage,
       businessModel: f.businessModel,
       sdgs: lines(f.sdgs),
       impactThesis: f.impactThesis,

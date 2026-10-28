@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { effectiveDeckStatus } from "@/lib/deck-status";
 import { aiDraftName, issueNumbers, renderMemo, reviewDraftName, reviewIssueName } from "@/lib/memo-ai/render";
 import { maxScore, totalScore, type MemoContent } from "@/lib/memo-ai/schema";
-import { canGenerateAssessment, impactThemeOptions } from "@/lib/pipeline";
+import { canGenerateAssessment, impactThemeOptions, memoRoundOptions } from "@/lib/pipeline";
 import { AiTag, Card, ExportLinks, formatDateTime, StageBadge } from "@/components/ui";
 import { CopyButton } from "../eligibility-client";
 import { FinaliseForm, GenerateButton, MemoTextForm, ReviseIssueButton, ScoreRow, StartReviewButton } from "./assessment-client";
@@ -18,7 +18,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
   const { id } = await params;
   const view = String((await searchParams).view ?? "");
 
-  const [v, playbook] = await requireAdminWith(() =>
+  const [v, playbook, rounds] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -42,6 +42,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
         },
       }),
       currentPlaybook("ASSESSMENT"),
+      db.venture.aggregate({ _max: { round: true } }),
     ]),
   );
   if (!v) notFound();
@@ -210,7 +211,7 @@ export default async function AssessmentPage({ params, searchParams }: PageProps
               </p>
 
               <Card title="Memo text">
-                <MemoTextForm draftId={draft.id} m={m} version={version} impactThemes={impactThemeOptions(playbook.content.impactThemes)} oneLiner={oneLiner} />
+                <MemoTextForm draftId={draft.id} m={m} version={version} impactThemes={impactThemeOptions(playbook.content.impactThemes)} roundOptions={memoRoundOptions(rounds._max.round, m.header.round)} oneLiner={oneLiner} />
               </Card>
 
               <Card title="Scoring" actions={<TotalScore scores={m.scores} />}>

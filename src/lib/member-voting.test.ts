@@ -167,3 +167,22 @@ describe("assessmentStatus (Dashboard: Investment Assessment)", () => {
     expect(assessmentStatus({ ...v, aiDrafts: [{ status: "FAILED" }] })).toBe("not-started");
   });
 });
+
+describe("memo Round and Stage pills", () => {
+  it("offers Not assigned, every round in use and the next one, keeping a memo's own later round", async () => {
+    const { memoRoundOptions } = await import("./pipeline");
+    expect(memoRoundOptions(4)).toEqual(["Not assigned", "Round 1", "Round 2", "Round 3", "Round 4", "Round 5"]);
+    expect(memoRoundOptions(null)).toEqual(["Not assigned", "Round 1"]);
+    expect(memoRoundOptions(2, "Round 7")).toHaveLength(8);
+  });
+  it("reads a chosen pill, or the Other text", async () => {
+    const { choiceFrom } = await import("../components/theme-pills");
+    const f = new FormData();
+    f.set("stage", "__other");
+    f.set("stageOther", " Series B ");
+    f.set("round", "Round 4");
+    expect(choiceFrom(f, "stage")).toBe("Series B");
+    expect(choiceFrom(f, "round")).toBe("Round 4");
+    expect(choiceFrom(f, "missing")).toBeNull();
+  });
+});
