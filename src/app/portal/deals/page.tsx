@@ -4,7 +4,8 @@ import { requireAngel } from "@/lib/auth";
 import { trackPortalView } from "@/lib/portal-analytics";
 import { PHASE_STYLE } from "@/lib/board-style";
 import { formatDateTime } from "@/components/ui";
-import { MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
+import { BOARD_INVOLVEMENT_LABELS, MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
+import { EoiProgressBar, HowThisWorks, VotingStatus } from "@/components/portal/member-deal-parts";
 import { angelHasDealAccess, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
 
 export const metadata = { title: "Deals board · DXV Members" };
@@ -20,9 +21,14 @@ const PITCH_SELECTION_INDEX = MEMBER_BOARD_STAGES.findIndex((b) => b.key === "PI
 export default async function MemberBoardPage() {
   const who = await requireAngel();
   const { angel } = who;
-  const [access, { round, cards, updatedAt }] = await Promise.all([angelHasDealAccess(angel), loadMemberBoard(), trackPortalView(who, "BOARD")]);
+  const [access, { round, cards, updatedAt, voting }] = await Promise.all([
+    angelHasDealAccess(angel),
+    loadMemberBoard(angel.id),
+    trackPortalView(who, "BOARD"),
+  ]);
   if (!access) redirect("/portal");
   const open = cards.filter((c) => c.phase).length;
+  const voteOpen = cards.some((c) => c.phase && c.column === "PITCH_SELECTION");
 
   return (
     <div className="space-y-4">
@@ -30,7 +36,7 @@ export default async function MemberBoardPage() {
         <h1 className="text-2xl font-semibold text-dxv-green">{round !== null ? `Deals: Round ${round}` : "Deals"}</h1>
         <p className="text-sm text-black/60">
           {round !== null
-            ? `Where each company in Round ${round} is in DXV's process. Companies open to you from Member Pitch Selection: click a highlighted card to read its deck and memo and vote.`
+            ? "Every DXV deal in this round appears here. Deals you vote for, say you're interested in, join due diligence on or invest in are highlighted."
             : "DXV hasn't opened a round's board to members yet."}
         </p>
         {round !== null && (
@@ -47,6 +53,22 @@ export default async function MemberBoardPage() {
         )}
       </div>
 
+      {round !== null && voteOpen && (
+        <div className="rounded-lg border-2 border-dxv-yellow bg-dxv-yellow/10 px-4 py-3 text-sm">
+          <p className="font-semibold text-dxv-green">Pre-selection vote: Round {round}</p>
+          <p className="mt-0.5 text-black/70">
+            Vote for your top {voting.limit}: the {voting.limit} companies with the most votes are invited to pitch. A vote is not a commitment to invest.
+          </p>
+          <p className="mt-1.5">
+            <VotingStatus voting={voting} />
+          </p>
+        </div>
+      )}
+
+      {round !== null && <HowThisWorks />}
+
+      {round !== null && <p className="-mb-2 text-xs text-black/50 xl:hidden">Swipe or scroll sideways to see every stage →</p>}
+
       {round !== null && (
         // Wider than the portal's reading column, but always inside the window's gutters.
         // Wide screens fit all six columns; narrower ones scroll inside this box (never the page).
@@ -62,7 +84,10 @@ export default async function MemberBoardPage() {
                     <h2 className="flex items-start gap-2 text-sm font-semibold leading-tight text-dxv-green">
                       <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${phase.dot}`} />
                       <span className="min-w-0 flex-1">{s.label}</span>
-                      <span className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20" title="Companies in this column">
+                      <span
+                        className="rounded-full bg-white px-1.5 text-xs font-medium text-dxv-green ring-1 ring-dxv-green/20"
+                        title="Companies in this column"
+                      >
                         {col.length}
                       </span>
                     </h2>
@@ -103,6 +128,11 @@ function CardBody({ c, muted = false }: { c: MemberBoardCard; muted?: boolean })
           "Raise to be confirmed"
         )}
       </span>
+      {c.involvement && (
+        <span className="mt-1.5 inline-block rounded-full bg-dxv-yellow px-2 py-0.5 text-[11px] font-semibold text-dxv-green">
+          ✓ {BOARD_INVOLVEMENT_LABELS[c.involvement]}
+        </span>
+      )}
       {c.oneLiner && <span className="mt-1 line-clamp-2 block text-xs leading-snug text-black/60">{c.oneLiner}</span>}
       <span className="mt-2 flex flex-wrap gap-1">
         {c.companyStage && <Pill className="bg-white text-black/75 ring-1 ring-black/15">{c.companyStage}</Pill>}
@@ -121,9 +151,10 @@ function BoardCard({ c }: { c: MemberBoardCard }) {
     return (
       <Link
         href={`/portal/deals/${c.id}`}
-        className="block rounded-lg border-2 border-dxv-green bg-white p-3 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+        className={`block rounded-lg border-2 border-dxv-green p-3 ${c.involvement ? "bg-dxv-yellow/15" : "bg-white"} shadow-sm transition hover:-translate-y-px hover:shadow-md`}
       >
         <CardBody c={c} />
+        {c.progress && <EoiProgressBar progress={c.progress} compact />}
         <span className="mt-2.5 block border-t border-black/5 pt-2 text-right text-xs font-semibold text-dxv-green">View deal →</span>
       </Link>
     );

@@ -17,6 +17,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
         { href: "/portal/deals", label: "Deals" },
         { href: "/portal/portfolio", label: "My portfolio" },
         { href: "/portal/profile", label: "My profile" },
+        { href: "/portal/help", label: "Help" },
       ]
     : [];
   return (
@@ -62,6 +63,12 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
         </div>
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
+      <p className="mx-auto w-full max-w-4xl px-4 pb-2 text-sm text-black/60">
+        Questions?{" "}
+        <Link href="/portal/help" className="font-medium text-dxv-green underline">
+          Help and FAQs
+        </Link>
+      </p>
     </div>
   );
 }

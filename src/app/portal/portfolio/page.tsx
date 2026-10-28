@@ -15,6 +15,8 @@ import {
   latestCertification,
   nextOnboardingStep,
   portfolioSummary,
+  reliefDisplay,
+  shareCertExpectedBy,
   stageLabel,
 } from "@/lib/pipeline";
 import { loadPortfolio, type PortfolioRow } from "@/lib/portfolio";
@@ -40,6 +42,7 @@ export default async function PortfolioPage() {
   const others = summary.byCurrency.filter((c) => c.currency !== "GBP");
   const diversity = diversityBreakdown(rows);
   const counted = rows.filter((r) => !r.pending);
+  const relief = reliefDisplay(summary);
 
   return (
     <div className="space-y-5">
@@ -80,7 +83,11 @@ export default async function PortfolioPage() {
                 value: String(summary.companies),
                 hint: `${summary.active} active · ${summary.exited} exited · ${summary.writtenOff} written off · ${summary.viaDxv} via DXV`,
               },
-              { label: "Est. S/EIS relief", value: formatMoneyMinor(summary.reliefMinor), hint: "SEIS 50%, EIS 30% of the amount: an estimate, not tax advice" },
+              {
+                label: "Est. S/EIS relief",
+                value: relief.value ?? "Not known",
+                hint: [relief.note, "SEIS 50%, EIS 30% of the amount: an estimate, not tax advice"].filter(Boolean).join(". "),
+              },
             ]}
           />
           <OtherCurrencies totals={others} />
@@ -106,10 +113,10 @@ export default async function PortfolioPage() {
           {counted.length > 0 && (
             // Same width as the boxes above and below; scrolls sideways only on narrow screens.
             <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
-              <table className="w-full min-w-[820px] text-left text-sm">
+              <table className="w-full min-w-[880px] text-left text-sm">
                 <thead className="bg-dxv-green text-xs uppercase tracking-wide text-white/85">
                   <tr>
-                    <th className="w-[28%] px-3 py-2 font-medium">Company</th>
+                    <th className="w-[32%] min-w-[14rem] px-3 py-2 font-medium">Company</th>
                     <th className="px-3 py-2 font-medium">Invested</th>
                     <th className="px-3 py-2 font-medium">Round</th>
                     <th className="px-3 py-2 text-right font-medium">Amount</th>
@@ -204,7 +211,9 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
           (r.taxScheme === "NONE" ? "None" : "–")
         )}
       </td>
-      <td className="px-3 py-2.5">{r.shareCertificateReceived ? "✓ Received" : <span className="text-black/50">Requested from founder</span>}</td>
+      <td className="px-3 py-2.5">
+        <ShareCert r={r} />
+      </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-right">
         <Link
           href={r.finalInvestmentId ? `/portal/portfolio/dxv/${r.finalInvestmentId}` : `/portal/portfolio/${r.holdingId}`}
@@ -214,5 +223,20 @@ function HoldingRow({ r }: { r: PortfolioRow }) {
         </Link>
       </td>
     </tr>
+  );
+}
+
+/** Share certificate: received, or (DXV investments) when to expect it, with a way to ask. */
+function ShareCert({ r }: { r: PortfolioRow }) {
+  if (r.shareCertificateReceived) return <>✓ Received</>;
+  if (r.source !== "DXV") return <span className="text-black/50">Not received yet</span>;
+  const by = shareCertExpectedBy(r.investedOn);
+  return (
+    <span className="block min-w-[9rem] text-xs text-black/60">
+      {by ? `Expected by ${formatDate(by)}, or contact the team` : "Requested from the founder; contact the team"}
+      <Link href="/portal/help#contact" className="mt-0.5 block font-medium text-dxv-green underline">
+        Help
+      </Link>
+    </span>
   );
 }

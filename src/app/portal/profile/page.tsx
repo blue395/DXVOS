@@ -1,3 +1,4 @@
+import { CharCountTextarea } from "@/components/char-count-textarea";
 import { ActionForm, SavedNote, SubmitButton } from "@/components/action-form";
 import { OnboardingStepper } from "@/components/portal/stepper";
 import Link from "next/link";
@@ -5,7 +6,7 @@ import { Field, buttonClass, inputClass } from "@/components/ui";
 import { requireAngel } from "@/lib/auth";
 import { trackPortalView } from "@/lib/portal-analytics";
 import { EmailSwitchOffer, SignInMethods, loadSignInMethods } from "@/components/sign-in-methods";
-import { ANGEL_TAG_SUGGESTIONS, EXPERIENCE_LEVELS, PREFER_NOT_TO_SAY, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
+import { ANGEL_TAG_SUGGESTIONS, BIO_MAX, EXPERIENCE_LEVELS, PREFER_NOT_TO_SAY, SECTOR_SUGGESTIONS, TICKET_RANGES } from "@/lib/pipeline";
 import { updateMyProfile } from "../actions";
 
 export const metadata = { title: "Your details · DXV Members" };
@@ -89,8 +90,16 @@ export default async function ProfilePage({ searchParams }: PageProps<"/portal/p
           </Field>
         </div>
 
-        <Field label="A line or two about you (optional)">
-          <textarea name="bio" rows={3} defaultValue={angel.bio ?? ""} placeholder="Your background, and what you can bring to founders" className={inputClass} />
+        <Field label="About you (optional)" hint="A short paragraph: your background, and what you can bring to founders.">
+          <CharCountTextarea
+            id="bio"
+            name="bio"
+            rows={6}
+            maxLength={BIO_MAX}
+            defaultValue={angel.bio ?? ""}
+            placeholder="Your background, and what you can bring to founders"
+            className={`${inputClass} min-h-36 resize-y`}
+          />
         </Field>
 
         <fieldset className="space-y-2 rounded-md bg-dxv-green/[0.03] p-3">

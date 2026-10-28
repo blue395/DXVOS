@@ -1539,6 +1539,8 @@ export function portfolioSummary(holdings: PortfolioHoldingLike[]) {
     outside: counted.filter((h) => h.source === "OUTSIDE").length,
     pending: holdings.filter((h) => h.pending),
     reliefMinor: Math.round(sum(gbp.map((h) => (h.amountMinor ?? 0) * TAX_RELIEF_RATE[h.taxScheme ?? "NONE"]))),
+    /** GBP investments with no scheme recorded (relief unknown, so not in reliefMinor). */
+    reliefUnknown: gbp.filter((h) => !h.taxScheme).length,
     bySector: group((h) => h.sector?.trim() || "Not set").sort((a, b) => b.investedMinor - a.investedMinor),
     byYear: group((h) => (h.investedOn ? String(h.investedOn.getUTCFullYear()) : "No date")).sort((a, b) => a.label.localeCompare(b.label)),
   };
@@ -1604,3 +1606,154 @@ export function firstSentences(text: string | null | undefined, n = 2, max = 280
   if (out.length > max) out = `${out.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
   return out;
 }
+
+// ── Members' voting and expressions of interest (Blue, 2026-10-28) ──────────
+
+/** Each member may say "yes, pitch" to at most this many deals per round: the 3 with most votes pitch. */
+export const PRE_SELECTION_VOTE_LIMIT = 3;
+
+/**
+ * How many of a member's pitch-selection votes are in use in one round: deals whose
+ * latest vote from them is "yes". Pass that member's votes on that round's deals only.
+ */
+export function preSelectionVotesUsed(votes: { ventureId: string; interested: boolean; createdAt: Date }[]): Set<string> {
+  const latest = new Map<string, { interested: boolean; createdAt: Date }>();
+  for (const v of votes) {
+    const cur = latest.get(v.ventureId);
+    if (!cur || v.createdAt >= cur.createdAt) latest.set(v.ventureId, v);
+  }
+  return new Set([...latest].filter(([, v]) => v.interested).map(([id]) => id));
+}
+
+/**
+ * Why a member's pitch-selection vote can't be taken, or null. Saying "no" is always
+ * allowed before the deadline (it frees a slot); a "yes" needs a free slot unless it's
+ * already one of their yes votes.
+ */
+export function preSelectionVoteRefusal(
+  vote: { ventureId: string; interested: boolean },
+  used: Set<string>,
+  round: { number: number | null; closesAt: Date | null },
+  now: Date = new Date(),
+): string | null {
+  if (round.closesAt && now >= round.closesAt) return `Voting for Round ${round.number} has closed.`;
+  if (!vote.interested || used.has(vote.ventureId) || round.number === null) return null;
+  if (used.size >= PRE_SELECTION_VOTE_LIMIT)
+    return `You've used your ${PRE_SELECTION_VOTE_LIMIT} votes for Round ${round.number}. Change one of them to "No" to free a vote.`;
+  return null;
+}
+
+/** Expressions of interest aim for this much in total before a deal moves forward (Blue: £25k, 2026-10-28). */
+export const EOI_MINIMUM_GBP = 25_000;
+/** The members' progress bar only shows once at least this many members are interested (no small numbers). */
+export const EOI_PROGRESS_MIN_INTERESTED = 5;
+
+export type EoiProgress = { show: false } | { show: true; totalGbp: number; interestedCount: number; percent: number; reached: boolean };
+
+/**
+ * Progress towards the minimum, for members: the total of interested members' stated
+ * maximum tickets (each member's latest live answer). Aggregate only: never names or
+ * single amounts, and hidden until enough members are interested that no one stands out.
+ */
+export function eoiProgress(votes: (EoiLike & { angelId?: string | null })[]): EoiProgress {
+  // One answer per member: by angel record where linked (two members can share a name), else by name.
+  const latest = new Map<string, EoiLike>();
+  for (const v of votes) {
+    const key = v.angelId ? `id:${v.angelId}` : `name:${normaliseAngelName(v.angelName)}`;
+    const cur = latest.get(key);
+    if (!cur || v.createdAt >= cur.createdAt) latest.set(key, v);
+  }
+  const interested = [...latest.values()].filter((v) => v.interested);
+  const totalGbp = sum(interested.map((v) => v.maxTicketGbp));
+  const interestedCount = interested.length;
+  if (interestedCount < EOI_PROGRESS_MIN_INTERESTED) return { show: false };
+  return { show: true, totalGbp, interestedCount, percent: Math.min(100, Math.floor((totalGbp / EOI_MINIMUM_GBP) * 100)), reached: totalGbp >= EOI_MINIMUM_GBP };
+}
+
+export type BoardInvolvement = "invested" | "committed" | "voted" | null;
+
+/** How a member is involved in a deal on their board, the strongest first: invested, said they'd invest, voted for the pitch. */
+export function boardInvolvement(x: { paidTicket: boolean; committed: boolean; votedYes: boolean }): BoardInvolvement {
+  if (x.paidTicket) return "invested";
+  if (x.committed) return "committed";
+  if (x.votedYes) return "voted";
+  return null;
+}
+
+export const BOARD_INVOLVEMENT_LABELS: Record<Exclude<BoardInvolvement, null>, string> = {
+  invested: "You invested",
+  committed: "You're interested",
+  voted: "You voted",
+};
+
+// ── Dates typed by the team (UK time) ───────────────────────────────────────
+
+/** Europe/London's offset from UTC at an instant, in minutes (0 in winter, 60 in summer). */
+function londonOffsetMinutes(at: Date): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+  return Math.round((asUtc - Math.floor(at.getTime() / 60_000) * 60_000) / 60_000);
+}
+
+/** A `datetime-local` value ("2026-11-05T18:30") read as UK time, or null if it isn't one. */
+export function londonLocalToDate(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const naive = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  if (Number.isNaN(naive)) return null;
+  // Guess with the offset at the naive instant, then correct once (handles the clock changes).
+  let t = naive - londonOffsetMinutes(new Date(naive)) * 60_000;
+  t = naive - londonOffsetMinutes(new Date(t)) * 60_000;
+  return new Date(t);
+}
+
+/** The `datetime-local` value for an instant, in UK time (for pre-filling a form). */
+export function dateToLondonLocal(d: Date): string {
+  const local = new Date(d.getTime() + londonOffsetMinutes(d) * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+// ── Members' events ─────────────────────────────────────────────────────────
+
+/** Booking links must be Luma's (so a typo can't send members to another site). Returns the cleaned link, or null. */
+export function lumaLink(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "https:" || u.username || u.password) return null;
+    return /^(www\.)?(lu\.ma|luma\.com)$/i.test(u.hostname) ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Events still to come (kept on the home page until a few hours after they start), soonest first. */
+export function upcomingEvents<T extends { startsAt: Date; archivedAt: Date | null }>(events: T[], now: Date = new Date()): T[] {
+  const cutoff = now.getTime() - 3 * 60 * 60 * 1000;
+  return events.filter((e) => !e.archivedAt && e.startsAt.getTime() >= cutoff).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+export const MEMBER_EVENT_KIND_LABELS: Record<"PITCH_SESSION" | "COMMUNITY", string> = {
+  PITCH_SESSION: "Pitch session",
+  COMMUNITY: "Community event",
+};
+
+/** The S/EIS relief tile: "Not known" rather than £0 when no investment says whether it qualifies. */
+export function reliefDisplay(s: { reliefMinor: number; reliefUnknown: number }): { value: string | null; note: string | null } {
+  if (s.reliefMinor === 0 && s.reliefUnknown > 0) return { value: null, note: "Add the scheme (SEIS, EIS or none) to your investments to see an estimate" };
+  const note = s.reliefUnknown > 0 ? `${s.reliefUnknown} investment${s.reliefUnknown === 1 ? "" : "s"} without a scheme not included` : null;
+  return { value: formatMoneyMinor(s.reliefMinor), note };
+}
+
+/** When a DXV member can expect their share certificate (an assumption for Blue to confirm: about 8 weeks after investing). */
+export const SHARE_CERT_EXPECTED_WEEKS = 8;
+
+export function shareCertExpectedBy(investedOn: Date | null): Date | null {
+  return investedOn ? new Date(investedOn.getTime() + SHARE_CERT_EXPECTED_WEEKS * 7 * DAY_MS) : null;
+}
+
+/** The longest "About you" a member can write on their profile. */
+export const BIO_MAX = 2000;

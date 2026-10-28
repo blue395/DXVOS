@@ -86,6 +86,8 @@ model User {
   teamEventsDone          TeamEvent[]          @relation("TeamEventActor")
   teamEvents              TeamEvent[]          @relation("TeamEventSubject")
   memberRounds            MemberRound[]
+  memberEventsCreated     MemberEvent[]        @relation("MemberEventCreatedBy")
+  memberEventsUpdated     MemberEvent[]        @relation("MemberEventUpdatedBy")
   syndicateHoldingsAdded  SyndicateHolding[]   @relation("SyndicateHoldingCreatedBy")
   syndicateHoldingsEdited SyndicateHolding[]   @relation("SyndicateHoldingUpdatedBy")
   complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
@@ -1007,13 +1009,44 @@ model TeamEvent {
 // Dashboard). The latest row counts; round null = no board. Card details still open only
 // from Member Pitch Selection, for shared deals.
 model MemberRound {
-  id        String   @id @default(cuid())
-  round     Int?
-  byId      String
-  by        User     @relation(fields: [byId], references: [id])
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  round          Int?
+  // When members' pitch-selection voting for this round closes (null = no deadline set).
+  // Changing it adds a new row, like changing the round.
+  votingClosesAt DateTime?
+  byId           String
+  by             User      @relation(fields: [byId], references: [id])
+  createdAt      DateTime  @default(now())
 
   @@index([createdAt])
+}
+
+// ── Members' events ─────────────────────────────────────────────────────────
+
+enum MemberEventKind {
+  PITCH_SESSION // DXV's monthly pitch session
+  COMMUNITY // any other community event
+}
+
+// Pitch sessions and community events shown on the member home, with a Luma link for
+// booking. Added and edited by the team; archived, never deleted.
+model MemberEvent {
+  id          String          @id @default(cuid())
+  kind        MemberEventKind @default(PITCH_SESSION)
+  title       String
+  startsAt    DateTime
+  location    String
+  lumaUrl     String?
+  details     String?
+  archivedAt  DateTime?
+  createdById String
+  createdBy   User            @relation("MemberEventCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?           @relation("MemberEventUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([startsAt])
 }
 
 // ── My Portfolio (angels) ───────────────────────────────────────────────────

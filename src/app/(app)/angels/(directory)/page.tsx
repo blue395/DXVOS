@@ -80,6 +80,9 @@ export default async function AngelsPage({ searchParams }: PageProps<"/angels">)
           <Link href="/angels/emails" className={buttonClass("secondary")}>
             Email angels
           </Link>
+          <Link href="/angels/events" className={buttonClass("secondary")}>
+            Events
+          </Link>
           <Link href="/angels/new" className={buttonClass("secondary")}>
             + Add angel
           </Link>

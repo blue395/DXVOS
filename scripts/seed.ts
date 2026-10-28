@@ -91,7 +91,75 @@ async function main() {
     });
   }
 
-  console.log(`Seeded. Dev login: ${DEV_EMAIL} / ${DEV_PASSWORD}`);
+  await seedMemberDemo(admin.id);
+
+  console.log(`Seeded. Dev login: ${DEV_EMAIL} / ${DEV_PASSWORD}; demo member: ${MEMBER_EMAIL} / ${MEMBER_PASSWORD}`);
+}
+
+const MEMBER_EMAIL = "member@dxv.local";
+const MEMBER_PASSWORD = "dxv-member-password";
+
+/**
+ * A synthetic member with a current statement, Round 2 open to members with a voting
+ * deadline, four companies at the pre-selection vote, one gathering expressions of
+ * interest (5 synthetic members, towards the £25k minimum) and two upcoming events.
+ */
+async function seedMemberDemo(adminId: string) {
+  if (await db.user.findUnique({ where: { email: MEMBER_EMAIL } })) return;
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const member = await db.angel.create({
+    data: {
+      name: "Morgan Example",
+      email: MEMBER_EMAIL,
+      status: "MEMBER",
+      createdById: adminId,
+      profileConfirmedAt: new Date(),
+      diversityPromptedAt: new Date(),
+      onboardedAt: new Date(),
+      bio: "Synthetic demo member for local development.",
+    },
+  });
+  await db.user.create({ data: { email: MEMBER_EMAIL, name: member.name, role: "ANGEL", angelId: member.id, passwordHash: await bcrypt.hash(MEMBER_PASSWORD, 12) } });
+  await db.angelCertification.create({
+    data: { angelId: member.id, type: "HIGH_NET_WORTH", signedOn: new Date(), expiresOn: new Date(now + 365 * day), recordedById: adminId, signedByAngel: true, criteria: [] },
+  });
+
+  // Round 2: four companies at the pre-selection vote, shared with members.
+  for (const name of ["Brightside Care", "Halo Learning", "Tessellate"]) {
+    const v = await db.venture.findFirstOrThrow({ where: { name } });
+    if (v.currentStage !== "PITCH_SELECTION") await moveVentureStage({ ventureId: v.id, to: "PITCH_SELECTION", userId: adminId });
+  }
+  const extra = await db.venture.create({
+    data: { name: "Aster Analytics", sector: "Fintech", companyStage: "Seed", raiseAmountGbp: 400_000, round: 2, currentStage: "PITCH_SELECTION", createdById: adminId },
+  });
+  await db.venture.updateMany({
+    where: { name: { in: ["Brightside Care", "Halo Learning", "Tessellate", "Verdant Foods"] } },
+    data: { round: 2 },
+  });
+  await db.venture.updateMany({
+    where: { id: extra.id },
+    data: { oneLiner: "Cash-flow forecasting for small charities." },
+  });
+  await db.venture.updateMany({
+    where: { name: { in: ["Brightside Care", "Halo Learning", "Tessellate", "Aster Analytics", "Verdant Foods"] } },
+    data: { sharedWithAngelsAt: new Date() },
+  });
+
+  // Verdant Foods: five synthetic members' expressions of interest (£22k of £25k).
+  const verdant = await db.venture.findFirstOrThrow({ where: { name: "Verdant Foods" } });
+  for (const [i, amount] of [5_000, 4_000, 3_000, 4_000, 6_000].entries()) {
+    const a = await db.angel.create({ data: { name: `Synthetic Member ${i + 1}`, status: "MEMBER", createdById: adminId } });
+    await db.investmentVote.create({ data: { ventureId: verdant.id, angelName: a.name, angelId: a.id, interested: true, maxTicketGbp: amount, recordedById: adminId } });
+  }
+
+  await db.memberRound.create({ data: { round: 2, votingClosesAt: new Date(now + 7 * day), byId: adminId } });
+  await db.memberEvent.createMany({
+    data: [
+      { kind: "PITCH_SESSION", title: "DXV pitch night: Round 2", startsAt: new Date(now + 10 * day), location: "Online", lumaUrl: "https://lu.ma/example-dxv", details: "Three founders, 10 minutes each plus questions.", createdById: adminId },
+      { kind: "COMMUNITY", title: "Members' winter social", startsAt: new Date(now + 30 * day), location: "Bristol (venue to follow)", createdById: adminId },
+    ],
+  });
 }
 
 main().finally(() => db.$disconnect());

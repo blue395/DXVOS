@@ -6,15 +6,20 @@ import { formatDate } from "@/components/ui";
 import { CATEGORY_LABELS, fileKind, formatFileSize } from "@/lib/documents";
 import { ANGEL_PHASE_LABELS, formatGbp, type AngelDealPhase } from "@/lib/pipeline";
 import type { DealRoom, DealRoomDoc } from "@/lib/portal-deals";
+import { EoiProgressBar } from "@/components/portal/member-deal-parts";
 
 const PHASE_HELP: Record<AngelDealPhase, string> = {
-  "pitch-selection": "DXV is asking members which companies they'd like to hear pitch. Read the deck and tell us if you're interested.",
+  "pitch-selection": "DXV is asking members which companies they'd like to hear pitch. Read the deck and vote for your top 3.",
   "post-pitch": "The company has pitched. Read the deck, DXV's memo and the supporting documents, then tell us whether you'd like to invest.",
   commitments: "Members are committing to invest. All the documents for this deal are below.",
 };
 
 export function PhaseBadge({ phase }: { phase: AngelDealPhase }) {
-  return <span className="inline-block whitespace-nowrap rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-semibold text-dxv-green">{ANGEL_PHASE_LABELS[phase]}</span>;
+  return (
+    <span className="inline-block whitespace-nowrap rounded-full bg-dxv-yellow px-2.5 py-0.5 text-xs font-semibold text-dxv-green">
+      {ANGEL_PHASE_LABELS[phase]}
+    </span>
+  );
 }
 
 export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHref: (id: string, download?: boolean) => string; voting?: React.ReactNode }) {
@@ -39,12 +44,18 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
         </p>
         <p className="mt-2 text-sm">
           {deal.phase === "pitch-selection" && deal.memo
-            ? "DXV is asking members which companies they'd like to hear pitch. Read the deck and DXV's memo, and tell us if you're interested."
+            ? "DXV is asking members which companies they'd like to hear pitch. Read the deck and DXV's memo, and vote for your top 3."
             : PHASE_HELP[deal.phase]}
         </p>
       </div>
 
       {deal.summary && <p className="whitespace-pre-wrap rounded-lg border border-black/10 bg-white p-4 text-sm">{deal.summary}</p>}
+
+      {deal.progress && (
+        <Section title="Members' interest">
+          <EoiProgressBar progress={deal.progress} />
+        </Section>
+      )}
 
       {voting}
 
@@ -55,11 +66,7 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
       {/* At pitch selection the memo shows once it's issued; later on, a placeholder until then. */}
       {(deal.memo || deal.phase !== "pitch-selection") && (
         <Section title="DXV investment memo">
-          {deal.memo ? (
-            <DocSpecView spec={deal.memo.spec} />
-          ) : (
-            <p className="text-sm text-black/55">DXV&apos;s memo will appear here once it&apos;s issued.</p>
-          )}
+          {deal.memo ? <DocSpecView spec={deal.memo.spec} /> : <p className="text-sm text-black/55">DXV&apos;s memo will appear here once it&apos;s issued.</p>}
         </Section>
       )}
 
@@ -93,8 +100,8 @@ export function DealRoomView({ deal, docHref, voting }: { deal: DealRoom; docHre
       )}
 
       <p className="text-xs text-black/55">
-        Shared in confidence under the DXV member terms: please don&apos;t forward these materials. Investing in early-stage companies is high risk:
-        you could lose all the money you invest. DXV doesn&apos;t give investment, tax or legal advice.
+        Shared in confidence under the DXV member terms: please don&apos;t forward these materials. Investing in early-stage companies is high risk: you could
+        lose all the money you invest. DXV doesn&apos;t give investment, tax or legal advice.
       </p>
     </div>
   );
