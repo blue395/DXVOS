@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { requireAngel } from "@/lib/auth";
 import { trackPortalView } from "@/lib/portal-analytics";
 import { PHASE_STYLE } from "@/lib/board-style";
-import { formatDateTime } from "@/components/ui";
+import { buttonClass, formatDateTime } from "@/components/ui";
 import { BOARD_INVOLVEMENT_LABELS, MEMBER_BOARD_STAGES, formatGbpCompact, stagePhase } from "@/lib/pipeline";
 import { EoiProgressBar, HowThisWorks, VotingStatus } from "@/components/portal/member-deal-parts";
-import { angelHasDealAccess, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
+import { angelHasDealAccess, currentMemberRound, loadMemberBoard, type MemberBoardCard } from "@/lib/portal-deals";
+import { approvedPackFor } from "@/lib/opportunity-packs";
 
 export const metadata = { title: "Deals board · DXV Members" };
 
@@ -21,9 +22,10 @@ const PITCH_SELECTION_INDEX = MEMBER_BOARD_STAGES.findIndex((b) => b.key === "PI
 export default async function MemberBoardPage() {
   const who = await requireAngel();
   const { angel } = who;
-  const [access, { round, cards, updatedAt, voting }] = await Promise.all([
+  const [access, { round, cards, updatedAt, voting }, pack] = await Promise.all([
     angelHasDealAccess(angel),
     loadMemberBoard(angel.id),
+    currentMemberRound().then(approvedPackFor), // the approved opportunities pack for this round, if any
     trackPortalView(who, "BOARD"),
   ]);
   if (!access) redirect("/portal");
@@ -52,6 +54,23 @@ export default async function MemberBoardPage() {
           </p>
         )}
       </div>
+
+      {round !== null && pack && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-dxv-green bg-white px-4 py-3 text-sm">
+          <span>
+            <strong className="text-dxv-green">{pack.title}</strong>
+            <span className="block text-black/60">DXV&apos;s summary of this round&apos;s companies, one slide each.</span>
+          </span>
+          <span className="flex flex-wrap items-center gap-2">
+            <a href={`/api/portal/opportunities/${pack.id}`} target="_blank" rel="noreferrer" className={buttonClass()}>
+              View the pack (PDF)
+            </a>
+            <a href={`/api/portal/opportunities/${pack.id}?download=1`} className="text-dxv-green underline">
+              Download
+            </a>
+          </span>
+        </div>
+      )}
 
       {round !== null && voteOpen && (
         <div className="rounded-lg border-2 border-dxv-yellow bg-dxv-yellow/10 px-4 py-3 text-sm">

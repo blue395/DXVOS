@@ -23,11 +23,11 @@ const WIDTH = PAGE_W - 2 * MARGIN;
 const BODY = 10;
 const LEADING = 14;
 
-type Fonts = { regular: PDFFont; bold: PDFFont; italic: PDFFont };
+export type Fonts = { regular: PDFFont; bold: PDFFont; italic: PDFFont };
 
 // Standard PDF fonts only cover Windows-1252 characters: swap or drop anything else.
 const REPLACEMENTS: Record<string, string> = { "→": "to", "✓": "v", "≥": ">=", "≤": "<=", " ": " ", "\t": " " };
-function makeSafe(fonts: Fonts) {
+export function makeSafe(fonts: Fonts) {
   const cache = new Map<string, boolean>();
   const ok = (ch: string) => {
     if (!cache.has(ch)) {
@@ -44,7 +44,7 @@ function makeSafe(fonts: Fonts) {
 }
 
 /** Wrap text to a width; explicit newlines start new lines. */
-function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const out: string[] = [];
   for (const para of text.split("\n")) {
     let line = "";

@@ -3,13 +3,17 @@ import "server-only";
 // the create action, which re-checks the chosen people server-side).
 import { db } from "@/lib/db";
 import { MEMBER_EMAIL_AUDIENCES, memberEmailAudience, type MemberEmailAudience } from "@/lib/pipeline";
+import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 
 export async function loadAudiences() {
-  const angels = await db.angel.findMany({
+  const [angels, dealAccess] = await Promise.all([
+    db.angel.findMany({
     where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true, email: true, status: true, archivedAt: true, emailOptOutAt: true, user: { select: { id: true } } },
-  });
+    }),
+    angelIdsWithDealAccess(), // who may receive deal material (an opportunities pack)
+  ]);
   const rows = angels.map((a) => ({ ...a, hasLogin: !!a.user }));
   return MEMBER_EMAIL_AUDIENCES.map((aud) => {
     const r = memberEmailAudience(rows, aud.key);
@@ -19,7 +23,7 @@ export async function loadAudiences() {
       note: aud.note,
       noEmail: r.noEmail,
       optedOut: r.optedOut,
-      people: r.included.map((a) => ({ id: a.id, name: a.name, email: a.email!, hasLogin: a.hasLogin })),
+      people: r.included.map((a) => ({ id: a.id, name: a.name, email: a.email!, hasLogin: a.hasLogin, dealAccess: dealAccess.has(a.id) })),
     };
   });
 }

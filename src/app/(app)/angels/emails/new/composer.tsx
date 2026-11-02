@@ -10,6 +10,8 @@ import { actionErrorMessage } from "@/lib/stale-version";
 import { createMemberEmail, sendTestEmail } from "../actions";
 import type { Audience } from "../audience";
 import { WritingHelp } from "../writing-help";
+import { Attachments, type PackOption } from "./attachments";
+import type { DraftAttachment } from "../attachment-actions";
 
 type Template = { id: string; name: string; subject: string; body: string };
 
@@ -19,12 +21,14 @@ export function Composer({
   start,
   myEmail,
   myFirstName,
+  packs,
 }: {
   templates: Template[];
   audiences: Audience[];
   start: Template | null;
   myEmail: string;
   myFirstName: string;
+  packs: PackOption[];
 }) {
   const router = useRouter();
   const [audienceKey, setAudienceKey] = useState<Audience["key"]>("members-not-on-platform");
@@ -37,7 +41,11 @@ export function Composer({
   const [boxes, setBoxes] = useState(0);
   const [pending, startSend] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const chosen = useMemo(() => audience.people.filter((p) => !unticked.has(p.id)), [audience, unticked]);
+  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
+  const ticked = useMemo(() => audience.people.filter((p) => !unticked.has(p.id)), [audience, unticked]);
+  // An opportunities pack is deal material: only members with a current investor statement get it.
+  const dealMaterial = attachments.some((a) => a.pack);
+  const chosen = useMemo(() => (dealMaterial ? ticked.filter((p) => p.dealAccess) : ticked), [ticked, dealMaterial]);
   const problems = templateProblems({ subject, body });
   const sample = chosen[0];
   const toggle = (id: string) =>
@@ -142,8 +150,19 @@ export function Composer({
         </section>
 
         <section className="space-y-3 rounded-lg border border-black/10 bg-white p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">3. Check and send</h2>
-          <ActionButton variant="secondary" pendingLabel="Sending test…" run={() => sendTestEmail({ subject, body })}>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">3. Attachments (optional)</h2>
+          <Attachments value={attachments} onChange={setAttachments} packs={packs} />
+          {dealMaterial && (
+            <p className="rounded bg-dxv-yellow/30 px-3 py-2 text-sm">
+              The opportunities pack is deal material, so this email goes only to members with a current investor statement: {chosen.length} of the{" "}
+              {ticked.length} chosen. The others are left out.
+            </p>
+          )}
+        </section>
+
+        <section className="space-y-3 rounded-lg border border-black/10 bg-white p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-dxv-green">4. Check and send</h2>
+          <ActionButton variant="secondary" pendingLabel="Sending test…" run={() => sendTestEmail({ subject, body, attachmentIds: attachments.map((a) => a.id) })}>
             Send me a test ({myEmail})
           </ActionButton>
           <div className="flex flex-wrap items-center gap-2">
@@ -156,7 +175,7 @@ export function Composer({
                 startSend(async () => {
                   setError(null);
                   try {
-                    const res = await createMemberEmail({ subject, body, audience: audienceKey, angelIds: chosen.map((p) => p.id) });
+                    const res = await createMemberEmail({ subject, body, audience: audienceKey, angelIds: chosen.map((p) => p.id), attachmentIds: attachments.map((a) => a.id) });
                     if ("error" in res) setError(res.error);
                     else router.push(`/angels/emails/${res.id}?send=1`);
                   } catch (e) {

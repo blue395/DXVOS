@@ -1,3 +1,4 @@
+import { formatFileSize } from "@/lib/documents";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDateTime } from "@/components/ui";
@@ -16,7 +17,11 @@ export default async function MemberEmailPage({ params, searchParams }: PageProp
   const email = await requireAdminWith(() =>
     db.memberEmail.findUnique({
       where: { id },
-      include: { createdBy: { select: { name: true } }, recipients: { orderBy: { angel: { name: "asc" } }, include: { angel: { select: { id: true, name: true } } } } },
+      include: {
+        createdBy: { select: { name: true } },
+        recipients: { orderBy: { angel: { name: "asc" } }, include: { angel: { select: { id: true, name: true } } } },
+        attachments: { orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, sizeBytes: true, opportunityPackId: true } },
+      },
     }),
   );
   if (!email) notFound();
@@ -33,6 +38,12 @@ export default async function MemberEmailPage({ params, searchParams }: PageProp
           {formatDateTime(email.createdAt)} · by {email.createdBy.name} · {MEMBER_EMAIL_AUDIENCES.find((a) => a.key === email.audience)?.label ?? email.audience} ·{" "}
           {email.recipients.length} {email.recipients.length === 1 ? "angel" : "angels"}
         </p>
+        {email.attachments.length > 0 && (
+          <p className="mt-1 text-sm text-black/70">
+            Attached: {email.attachments.map((a) => `${a.fileName} (${formatFileSize(a.sizeBytes)})`).join(", ")}
+            {email.attachments.some((a) => a.opportunityPackId) && " · deal material: sent only to members with a current investor statement"}
+          </p>
+        )}
       </div>
       <SendProgress id={email.id} total={email.recipients.length} initial={counts} autoStart={sp.send === "1"} />
       <div className="grid gap-5 lg:grid-cols-2">

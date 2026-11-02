@@ -6,7 +6,8 @@ import nodemailer, { type Transporter } from "nodemailer";
 // changing the settings. Without them, production sends nothing and the sign-in page hides
 // the email options; local development prints each email to the server console instead.
 
-export type Mail = { to: string; subject: string; text: string; html: string; headers?: Record<string, string> };
+export type MailAttachment = { filename: string; content: Buffer; contentType: string };
+export type Mail = { to: string; subject: string; text: string; html: string; headers?: Record<string, string>; attachments?: MailAttachment[] };
 
 const isProduction = () => process.env.NODE_ENV === "production";
 
@@ -34,7 +35,8 @@ let transport: Transporter | null = null;
 export async function sendMail(mail: Mail): Promise<void> {
   if (!smtpReady()) {
     if (isProduction()) throw new Error("Email isn't set up (SMTP settings missing).");
-    console.log(`\n── Email (dev: not sent) ──\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n──\n`);
+    const files = mail.attachments?.length ? `\nAttachments: ${mail.attachments.map((a) => `${a.filename} (${a.content.length} bytes)`).join(", ")}` : "";
+    console.log(`\n── Email (dev: not sent) ──\nTo: ${mail.to}\nSubject: ${mail.subject}${files}\n\n${mail.text}\n──\n`);
     return;
   }
   const port = Number(process.env.SMTP_PORT ?? 465);
@@ -45,5 +47,13 @@ export async function sendMail(mail: Mail): Promise<void> {
     requireTLS: port !== 465,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
-  await transport.sendMail({ from: process.env.MAIL_FROM, to: mail.to, subject: mail.subject, text: mail.text, html: mail.html, headers: mail.headers });
+  await transport.sendMail({
+    from: process.env.MAIL_FROM,
+    to: mail.to,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+    headers: mail.headers,
+    attachments: mail.attachments,
+  });
 }
