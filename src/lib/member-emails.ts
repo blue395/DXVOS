@@ -6,7 +6,9 @@ import "server-only";
 import { db } from "./db";
 import { complianceReady } from "./compliance";
 import { INVITE_DAYS, newInviteToken } from "./invite-token";
-import { appOrigin, mailConfigured, sendMail } from "./mail";
+import { appOrigin, mailConfigured, sendMail, type MailAttachment } from "./mail";
+import { readObject } from "./deck-storage";
+import { angelIdsWithDealAccess } from "./portal-deals";
 import { firstNameOf, renderMemberEmail, templateProblems } from "./member-email";
 import { unsubscribeUrl } from "./unsubscribe";
 import type { EmailOutcome } from "./send-link";
@@ -47,6 +49,16 @@ async function freshInviteLink(angelId: string, actorId: string, why: string): P
 
 export const BATCH_SIZE = 5;
 
+/** An email's attachments, read from storage, and whether one is an opportunities pack (deal material). */
+export async function loadEmailAttachments(where: { memberEmailId: string } | { ids: string[]; createdById: string }): Promise<{ files: MailAttachment[]; dealMaterial: boolean }> {
+  const rows = await db.memberEmailAttachment.findMany({
+    where: "memberEmailId" in where ? { memberEmailId: where.memberEmailId } : { id: { in: where.ids }, createdById: where.createdById, uploadedAt: { not: null } },
+    orderBy: { createdAt: "asc" },
+  });
+  const files = await Promise.all(rows.map(async (a) => ({ filename: a.fileName, content: await readObject(a.bucket, a.storagePath), contentType: a.mimeType })));
+  return { files, dealMaterial: rows.some((a) => a.opportunityPackId) };
+}
+
 /**
  * Send the next few recipients of a bulk email. Angels without a login get a new sign-up
  * link in their copy; everyone else's link is the sign-in page. Returns what's left.
@@ -62,6 +74,9 @@ export async function sendNextBatch(memberEmailId: string, actorId: string) {
     include: { angel: { select: { id: true, name: true, email: true, archivedAt: true, emailOptOutAt: true, user: { select: { id: true } } } } },
   });
   let ready: boolean | null = null;
+  // Attachments are read once per batch; deal material goes only to members who can see deals (checked again at send).
+  const attachments = batch.length ? await loadEmailAttachments({ memberEmailId }) : { files: [], dealMaterial: false };
+  const dealAccess = attachments.dealMaterial ? await angelIdsWithDealAccess() : null;
   for (const r of batch) {
     // Claim it first, so two tabs can't send the same copy twice.
     const claimed = await db.memberEmailRecipient.updateMany({ where: { id: r.id, status: "PENDING" }, data: { status: "SENDING" } });
@@ -69,6 +84,10 @@ export async function sendNextBatch(memberEmailId: string, actorId: string) {
     const fail = (error: string) => db.memberEmailRecipient.update({ where: { id: r.id }, data: { status: "FAILED", error } });
     if (r.angel.archivedAt || r.angel.emailOptOutAt || !r.angel.email) {
       await fail(r.angel.emailOptOutAt ? "Unsubscribed before it went" : "No longer has an email");
+      continue;
+    }
+    if (dealAccess && !dealAccess.has(r.angel.id)) {
+      await fail("No current investor statement: deal material isn't sent");
       continue;
     }
     try {
@@ -85,6 +104,7 @@ export async function sendNextBatch(memberEmailId: string, actorId: string) {
         to: r.angel.email,
         ...mail,
         headers: { "List-Unsubscribe": `<${unsub.replace("/unsubscribe/", "/api/unsubscribe/")}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        attachments: attachments.files,
       });
       await db.$transaction([
         db.memberEmailRecipient.update({ where: { id: r.id }, data: { status: "SENT", sentAt: new Date(), email: r.angel.email, invited: invite, error: null } }),

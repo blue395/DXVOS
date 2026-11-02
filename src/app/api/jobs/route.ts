@@ -6,6 +6,7 @@ import { effectiveDeckStatus } from "@/lib/deck-status";
 import { JOB_WINDOW_MS, type Job } from "@/lib/jobs";
 import { aiDraftName } from "@/lib/memo-ai/render";
 import { summaryName } from "@/lib/round-summary/build";
+import { packName } from "@/lib/opportunities/build";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -13,7 +14,7 @@ export async function GET() {
 
   const since = new Date(Date.now() - JOB_WINDOW_MS);
   const common = { createdAt: true, startedAt: true, status: true, error: true } as const;
-  const [decks, memos, dds, summaries] = await Promise.all([
+  const [decks, memos, dds, summaries, packs] = await Promise.all([
     // PENDING decks are still uploading (the uploader shows that itself).
     db.deckAnalysis.findMany({
       where: { createdAt: { gte: since }, status: { not: "PENDING" } },
@@ -28,6 +29,8 @@ export async function GET() {
       select: { id: true, ventureId: true, venture: { select: { name: true } }, document: { select: { fileName: true } }, ...common },
     }),
     db.roundSummary.findMany({ where: { createdAt: { gte: since } }, select: { id: true, round: true, number: true, ...common } }),
+    // Copies ("New version from this pack") never ran a job, so they have no startedAt.
+    db.opportunityPack.findMany({ where: { createdAt: { gte: since }, OR: [{ status: { in: ["PENDING", "PROCESSING"] } }, { startedAt: { not: null } }] }, select: { id: true, round: true, number: true, ...common } }),
   ]);
 
   const jobs: Job[] = [
@@ -66,6 +69,15 @@ export async function GET() {
       ...effectiveDeckStatus(r),
       startedAt: (r.startedAt ?? r.createdAt).toISOString(),
       result: `${summaryName(r.number)} ready`,
+    })),
+    ...packs.map((p) => ({
+      id: p.id,
+      kind: "opportunities" as const,
+      ventureName: `Round ${p.round}`,
+      href: `/deals/opportunities?round=${p.round}&v=${p.number}`,
+      ...effectiveDeckStatus(p),
+      startedAt: (p.startedAt ?? p.createdAt).toISOString(),
+      result: `${packName(p.number)} ready`,
     })),
   ].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 

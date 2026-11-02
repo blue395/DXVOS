@@ -48,52 +48,57 @@ model User {
   founderEmailsSent     FounderEmail[]
   diversityAccess       DiversityAccessLog[]
 
-  stageChanges            StageChange[]
-  memoVersions            MemoVersion[]
-  preSelectionVotes       PreSelectionVote[]
-  investmentVotes         InvestmentVote[]
-  founderCommsSent        FounderComm[]
-  venturesCreated         Venture[]
-  deckAnalyses            DeckAnalysis[]
-  eligibilityReviews      EligibilityReview[]
-  memoAnalyses            MemoAnalysis[]
-  memoDraftsCreated       MemoDraft[]          @relation("MemoDraftCreatedBy")
-  memoDraftsUpdated       MemoDraft[]          @relation("MemoDraftUpdatedBy")
-  memoScoreChanges        MemoScoreChange[]
-  documentsUploaded       Document[]           @relation("DocumentUploadedBy")
-  documentsArchived       Document[]           @relation("DocumentArchivedBy")
-  ddReportJobs            DDReportJob[]
-  roundSummaries          RoundSummary[]       @relation("RoundSummaryCreatedBy")
-  roundSummaryEdits       RoundSummary[]       @relation("RoundSummaryUpdatedBy")
-  investmentVotesRemoved  InvestmentVote[]     @relation("InvestmentVoteRemovedBy")
-  finalInvestmentsCreated FinalInvestment[]    @relation("FinalInvestmentCreatedBy")
-  finalInvestmentsPaid    FinalInvestment[]    @relation("FinalInvestmentPaidBy")
-  finalInvestmentsRemoved FinalInvestment[]    @relation("FinalInvestmentRemovedBy")
-  entryAudits             EntryAudit[]
-  playbookVersions        PlaybookVersion[]
-  lessonsCreated          Lesson[]             @relation("LessonCreatedBy")
-  lessonsApproved         Lesson[]             @relation("LessonApprovedBy")
-  lessonsUpdated          Lesson[]             @relation("LessonUpdatedBy")
-  lessonJobs              LessonJob[]
-  brainConversations      BrainConversation[]
-  angelsCreated           Angel[]              @relation("AngelCreatedBy")
-  angelsUpdated           Angel[]              @relation("AngelUpdatedBy")
-  angelCertifications     AngelCertification[]
-  angelNotes              AngelNote[]
-  angelAliases            AngelAlias[]
-  angelInvitesCreated     AngelInvite[]
-  dealShareLogs           DealShareLog[]
-  teamInvitesCreated      TeamInvite[]         @relation("TeamInviteCreatedBy")
-  teamInvites             TeamInvite[]         @relation("TeamInviteUser")
-  teamEventsDone          TeamEvent[]          @relation("TeamEventActor")
-  teamEvents              TeamEvent[]          @relation("TeamEventSubject")
-  memberRounds            MemberRound[]
-  memberEventsCreated     MemberEvent[]        @relation("MemberEventCreatedBy")
-  memberEventsUpdated     MemberEvent[]        @relation("MemberEventUpdatedBy")
-  syndicateHoldingsAdded  SyndicateHolding[]   @relation("SyndicateHoldingCreatedBy")
-  syndicateHoldingsEdited SyndicateHolding[]   @relation("SyndicateHoldingUpdatedBy")
-  complianceTextsCreated  ComplianceText[]     @relation("ComplianceTextCreatedBy")
-  complianceTextsApproved ComplianceText[]     @relation("ComplianceTextApprovedBy")
+  stageChanges             StageChange[]
+  memoVersions             MemoVersion[]
+  preSelectionVotes        PreSelectionVote[]
+  investmentVotes          InvestmentVote[]
+  founderCommsSent         FounderComm[]
+  venturesCreated          Venture[]
+  deckAnalyses             DeckAnalysis[]
+  eligibilityReviews       EligibilityReview[]
+  memoAnalyses             MemoAnalysis[]
+  memoDraftsCreated        MemoDraft[]             @relation("MemoDraftCreatedBy")
+  memoDraftsUpdated        MemoDraft[]             @relation("MemoDraftUpdatedBy")
+  memoScoreChanges         MemoScoreChange[]
+  documentsUploaded        Document[]              @relation("DocumentUploadedBy")
+  documentsArchived        Document[]              @relation("DocumentArchivedBy")
+  ddReportJobs             DDReportJob[]
+  roundSummaries           RoundSummary[]          @relation("RoundSummaryCreatedBy")
+  roundSummaryEdits        RoundSummary[]          @relation("RoundSummaryUpdatedBy")
+  opportunityPacks         OpportunityPack[]       @relation("OpportunityPackCreatedBy")
+  opportunityPackEdits     OpportunityPack[]       @relation("OpportunityPackUpdatedBy")
+  opportunityPackApprovals OpportunityPack[]       @relation("OpportunityPackApprovedBy")
+  ventureLogos             VentureLogo[]
+  emailAttachments         MemberEmailAttachment[]
+  investmentVotesRemoved   InvestmentVote[]        @relation("InvestmentVoteRemovedBy")
+  finalInvestmentsCreated  FinalInvestment[]       @relation("FinalInvestmentCreatedBy")
+  finalInvestmentsPaid     FinalInvestment[]       @relation("FinalInvestmentPaidBy")
+  finalInvestmentsRemoved  FinalInvestment[]       @relation("FinalInvestmentRemovedBy")
+  entryAudits              EntryAudit[]
+  playbookVersions         PlaybookVersion[]
+  lessonsCreated           Lesson[]                @relation("LessonCreatedBy")
+  lessonsApproved          Lesson[]                @relation("LessonApprovedBy")
+  lessonsUpdated           Lesson[]                @relation("LessonUpdatedBy")
+  lessonJobs               LessonJob[]
+  brainConversations       BrainConversation[]
+  angelsCreated            Angel[]                 @relation("AngelCreatedBy")
+  angelsUpdated            Angel[]                 @relation("AngelUpdatedBy")
+  angelCertifications      AngelCertification[]
+  angelNotes               AngelNote[]
+  angelAliases             AngelAlias[]
+  angelInvitesCreated      AngelInvite[]
+  dealShareLogs            DealShareLog[]
+  teamInvitesCreated       TeamInvite[]            @relation("TeamInviteCreatedBy")
+  teamInvites              TeamInvite[]            @relation("TeamInviteUser")
+  teamEventsDone           TeamEvent[]             @relation("TeamEventActor")
+  teamEvents               TeamEvent[]             @relation("TeamEventSubject")
+  memberRounds             MemberRound[]
+  memberEventsCreated      MemberEvent[]           @relation("MemberEventCreatedBy")
+  memberEventsUpdated      MemberEvent[]           @relation("MemberEventUpdatedBy")
+  syndicateHoldingsAdded   SyndicateHolding[]      @relation("SyndicateHoldingCreatedBy")
+  syndicateHoldingsEdited  SyndicateHolding[]      @relation("SyndicateHoldingUpdatedBy")
+  complianceTextsCreated   ComplianceText[]        @relation("ComplianceTextCreatedBy")
+  complianceTextsApproved  ComplianceText[]        @relation("ComplianceTextApprovedBy")
 }
 
 // ── Pipeline ────────────────────────────────────────────────────────────────
@@ -188,6 +193,7 @@ model Venture {
   shareLog           DealShareLog[]
   syndicateHolding   SyndicateHolding?
   founderSubmissions FounderSubmission[] @relation("SubmissionVenture")
+  logos              VentureLogo[]
   founderEmails      FounderEmail[]
 
   @@index([currentStage])
@@ -629,6 +635,57 @@ model RoundSummary {
 
   @@unique([round, number])
   @@index([createdAt])
+}
+
+// Members' opportunities pack (Blue, 2026-11-02): branded slides on every deal at Member
+// Pitch Selection in a round, for distribution to certified members. The AI drafts
+// (`aiOutput`, never edited), partners edit `content`, then approve: an approved version is
+// locked, and only approved versions can be downloaded for members, shown in the portal or
+// attached to emails. Changing it means a new version.
+model OpportunityPack {
+  id           String             @id @default(cuid())
+  round        Int
+  number       Int
+  title        String // e.g. "Syndicate Opportunities, November 2026"
+  status       DeckAnalysisStatus @default(PENDING)
+  model        String?
+  context      Json
+  aiOutput     Json?
+  content      Json?
+  error        String?
+  inputTokens  Int?
+  outputTokens Int?
+  createdById  String
+  createdBy    User               @relation("OpportunityPackCreatedBy", fields: [createdById], references: [id])
+  updatedById  String?
+  updatedBy    User?              @relation("OpportunityPackUpdatedBy", fields: [updatedById], references: [id])
+  editedAt     DateTime?
+  approvedAt   DateTime?
+  approvedById String?
+  approvedBy   User?              @relation("OpportunityPackApprovedBy", fields: [approvedById], references: [id])
+  createdAt    DateTime           @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  emailAttachments MemberEmailAttachment[]
+
+  @@unique([round, number])
+  @@index([createdAt])
+}
+
+// A company's logo for members' materials (PNG or JPEG, small). The latest row counts;
+// replacing one adds a row (nothing deleted).
+model VentureLogo {
+  id          String   @id @default(cuid())
+  ventureId   String
+  venture     Venture  @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  mimeType    String
+  data        Bytes
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([ventureId, createdAt])
 }
 
 // ── Playbook: DXV's criteria and lessons (feeds the AI; later, the DXV Brain) ──
@@ -1264,14 +1321,39 @@ model EmailTemplate {
  * A bulk email as sent (never edited afterwards).
  */
 model MemberEmail {
-  id          String                 @id @default(cuid())
+  id          String                  @id @default(cuid())
   subject     String
   body        String
   audience    String // which group it was for (MEMBER_EMAIL_AUDIENCES)
   createdById String
-  createdBy   User                   @relation(fields: [createdById], references: [id])
-  createdAt   DateTime               @default(now())
+  createdBy   User                    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime                @default(now())
   recipients  MemberEmailRecipient[]
+  attachments MemberEmailAttachment[]
+}
+
+// Files attached to a bulk email (Blue, 2026-11-02): uploaded in the composer (browser
+// straight to storage), or an approved opportunities pack rendered to PDF when the email is
+// created. Draft attachments have no memberEmailId until the email is sent. An email
+// carrying a pack goes only to members who can see deals.
+model MemberEmailAttachment {
+  id                String           @id @default(cuid())
+  memberEmailId     String?
+  memberEmail       MemberEmail?     @relation(fields: [memberEmailId], references: [id])
+  fileName          String
+  mimeType          String
+  sizeBytes         Int
+  bucket            String
+  storagePath       String
+  uploadedAt        DateTime?
+  opportunityPackId String?
+  opportunityPack   OpportunityPack? @relation(fields: [opportunityPackId], references: [id])
+  createdById       String
+  createdBy         User             @relation(fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+
+  @@index([memberEmailId])
+  @@index([createdById, createdAt])
 }
 
 enum MemberEmailStatus {

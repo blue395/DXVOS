@@ -12,7 +12,9 @@ import { complianceReady } from "@/lib/compliance";
 import { db } from "@/lib/db";
 import { appOrigin, mailConfigured, sendMail } from "@/lib/mail";
 import { firstNameOf, renderMemberEmail, templateProblems } from "@/lib/member-email";
-import { sendNextBatch } from "@/lib/member-emails";
+import { loadEmailAttachments, sendNextBatch } from "@/lib/member-emails";
+import { attachmentRecipients, MAX_ATTACHMENTS, MAX_ATTACHMENTS_BYTES } from "@/lib/email-attachments";
+import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 import { isMemberEmailAudience } from "@/lib/pipeline";
 import { loadAudiences } from "./audience";
 
@@ -54,10 +56,10 @@ export async function archiveTemplate(id: string): Promise<ActionResult> {
   redirect("/angels/emails");
 }
 
-const DraftSchema = z.object({ subject: z.string().max(200), body: z.string().max(20_000) });
+const DraftSchema = z.object({ subject: z.string().max(200), body: z.string().max(20_000), attachmentIds: z.array(z.string()).max(MAX_ATTACHMENTS).default([]) });
 
 /** Send the draft to me, as a member would see it (the link goes to the sign-in page; no invite is made). */
-export async function sendTestEmail(draft: { subject: string; body: string }): Promise<ActionResult> {
+export async function sendTestEmail(draft: { subject: string; body: string; attachmentIds?: string[] }): Promise<ActionResult> {
   const me = await requireAdmin();
   const d = DraftSchema.parse(draft);
   const problems = templateProblems(d);
@@ -66,7 +68,8 @@ export async function sendTestEmail(draft: { subject: string; body: string }): P
   if (!mailConfigured() || !origin) return { error: "Email isn't set up." };
   const mail = renderMemberEmail(d, { first_name: firstNameOf(me.name), platform_link: `${origin}/login` }, { unsubscribeUrl: `${origin}/unsubscribe/test` });
   try {
-    await sendMail({ to: me.email, ...mail, subject: `[Test] ${mail.subject}` });
+    const { files } = await loadEmailAttachments({ ids: d.attachmentIds, createdById: me.id });
+    await sendMail({ to: me.email, ...mail, subject: `[Test] ${mail.subject}`, attachments: files });
   } catch (e) {
     console.error("Test email failed", e);
     return { error: "The test email didn't send. Check the email settings." };
@@ -80,19 +83,35 @@ const CreateSchema = DraftSchema.extend({ audience: z.string(), angelIds: z.arra
  * Record a bulk email and who it goes to (only people really in the chosen audience).
  * Sending then happens in batches from its page.
  */
-export async function createMemberEmail(input: { subject: string; body: string; audience: string; angelIds: string[] }): Promise<{ error: string } | { id: string }> {
+export async function createMemberEmail(input: {
+  subject: string;
+  body: string;
+  audience: string;
+  angelIds: string[];
+  attachmentIds?: string[];
+}): Promise<{ error: string } | { id: string }> {
   const me = await requireAdmin();
   const parsed = CreateSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the email." };
-  const { subject, body, audience, angelIds } = parsed.data;
+  const { subject, body, audience, angelIds, attachmentIds } = parsed.data;
   if (!isMemberEmailAudience(audience)) return { error: "Choose who it's for." };
   const problems = templateProblems({ subject, body });
   if (problems.length) return { error: problems.join(" ") };
   if (!mailConfigured() || !appOrigin()) return { error: "Email isn't set up." };
   const group = (await loadAudiences()).find((a) => a.key === audience)!;
   const chosen = new Set(angelIds);
-  const people = group.people.filter((p) => chosen.has(p.id));
-  if (people.length === 0) return { error: "None of the chosen people are in that group any more. Reload the page." };
+  const inGroup = group.people.filter((p) => chosen.has(p.id));
+  if (inGroup.length === 0) return { error: "None of the chosen people are in that group any more. Reload the page." };
+  // Attachments: only my own uploaded drafts. An opportunities pack is deal material, so it
+  // goes only to members who can see deals (a current investor statement).
+  const attachments = attachmentIds.length
+    ? await db.memberEmailAttachment.findMany({ where: { id: { in: attachmentIds }, createdById: me.id, memberEmailId: null, uploadedAt: { not: null } } })
+    : [];
+  if (attachments.length !== attachmentIds.length) return { error: "An attachment is missing. Remove it and attach it again." };
+  if (attachments.reduce((n, a) => n + a.sizeBytes, 0) > MAX_ATTACHMENTS_BYTES) return { error: "Attachments can be 15 MB in total." };
+  const dealMaterial = attachments.some((a) => a.opportunityPackId);
+  const { send: people } = attachmentRecipients(inGroup, dealMaterial, dealMaterial ? await angelIdsWithDealAccess() : new Set());
+  if (people.length === 0) return { error: "None of them has a current investor statement, so the opportunities pack can't go to them." };
   if (people.some((p) => !p.hasLogin) && !(await complianceReady()).ready) {
     return { error: "Some of them aren't on the platform yet, and invites are paused until the investor statements and member terms are approved." };
   }
@@ -105,6 +124,7 @@ export async function createMemberEmail(input: { subject: string; body: string; 
       recipients: { create: people.map((p) => ({ angelId: p.id, email: p.email })) },
     },
   });
+  if (attachments.length) await db.memberEmailAttachment.updateMany({ where: { id: { in: attachments.map((a) => a.id) } }, data: { memberEmailId: email.id } });
   revalidatePath("/angels/emails");
   return { id: email.id };
 }

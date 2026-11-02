@@ -11,9 +11,10 @@ export const metadata = { title: "New email · DXV OS" };
 export default async function NewEmailPage({ searchParams }: PageProps<"/angels/emails/new">) {
   const [me, sp] = await Promise.all([requireAdmin(), searchParams]);
   if (!mailConfigured()) redirect("/angels/emails");
-  const [templates, audiences] = await Promise.all([
+  const [templates, audiences, packs] = await Promise.all([
     db.emailTemplate.findMany({ where: { archivedAt: null, key: null }, orderBy: { name: "asc" }, select: { id: true, name: true, subject: true, body: true } }),
     loadAudiences(),
+    db.opportunityPack.findMany({ where: { approvedAt: { not: null } }, orderBy: { approvedAt: "desc" }, take: 6, select: { id: true, title: true, round: true, number: true } }),
   ]);
   const start = templates.find((t) => t.id === sp.template) ?? null;
   return (
@@ -22,7 +23,7 @@ export default async function NewEmailPage({ searchParams }: PageProps<"/angels/
         ← Email angels
       </Link>
       <h1 className="text-2xl font-semibold text-dxv-green">New email to angels</h1>
-      <Composer templates={templates} audiences={audiences} start={start} myEmail={me.email} myFirstName={me.name.split(" ")[0]} />
+      <Composer templates={templates} audiences={audiences} start={start} myEmail={me.email} myFirstName={me.name.split(" ")[0]} packs={packs} />
     </div>
   );
 }
