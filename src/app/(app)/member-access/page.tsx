@@ -8,7 +8,7 @@ import { ChooseRecord, ThatsMeButton } from "./member-access-client";
 export const metadata = { title: "Member view · DXV OS" };
 
 /**
- * The team's "Member portal" button, before a team member's login is linked to their
+ * The team's "Angel View" button, before a team member's login is linked to their
  * angel record: find (or create) their record, then go straight to the portal.
  */
 export default async function MemberAccessPage() {
@@ -29,7 +29,7 @@ export default async function MemberAccessPage() {
         <p className="text-sm text-black/65">
           Your team login can also be your member login: the same portal, views and actions as every DXV angel, as yourself. The first time,
           you&apos;ll check your details and sign your own investor statement; then you see shared deals, vote and record your interest like any
-          member. The yellow <strong>Team app</strong> button brings you back here.
+          member. The yellow <strong>Partner View</strong> button brings you back here.
         </p>
       </div>
 

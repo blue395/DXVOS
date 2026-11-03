@@ -53,7 +53,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               className="rounded bg-dxv-yellow px-2 py-1 font-medium whitespace-nowrap text-dxv-green transition hover:bg-white"
               title="See DXV as an angel: your own member portal"
             >
-              Member portal
+              Angel View
             </Link>
             <span className="hidden items-center gap-3 lg:flex">
               <Link href="/team" className="rounded px-2 py-1 text-white/80 transition hover:bg-white/10 hover:text-white" title="Team logins">
