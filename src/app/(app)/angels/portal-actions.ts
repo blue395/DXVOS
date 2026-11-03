@@ -104,7 +104,7 @@ export async function inviteNewAngel(input: { name: string; email: string }, sen
   const [ready, existing] = await Promise.all([complianceReady(), db.angel.findUnique({ where: { email }, select: { id: true, name: true } })]);
   if (!ready.ready) return { error: "Approve the investor statements and member terms first (Angels → Statements & terms)." };
   if (existing) return { error: `${existing.name} is already in the directory with that email: invite them from their page.`, existingAngelId: existing.id };
-  const clash = await loginClash(email, "Partners get member access from the Member portal button in the team app.");
+  const clash = await loginClash(email, "Partners get member access from the Angel View button in Partner View.");
   if (clash) return { error: clash };
 
   const { token, tokenHash } = newInviteToken();

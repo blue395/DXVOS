@@ -6,7 +6,7 @@ import { NavLink } from "@/components/nav-link";
 import { MenuDivider, MobileMenu } from "@/components/mobile-menu";
 
 // The angel portal's shell: no team navigation, no DXV Brain, no job tray (partners, who are
-// also angels, get a "Team app" link back). Pages and actions still check requireAngel()
+// also angels, get a "Partner View" link back). Pages and actions still check requireAngel()
 // themselves.
 export default async function PortalLayout({ children }: LayoutProps<"/portal">) {
   const { user, angel } = await requireAngel();
@@ -39,7 +39,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
           <div className="ml-auto flex items-center gap-3 text-sm md:ml-0">
             {user.role === "ADMIN" && (
               <Link href="/" className="rounded bg-dxv-yellow px-2 py-1 font-medium whitespace-nowrap text-dxv-green transition hover:bg-white" title="Back to DXV OS">
-                Team app
+                Partner View
               </Link>
             )}
             <span className="hidden items-center gap-3 md:flex">
