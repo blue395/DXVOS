@@ -1899,3 +1899,30 @@ export function memoRoundOptions(maxRound: number | null, current?: string | nul
   const top = Math.max((maxRound ?? 0) + 1, fromCurrent, 1);
   return ["Not assigned", ...Array.from({ length: top }, (_, i) => `Round ${i + 1}`)];
 }
+
+// ── Shareable sign-up links (Blue, 2026-11-05) ──────────────────────────────
+
+/** How long a new shareable link works (the partner picks one). */
+export const JOIN_LINK_DAY_OPTIONS = [7, 14, 30, 90] as const;
+/** How long the "confirm your email" link in a join request works. */
+export const JOIN_CONFIRM_HOURS = 48;
+/** Requests that never became members are deleted after this many days (retention). */
+export const JOIN_REQUEST_KEEP_DAYS = 90;
+export const JOIN_LIMITS = { perIpPerHour: 5, perEmailPerDay: 3, perLinkPerDay: 100 } as const;
+
+export type JoinLinkState = "open" | "switched-off" | "expired" | "full";
+
+/** Whether a shareable link can take new requests. `used` = requests whose email was confirmed. */
+export function joinLinkState(link: { revokedAt: Date | null; expiresAt: Date; maxUses: number | null }, used: number, now: Date = new Date()): JoinLinkState {
+  if (link.revokedAt) return "switched-off";
+  if (link.expiresAt <= now) return "expired";
+  if (link.maxUses !== null && used >= link.maxUses) return "full";
+  return "open";
+}
+
+/** Rate limits on the public join form (null: fine). */
+export function joinRequestLimitError(n: { fromIpLastHour: number; fromEmailLastDay: number; viaLinkLastDay: number }): string | null {
+  if (n.fromIpLastHour >= JOIN_LIMITS.perIpPerHour || n.viaLinkLastDay >= JOIN_LIMITS.perLinkPerDay) return "We've had a lot of requests just now. Please try again later.";
+  if (n.fromEmailLastDay >= JOIN_LIMITS.perEmailPerDay) return "We've already had a few requests from this email today. Check your inbox (and spam) for our email.";
+  return null;
+}

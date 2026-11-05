@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { buttonClass, inputClass } from "@/components/ui";
 
-/** The public application link, with a Copy button. */
-export function CopyLink({ url }: { url: string }) {
+/** A link with a Copy button (the founder application link, shareable sign-up links). */
+export function CopyLink({ url, label = "Link" }: { url: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex gap-2">
-      <input readOnly value={url} onFocus={(e) => e.target.select()} className={`${inputClass} font-mono text-sm`} aria-label="Application link" />
+      <input readOnly value={url} onFocus={(e) => e.target.select()} className={`${inputClass} font-mono text-sm`} aria-label={label} />
       <button
         type="button"
         className={buttonClass("secondary")}

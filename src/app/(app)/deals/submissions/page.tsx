@@ -4,7 +4,7 @@ import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { appOrigin } from "@/lib/mail";
 import { formatGbpCompact } from "@/lib/pipeline";
-import { CopyLink } from "./copy-link";
+import { CopyLink } from "@/components/copy-link";
 
 export const metadata = { title: "Website submissions · DXV OS" };
 
@@ -46,7 +46,7 @@ export default async function SubmissionsPage() {
 
       <Card title="Your application link">
         <div className="space-y-2 text-sm">
-          <CopyLink url={link} />
+          <CopyLink url={link} label="Application link" />
           <p className="text-black/60">
             Add it to the Founders page on Squarespace as a button (&ldquo;Submit your deck&rdquo;).{" "}
             <a href="/apply" target="_blank" rel="noreferrer" className="font-medium text-dxv-green underline">
