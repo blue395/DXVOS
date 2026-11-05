@@ -12,7 +12,7 @@ export default async function PreviewPage({ params }: PageProps<"/angels/[id]/pr
   const { id } = await params;
   const [angel, deals, events] = await requireAdminWith(() =>
     Promise.all([
-      db.angel.findUnique({ where: { id }, include: { certifications: { select: { type: true, signedOn: true, expiresOn: true } } } }),
+      db.angel.findUnique({ where: { id }, include: { certifications: { where: { signedByAngel: true }, select: { type: true, signedOn: true, expiresOn: true } } } }),
       listSharedDeals(),
       loadMemberEvents(),
     ]),

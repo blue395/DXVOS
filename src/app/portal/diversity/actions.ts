@@ -17,7 +17,7 @@ import type { ActionResult } from "@/lib/action-result";
 export type DiversityResult = { error?: string; ok?: boolean; saved?: DiversityCategory[]; refused?: DiversityCategory[]; withdrawn?: DiversityCategory[] };
 
 async function nextStepPath(angelId: string) {
-  const a = await db.angel.findUniqueOrThrow({ where: { id: angelId }, include: { certifications: { select: { signedOn: true, expiresOn: true } } } });
+  const a = await db.angel.findUniqueOrThrow({ where: { id: angelId }, include: { certifications: { where: { signedByAngel: true }, select: { signedOn: true, expiresOn: true } } } });
   const step = nextOnboardingStep(a, latestCertification(a.certifications));
   return step === "done" ? "/portal" : `/portal/${step}`;
 }

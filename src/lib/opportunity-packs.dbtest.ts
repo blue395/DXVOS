@@ -80,6 +80,7 @@ describe("emails carrying an opportunities pack", () => {
         expiresOn: new Date(Date.now() + 86_400_000 * 300),
         recordedById: partner,
         criteria: [],
+        signedByAngel: true, // only a statement signed in the portal counts (Blue, 2026-11-05)
       },
     });
     const prospect = await db.angel.create({

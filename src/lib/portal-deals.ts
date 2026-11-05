@@ -38,8 +38,9 @@ const VISIBLE_STAGES: Stage[] = ["PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT
 
 /** May this angel see deals right now? Onboarded, a current investor statement, and not "neither applies". */
 export async function angelHasDealAccess(angel: Pick<Angel, "id" | "status" | "archivedAt" | "restrictedDeclaredAt" | "profileConfirmedAt" | "onboardedAt">) {
+  // Only a statement the angel signed in the portal counts (Blue, 2026-11-05).
   const certs = await db.angelCertification.findMany({
-    where: { angelId: angel.id },
+    where: { angelId: angel.id, signedByAngel: true },
     select: { signedOn: true, expiresOn: true },
   });
   const cert = latestCertification(certs);
@@ -528,7 +529,7 @@ export async function angelIdsWithDealAccess(now = new Date()): Promise<Set<stri
       id: true,
       status: true,
       archivedAt: true,
-      certifications: { select: { signedOn: true, expiresOn: true } },
+      certifications: { where: { signedByAngel: true }, select: { signedOn: true, expiresOn: true } },
     },
   });
   return new Set(angels.filter((a) => canSeeLiveDeals(a, latestCertification(a.certifications), now)).map((a) => a.id));
