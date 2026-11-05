@@ -22,7 +22,7 @@ import { formTimingOk } from "./founder-intake";
 import { hashInviteToken, isInviteTokenShape, newInviteToken } from "./invite-token";
 import { joinAlreadyMemberEmail, joinConfirmEmail, joinRequestPartnerEmail } from "./login-email";
 import { appOrigin, mailConfigured, sendMail } from "./mail";
-import { JOIN_CONFIRM_HOURS, joinLinkState, joinRequestLimitError, type JoinLinkState } from "./pipeline";
+import { JOIN_CONFIRM_HOURS, joinLinkState, joinRequestLimitError, maskEmail, type JoinLinkState } from "./pipeline";
 import type { EmailOutcome } from "./send-link";
 
 const HOUR = 3_600_000;
@@ -119,7 +119,10 @@ export async function requestToJoin(
     db.memberJoinRequest.count({ where: { email, createdAt: { gte: new Date(now - 24 * HOUR) } } }),
     db.memberJoinRequest.count({ where: { linkId: link.id, createdAt: { gte: new Date(now - 24 * HOUR) } } }),
     db.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
-    db.angel.findFirst({ where: { email: { equals: email, mode: "insensitive" }, erasedAt: null }, select: { id: true, user: { select: { id: true } } } }),
+    db.angel.findFirst({
+      where: { email: { equals: email, mode: "insensitive" }, erasedAt: null },
+      select: { id: true, user: { select: { id: true, email: true } } },
+    }),
     db.memberJoinRequest.findFirst({ where: { email, status: "PENDING" }, select: { id: true } }),
   ]);
   const limited = joinRequestLimitError({ fromIpLastHour, fromEmailLastDay, viaLinkLastDay });
@@ -129,7 +132,12 @@ export async function requestToJoin(
   // Already has a login: send a sign-in email, nothing for partners to approve.
   if (user || angel?.user) {
     await db.memberJoinRequest.create({ data: { linkId: link.id, name, email, status: "HAS_LOGIN", ipHash, angelId: angel?.id ?? null } });
-    await sendMail({ to: email, ...joinAlreadyMemberEmail({ name, signInUrl: `${origin}/login` }) }).catch(() => console.error("Join email failed"));
+    // Their directory record's login may use a different email (e.g. a partner's work address):
+    // say so, partly hidden, so they don't try to sign in with this one. Sent only to this address.
+    const loginEmail = !user && angel?.user && angel.user.email.toLowerCase() !== email ? maskEmail(angel.user.email) : null;
+    await sendMail({ to: email, ...joinAlreadyMemberEmail({ name, signInUrl: `${origin}/login`, loginEmailHint: loginEmail }) }).catch(() =>
+      console.error("Join email failed"),
+    );
     return { ok: true };
   }
   // Already waiting for a partner: nothing new to send.

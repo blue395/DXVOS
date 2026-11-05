@@ -1929,6 +1929,14 @@ export function joinLinkState(link: { revokedAt: Date | null; expiresAt: Date; m
   return "open";
 }
 
+/** An email partly hidden for a hint: "blue@socialventurise.com" → "bl••@socialventurise.com". */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "••••";
+  const keep = local.length <= 2 ? local.slice(0, 1) : local.slice(0, 2);
+  return `${keep}${"•".repeat(Math.max(2, Math.min(6, local.length - keep.length)))}@${domain}`;
+}
+
 /** Rate limits on the public join form (null: fine). */
 export function joinRequestLimitError(n: { fromIpLastHour: number; fromEmailLastDay: number; viaLinkLastDay: number }): string | null {
   if (n.fromIpLastHour >= JOIN_LIMITS.perIpPerHour || n.viaLinkLastDay >= JOIN_LIMITS.perLinkPerDay) return "We've had a lot of requests just now. Please try again later.";
