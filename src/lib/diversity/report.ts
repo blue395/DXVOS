@@ -70,3 +70,54 @@ export function crossTab(rows: { a: string; b: string; n: number }[], aValues: s
   }
   return { allowed: true, cells };
 }
+
+/**
+ * Members' combined figures under the same headings DXV uses for founders (Kevin's wording,
+ * 2026-11-05), worked out from the questions members already answer. Members aren't asked
+ * their age, so there's no "over 50" heading. Self-described answers aren't counted (they
+ * can't be sorted reliably).
+ */
+export const MEMBER_HEADLINES: { label: string; question: string; values: string[] }[] = [
+  { label: "Female", question: "gender", values: ["Woman"] },
+  {
+    label: "Person of Colour",
+    question: "ethnic_group",
+    values: [
+      "Indian",
+      "Pakistani",
+      "Bangladeshi",
+      "Chinese",
+      "Any other Asian background",
+      "Caribbean",
+      "African",
+      "Any other Black, Black British or Caribbean background",
+      "White and Black Caribbean",
+      "White and Black African",
+      "White and Asian",
+      "Any other Mixed or multiple ethnic background",
+      "Arab",
+      "Any other ethnic group",
+    ],
+  },
+  { label: "Neurodivergent", question: "disability", values: ["Yes, neurodivergent", "Yes, both"] },
+  { label: "Disabled", question: "disability", values: ["Yes, disability", "Yes, both"] },
+  { label: "From a socio-economic disadvantaged background", question: "life_experience", values: ["I grew up in a low-income household"] },
+  { label: "LGBTQIA+", question: "sexual_orientation", values: ["Gay or lesbian", "Bisexual"] },
+];
+
+/**
+ * The headline figures, under the small-number rule. A heading is a sum of answers to one
+ * question, so it's shown only when every answer it adds up is already shown in that
+ * question's table (and the sum is 10 or more): it never reveals a hidden group, even by
+ * subtracting one heading from another.
+ */
+export function memberHeadlines(raw: RawCount[]): { label: string; count: Cell }[] {
+  const reports = new Map(singleCharacteristicReport(raw).map((r) => [r.question, r]));
+  return MEMBER_HEADLINES.map((h) => {
+    const report = reports.get(h.question);
+    if (!report || report.hidden) return { label: h.label, count: FEWER };
+    const rows = report.rows.filter((r) => h.values.includes(r.value));
+    if (rows.some((r) => r.count === FEWER)) return { label: h.label, count: FEWER };
+    return { label: h.label, count: cell(rows.reduce((n, r) => n + (r.count as number), 0)) };
+  });
+}

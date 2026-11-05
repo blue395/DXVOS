@@ -7,6 +7,7 @@ import { db } from "./db";
 import { templateProblems } from "./member-email";
 import {
   canSeeLiveDeals,
+  canonicalFounderThemes,
   daysAgo,
   declineReasons,
   insightNudges,
@@ -216,7 +217,7 @@ export async function loadInsights(periodDays: number, now = new Date()) {
   const reach = stageReach(tracked.map((v) => ({ stagesReached: [...v.stageChanges.map((c) => c.toStage), v.currentStage] })));
   const invested = ventures.filter((v) => isInvestedStage(v.currentStage));
   const themeCounts = new Map<string, number>();
-  for (const v of invested) for (const t of v.founderDiversity) themeCounts.set(t, (themeCounts.get(t) ?? 0) + 1);
+  for (const v of invested) for (const t of canonicalFounderThemes(v.founderDiversity)) themeCounts.set(t, (themeCounts.get(t) ?? 0) + 1);
   const dealflow = {
     newDeals: tracked.filter((v) => v.createdAt >= since).length,
     byMonth: monthlyCounts(tracked.map((v) => v.createdAt), 12, now),

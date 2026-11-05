@@ -17,7 +17,7 @@ import type { EligibilityScreen } from "@/lib/deck-ai/schema";
 import type { MemoContext } from "@/lib/memo-ai/context";
 import type { MemoContent } from "@/lib/memo-ai/schema";
 import { MEMO_JOB_PREFIX, runMemoAnalysis } from "@/lib/memo-worker";
-import { canGenerateAssessment, formatGbp, PASS_REASON_LABELS } from "@/lib/pipeline";
+import { canGenerateAssessment, canonicalFounderThemes, formatGbp, PASS_REASON_LABELS } from "@/lib/pipeline";
 import { triggerBackgroundJob } from "@/lib/trigger-worker";
 import { FOUNDER_SUBMISSIONS_INCLUDE, founderInfoFrom, renderFounderInfo } from "@/lib/founder-info";
 import type { ActionResult } from "@/lib/action-result";
@@ -301,5 +301,5 @@ export async function reviseIssue(memoVersionId: string): Promise<ActionResult> 
 
 /** The themes a memo states (dropping "not stated"-style entries). */
 function issueDiversityThemes(content: MemoContent): string[] {
-  return content.header.diversityThemes.map((t) => t.trim()).filter((t) => t && !/^(not stated|none|n\/a|unknown)$/i.test(t));
+  return canonicalFounderThemes(content.header.diversityThemes.map((t) => t.trim()).filter((t) => t && !/^(not stated|none|n\/a|unknown)$/i.test(t)));
 }
