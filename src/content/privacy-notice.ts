@@ -16,10 +16,11 @@ export const PRIVACY_FACTS: {
   registeredAddress: string | null;
   dataProtectionLead: string | null; // the person who handles privacy requests
 } = {
-  legalName: null,
-  companyNumber: null,
-  registeredAddress: null,
-  dataProtectionLead: null,
+  // From Blue, 2026-11-05. The company is the controller; Kevin handles privacy requests for it.
+  legalName: "Diversity X Ltd",
+  companyNumber: "13474151",
+  registeredAddress: "Heritage House, Newton Road, Sudbury, England, CO10 2RL",
+  dataProtectionLead: "Kevin Withane",
 };
 
 const FACT_LABELS: Record<keyof typeof PRIVACY_FACTS, string> = {
