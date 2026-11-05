@@ -29,7 +29,7 @@ export default async function PortfolioPage() {
   const { angel } = who;
   // Counted only as "active that day" (OTHER): what's in My Portfolio stays private.
   const [certs, { rows, pendingInterest }] = await Promise.all([
-    db.angelCertification.findMany({ where: { angelId: angel.id }, select: { signedOn: true, expiresOn: true } }),
+    db.angelCertification.findMany({ where: { angelId: angel.id, signedByAngel: true }, select: { signedOn: true, expiresOn: true } }),
     loadPortfolio(angel.id),
     trackPortalView(who, "OTHER"),
   ]);

@@ -11,7 +11,7 @@ export const metadata = { title: "Welcome · DXV Members" };
 
 export default async function WelcomePage() {
   const { angel } = await requireAngel();
-  const certs = await db.angelCertification.findMany({ where: { angelId: angel.id }, select: { signedOn: true, expiresOn: true } });
+  const certs = await db.angelCertification.findMany({ where: { angelId: angel.id, signedByAngel: true }, select: { signedOn: true, expiresOn: true } });
   const cert = latestCertification(certs);
   const step = nextOnboardingStep(angel, cert);
   if (step === "profile" || step === "diversity" || step === "certify") redirect(`/portal/${step}`);

@@ -37,7 +37,7 @@ const ProfileSchema = z.object({
 
 /** Where to go after a step: the next onboarding step, or home. */
 async function nextPath(angelId: string) {
-  const a = await db.angel.findUniqueOrThrow({ where: { id: angelId }, include: { certifications: { select: { signedOn: true, expiresOn: true } } } });
+  const a = await db.angel.findUniqueOrThrow({ where: { id: angelId }, include: { certifications: { where: { signedByAngel: true }, select: { signedOn: true, expiresOn: true } } } });
   const step = nextOnboardingStep(a, latestCertification(a.certifications));
   return step === "done" ? "/portal" : `/portal/${step}`;
 }

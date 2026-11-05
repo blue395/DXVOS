@@ -4,7 +4,7 @@ import "server-only";
 // One place, so the directory, the export and the dashboard agree.
 import type { AngelStatus, CertificationType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { angelTotals, certNeedsAction, certState, latestCertification, normaliseAngelName, resolveAngelId, type CertState } from "@/lib/pipeline";
+import { angelTotals, certNeedsAction, certState, platformCertification, normaliseAngelName, resolveAngelId, type CertState } from "@/lib/pipeline";
 
 export type AngelRow = {
   id: string;
@@ -38,7 +38,7 @@ export async function loadAngelRows(opts: { archived?: boolean } = {}, now = new
     db.angel.findMany({
       where: { archivedAt: opts.archived ? { not: null } : null },
       orderBy: { name: "asc" },
-      include: { certifications: { select: { type: true, signedOn: true, expiresOn: true } } },
+      include: { certifications: { select: { type: true, signedOn: true, expiresOn: true, signedByAngel: true } } },
     }),
     aliasMap(),
     db.investmentVote.findMany({
@@ -51,7 +51,7 @@ export async function loadAngelRows(opts: { archived?: boolean } = {}, now = new
   const finalsBy = Map.groupBy(finals, (f) => resolveAngelId(f, aliases) ?? "");
 
   return angels.map((a) => {
-    const cert = latestCertification(a.certifications);
+    const cert = platformCertification(a.certifications); // only one signed on the platform counts
     const state = certState(cert, now);
     const totals = angelTotals(eoisBy.get(a.id) ?? [], finalsBy.get(a.id) ?? []);
     return {

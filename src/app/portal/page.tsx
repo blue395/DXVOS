@@ -13,7 +13,7 @@ export default async function PortalHomePage() {
   const who = await requireAngel();
   const { angel } = who;
   const [certs, access, deals, boardRound, events] = await Promise.all([
-    db.angelCertification.findMany({ where: { angelId: angel.id }, select: { type: true, signedOn: true, expiresOn: true } }),
+    db.angelCertification.findMany({ where: { angelId: angel.id, signedByAngel: true }, select: { type: true, signedOn: true, expiresOn: true } }),
     angelHasDealAccess(angel),
     listSharedDeals(angel.id),
     currentMemberRound(),

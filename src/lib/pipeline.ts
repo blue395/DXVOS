@@ -560,6 +560,15 @@ export function latestCertification<T extends CertLike>(certs: T[]): T | null {
   return certs.reduce<T | null>((best, c) => (!best || c.signedOn > best.signedOn ? c : best), null);
 }
 
+/**
+ * The statement that counts for platform access (Blue, 2026-11-05): the latest one the angel
+ * signed themselves in the member portal (exact wording, ticked criteria, typed name, IP).
+ * Statements the team recorded (angel page, CSV import) stay on file but don't count.
+ */
+export function platformCertification<T extends CertLike & { signedByAngel: boolean }>(certs: T[]): T | null {
+  return latestCertification(certs.filter((c) => c.signedByAngel));
+}
+
 export type CertState = "current" | "due-soon" | "overdue" | "none";
 
 export function certState(latest: CertLike | null | undefined, now: Date = new Date()): CertState {

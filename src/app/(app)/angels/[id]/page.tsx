@@ -13,6 +13,7 @@ import {
   certState,
   formatGbp,
   latestCertification,
+  platformCertification,
   normaliseAngelName,
   PORTAL_STATE_LABELS,
   portalState,
@@ -71,7 +72,8 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
   const myFinals = mine(finals);
   const totals = angelTotals(myEois, myFinals);
 
-  const latest = latestCertification(angel.certifications);
+  const latest = platformCertification(angel.certifications); // only one signed on the platform counts
+  const teamRecorded = latestCertification(angel.certifications.filter((c) => !c.signedByAngel));
   const state = certState(latest);
   const member = angel.status === "MEMBER";
   const gateOpen = canSeeLiveDeals(angel, latest);
@@ -115,8 +117,12 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
 
       {member && (state === "overdue" || state === "none") && (
         <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/30 px-3 py-2 text-sm">
-          <strong>{state === "none" ? "No investor statement on record." : `Statement expired ${formatDate(latest!.expiresOn)}.`}</strong> DXV can&apos;t send
-          this member deal promotions until they sign a new high net worth or sophisticated investor statement. Record it below once signed.
+          <strong>{state === "none" ? "No investor statement signed on the platform." : `Statement expired ${formatDate(latest!.expiresOn)}.`}</strong> DXV
+          can&apos;t send this member deal promotions until they sign a high net worth or sophisticated investor statement in the member portal (they&apos;re
+          asked to when they sign in).
+          {teamRecorded && state === "none" && (
+            <> A statement recorded by the team ({formatDate(teamRecorded.signedOn)}) is on file, but only one signed on the platform counts.</>
+          )}
         </p>
       )}
 
@@ -155,7 +161,8 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
                 <CertificationForm angelId={angel.id} />
               </Reveal>
               <p className="text-xs text-black/50">
-                Once angels log in, only members with a current statement will see live deal terms and vote. {angel.name}:{" "}
+                Only members with a current statement they signed themselves in the member portal see live deals and vote; statements recorded here are kept
+                on file but don&apos;t give access. {angel.name}:{" "}
                 <strong className="text-black/70">{gateOpen ? "would have access" : "would not have access"}</strong>.
               </p>
             </div>

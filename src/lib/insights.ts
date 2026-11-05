@@ -12,7 +12,7 @@ import {
   declineReasons,
   insightNudges,
   isInvestedStage,
-  latestCertification,
+  platformCertification,
   latestVotePerAngel,
   medianDaysInStage,
   monthlyCounts,
@@ -48,7 +48,7 @@ export async function loadInsights(periodDays: number, now = new Date()) {
         onboardedAt: true,
         restrictedDeclaredAt: true,
         user: { select: { role: true, createdAt: true } },
-        certifications: { select: { type: true, signedOn: true, expiresOn: true } },
+        certifications: { select: { type: true, signedOn: true, expiresOn: true, signedByAngel: true } },
         invites: { where: { kind: "INVITE" }, orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, usedAt: true, revokedAt: true, expiresAt: true } },
       },
     }),
@@ -87,7 +87,7 @@ export async function loadInsights(periodDays: number, now = new Date()) {
   const who = (e: { angelId: string | null; angelName: string }) => e.angelId ?? aliasTo.get(normaliseAngelName(e.angelName)) ?? `name:${normaliseAngelName(e.angelName)}`;
   const lastSeenBy = new Map(lastSeen.map((l) => [l.angelId, l._max.createdAt]));
   const people = angels.map((a) => {
-    const cert = latestCertification(a.certifications);
+    const cert = platformCertification(a.certifications);
     const invite = a.invites[0];
     return {
       ...a,

@@ -1101,3 +1101,14 @@ describe("inactivityAction (retention: 24 months, then a 30-day warning)", () =>
     expect(inactivityAction({ lastActiveAt: daysAgo(2), warnedAt: daysAgo(10) }, now)).toBe("cancel-warning");
   });
 });
+
+describe("platformCertification", () => {
+  it("only counts statements the angel signed in the portal (Blue, 2026-11-05)", async () => {
+    const { platformCertification } = await import("./pipeline");
+    const d = (s: string) => new Date(s);
+    const team = { signedOn: d("2026-10-01"), expiresOn: d("2027-10-01"), signedByAngel: false };
+    const portal = { signedOn: d("2026-06-01"), expiresOn: d("2027-06-01"), signedByAngel: true };
+    expect(platformCertification([team])).toBeNull();
+    expect(platformCertification([team, portal])).toBe(portal); // the newer team-recorded one doesn't count
+  });
+});

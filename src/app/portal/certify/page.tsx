@@ -15,7 +15,7 @@ export default async function CertifyPage() {
       orderBy: { kind: "asc" },
       select: { id: true, kind: true, title: true, body: true, criteria: true },
     }),
-    db.angelCertification.findMany({ where: { angelId: angel.id }, select: { type: true, signedOn: true, expiresOn: true } }),
+    db.angelCertification.findMany({ where: { angelId: angel.id, signedByAngel: true }, select: { type: true, signedOn: true, expiresOn: true } }),
   ]);
   const cert = latestCertification(certs);
   const state = certState(cert);
