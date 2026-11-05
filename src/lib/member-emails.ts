@@ -50,9 +50,11 @@ async function freshInviteLink(angelId: string, actorId: string, why: string): P
 export const BATCH_SIZE = 5;
 
 /** An email's attachments, read from storage, and whether one is an opportunities pack (deal material). */
-export async function loadEmailAttachments(where: { memberEmailId: string } | { ids: string[]; createdById: string }): Promise<{ files: MailAttachment[]; dealMaterial: boolean }> {
+export async function loadEmailAttachments(
+  where: { memberEmailId: string } | { founderBulkEmailId: string } | { ids: string[]; createdById: string },
+): Promise<{ files: MailAttachment[]; dealMaterial: boolean }> {
   const rows = await db.memberEmailAttachment.findMany({
-    where: "memberEmailId" in where ? { memberEmailId: where.memberEmailId } : { id: { in: where.ids }, createdById: where.createdById, uploadedAt: { not: null } },
+    where: "ids" in where ? { id: { in: where.ids }, createdById: where.createdById, uploadedAt: { not: null } } : where,
     orderBy: { createdAt: "asc" },
   });
   const files = await Promise.all(rows.map(async (a) => ({ filename: a.fileName, content: await readObject(a.bucket, a.storagePath), contentType: a.mimeType })));

@@ -1736,6 +1736,59 @@ export function upcomingEvents<T extends { startsAt: Date; archivedAt: Date | nu
   return events.filter((e) => !e.archivedAt && e.startsAt.getTime() >= cutoff).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 }
 
+// ── Emails to founders (Blue, 2026-11-05) ──────────────────────────────────
+
+/** A deal's founder email address, if it looks like one address (else null: that deal is left out). */
+export function founderEmailAddress(raw: string | null | undefined): string | null {
+  const e = (raw ?? "").trim();
+  return /^[^\s@,;<>()[\]]+@[^\s@,;<>()[\]]+\.[a-z]{2,}$/i.test(e) ? e : null;
+}
+
+/** Which deals a bulk email to founders is for: a round (null = any), board stages (none = every live stage), and whether declined deals count. */
+export type FounderAudienceFilter = { round: number | null; stages: Stage[]; includeDeclined: boolean };
+
+export function founderAudience<T extends { currentStage: Stage; round: number | null; founderEmail: string | null }>(
+  ventures: T[],
+  f: FounderAudienceFilter,
+): { send: (T & { email: string })[]; noEmail: T[] } {
+  const matches = ventures.filter((v) => {
+    if (f.round !== null && v.round !== f.round) return false;
+    if (v.currentStage === "PASSED") return f.includeDeclined;
+    if (!BOARD_STAGES.some((s) => s.key === boardColumn(v.currentStage))) return false; // retired stages
+    return f.stages.length === 0 || f.stages.includes(boardColumn(v.currentStage));
+  });
+  const send: (T & { email: string })[] = [];
+  const noEmail: T[] = [];
+  for (const v of matches) {
+    const email = founderEmailAddress(v.founderEmail);
+    if (email) send.push({ ...v, email });
+    else noEmail.push(v);
+  }
+  return { send, noEmail };
+}
+
+/** How the deals were chosen, in words, for the email's record. */
+export function founderAudienceLabel(f: FounderAudienceFilter): string {
+  const round = f.round === null ? "All rounds" : `Round ${f.round}`;
+  const stages = f.stages.length === 0 ? "every live stage" : f.stages.map(stageLabel).join(", ");
+  return `${round} · ${stages}${f.includeDeclined ? " · declined deals included" : ""}`;
+}
+
+/** The lines "Insert next pitch session" adds to an email: date and time (UK), place, booking link. */
+export function pitchSessionText(e: { title: string; startsAt: Date; location: string; lumaUrl: string | null }): string {
+  const when = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/London",
+  }).format(e.startsAt);
+  const link = e.lumaUrl ? lumaLink(e.lumaUrl) : null;
+  return [`${e.title}: ${when.replace(/^(\w+),/, "$1")} (UK time)`, `Where: ${e.location}`, ...(link ? [`Details: ${link}`] : [])].join("\n");
+}
+
 export const MEMBER_EVENT_KIND_LABELS: Record<"PITCH_SESSION" | "COMMUNITY", string> = {
   PITCH_SESSION: "Pitch session",
   COMMUNITY: "Community event",

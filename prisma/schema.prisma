@@ -95,6 +95,7 @@ model User {
   memberRounds             MemberRound[]
   memberEventsCreated      MemberEvent[]           @relation("MemberEventCreatedBy")
   memberEventsUpdated      MemberEvent[]           @relation("MemberEventUpdatedBy")
+  founderBulkEmails        FounderBulkEmail[]      @relation("FounderBulkEmailCreatedBy")
   syndicateHoldingsAdded   SyndicateHolding[]      @relation("SyndicateHoldingCreatedBy")
   syndicateHoldingsEdited  SyndicateHolding[]      @relation("SyndicateHoldingUpdatedBy")
   complianceTextsCreated   ComplianceText[]        @relation("ComplianceTextCreatedBy")
@@ -192,9 +193,10 @@ model Venture {
   lessonJobs         LessonJob[]
   shareLog           DealShareLog[]
   syndicateHolding   SyndicateHolding?
-  founderSubmissions FounderSubmission[] @relation("SubmissionVenture")
+  founderSubmissions FounderSubmission[]    @relation("SubmissionVenture")
   logos              VentureLogo[]
   founderEmails      FounderEmail[]
+  founderBulkSends   FounderBulkRecipient[]
 
   @@index([currentStage])
 }
@@ -1334,23 +1336,25 @@ model MemberEmail {
 
 // Files attached to a bulk email (Blue, 2026-11-02): uploaded in the composer (browser
 // straight to storage), or an approved opportunities pack rendered to PDF when the email is
-// created. Draft attachments have no memberEmailId until the email is sent. An email
+// created. Draft attachments have no memberEmailId (or founderBulkEmailId) until the email is sent. An email
 // carrying a pack goes only to members who can see deals.
 model MemberEmailAttachment {
-  id                String           @id @default(cuid())
-  memberEmailId     String?
-  memberEmail       MemberEmail?     @relation(fields: [memberEmailId], references: [id])
-  fileName          String
-  mimeType          String
-  sizeBytes         Int
-  bucket            String
-  storagePath       String
-  uploadedAt        DateTime?
-  opportunityPackId String?
-  opportunityPack   OpportunityPack? @relation(fields: [opportunityPackId], references: [id])
-  createdById       String
-  createdBy         User             @relation(fields: [createdById], references: [id])
-  createdAt         DateTime         @default(now())
+  id                 String            @id @default(cuid())
+  memberEmailId      String?
+  memberEmail        MemberEmail?      @relation(fields: [memberEmailId], references: [id])
+  founderBulkEmailId String? // or attached to an email to founders
+  founderBulkEmail   FounderBulkEmail? @relation(fields: [founderBulkEmailId], references: [id])
+  fileName           String
+  mimeType           String
+  sizeBytes          Int
+  bucket             String
+  storagePath        String
+  uploadedAt         DateTime?
+  opportunityPackId  String?
+  opportunityPack    OpportunityPack?  @relation(fields: [opportunityPackId], references: [id])
+  createdById        String
+  createdBy          User              @relation(fields: [createdById], references: [id])
+  createdAt          DateTime          @default(now())
 
   @@index([memberEmailId])
   @@index([createdById, createdAt])
@@ -1454,23 +1458,58 @@ model FounderSubmission {
 enum FounderEmailKind {
   ACKNOWLEDGEMENT
   DECISION
+  BULK // one copy of a partners' email to several founders (FounderBulkEmail)
 }
 
 model FounderEmail {
-  id        String           @id @default(cuid())
-  ventureId String
-  venture   Venture          @relation(fields: [ventureId], references: [id])
-  commId    String? // the FounderComm it answered (decision updates)
-  kind      FounderEmailKind
-  to        String
-  subject   String
-  body      String
-  sentById  String? // null: sent automatically (acknowledgements)
-  sentBy    User?            @relation(fields: [sentById], references: [id])
-  error     String? // set when it didn't send
-  createdAt DateTime         @default(now())
+  id          String            @id @default(cuid())
+  ventureId   String
+  venture     Venture           @relation(fields: [ventureId], references: [id])
+  commId      String? // the FounderComm it answered (decision updates)
+  kind        FounderEmailKind
+  to          String
+  subject     String
+  body        String
+  sentById    String? // null: sent automatically (acknowledgements)
+  sentBy      User?             @relation(fields: [sentById], references: [id])
+  bulkEmailId String? // set for a copy of a bulk email to founders
+  bulkEmail   FounderBulkEmail? @relation(fields: [bulkEmailId], references: [id])
+  error       String? // set when it didn't send
+  createdAt   DateTime          @default(now())
 
   @@index([ventureId, createdAt])
+}
+
+// Partners' emails to several founders at once (Blue, 2026-11-05), e.g. the date of the
+// pitch session: what was sent (never edited), which deals it went to, and how each send
+// went. Each copy is also kept as a FounderEmail on its deal. Sent in batches of 5 from the
+// email's page; each recipient is claimed PENDING→SENDING once, so nobody gets two copies.
+model FounderBulkEmail {
+  id          String                  @id @default(cuid())
+  subject     String
+  body        String
+  audience    String // how the deals were chosen, in words (e.g. "Round 3 · Member Pitch Selection")
+  createdById String
+  createdBy   User                    @relation("FounderBulkEmailCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime                @default(now())
+  recipients  FounderBulkRecipient[]
+  copies      FounderEmail[]
+  attachments MemberEmailAttachment[]
+}
+
+model FounderBulkRecipient {
+  id          String            @id @default(cuid())
+  bulkEmailId String
+  bulkEmail   FounderBulkEmail  @relation(fields: [bulkEmailId], references: [id])
+  ventureId   String
+  venture     Venture           @relation(fields: [ventureId], references: [id])
+  email       String // where it went
+  status      MemberEmailStatus @default(PENDING)
+  error       String?
+  sentAt      DateTime?
+
+  @@unique([bulkEmailId, ventureId])
+  @@index([bulkEmailId, status])
 }
 
 /// Password sign-in attempts, for slowing down password guessing (loginThrottle() in pipeline.ts).

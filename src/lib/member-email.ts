@@ -31,7 +31,22 @@ export function templateProblems(t: { subject: string; body: string }): string[]
   if (!t.subject.trim()) problems.push("Add a subject.");
   if (!t.body.trim()) problems.push("Add the message.");
   for (const p of unknownPlaceholders(`${t.subject}\n${t.body}`)) problems.push(`{{${p}}} isn't a placeholder DXV OS knows (use {{first_name}}, {{platform_link}}, {{company}} or {{next_step}}).`);
-  for (const b of unfinishedBits(t.body)) problems.push(`Replace ${b} with the real link.`);
+  for (const b of unfinishedBits(t.body)) problems.push(`Replace ${b} with the real ${/LINK/.test(b) ? "link" : "details"}.`);
+  return problems;
+}
+
+/**
+ * Problems with a partners' bulk email to founders: as templateProblems, but only
+ * {{first_name}} and {{company}} are filled in (founders have no platform link, and each
+ * deal's next step is different).
+ */
+export function founderEmailProblems(t: { subject: string; body: string }): string[] {
+  const text = `${t.subject}\n${t.body}`;
+  const problems = templateProblems(t).filter((p) => !p.includes("isn't a placeholder DXV OS knows"));
+  const found = [...new Set([...text.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/gi)].map((m) => m[1].toLowerCase()))];
+  for (const p of found.filter((x) => x !== "first_name" && x !== "company")) {
+    problems.push(`{{${p}}} can't be used in emails to founders (use {{first_name}} or {{company}}).`);
+  }
   return problems;
 }
 

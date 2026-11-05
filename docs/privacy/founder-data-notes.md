@@ -24,3 +24,16 @@ and memo job (`MemoAnalysis.context`). **For Kevin to check:** that the founder 
 wording on /apply ("DXV uses the information and deck you share to assess your application")
 and the DPIA's processor register cover AI-assisted assessment by Anthropic, and whether the
 diversity consent line should name AI assistance explicitly.
+
+## 2026-11-05: partners' emails to several founders at once
+
+**What changed.** Partners can write one email to the founders of several deals (Deals →
+Email founders), e.g. the date of the pitch session, with optional attachments. **Data
+used.** The founder email address and names already held on each deal, and the company
+name; no new field is collected. Each founder gets their own copy (no founder sees another's
+address), and a copy is kept on the deal, as with decision emails. Declined deals are left
+out unless a partner ticks "Include declined deals". **Recipient.** Sent from
+angels@diversityx.vc through Google Workspace (DXV's existing mail provider); no new
+processor. **For Kevin to check:** that the founder privacy wording covers DXV contacting
+founders about the process (pitch sessions, updates) after they apply, and whether emails to
+declined founders (e.g. future events) need a separate basis or an opt-out line.

@@ -570,7 +570,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                     <li key={e.id} className="rounded-md bg-black/[0.03] p-2">
                       <p className="font-medium">{e.subject}</p>
                       <p className="text-xs text-black/55">
-                        {formatDate(e.createdAt)} · to {e.to} · {e.kind === "ACKNOWLEDGEMENT" ? "automatic acknowledgement" : `sent by ${e.sentBy?.name ?? "the team"}`}
+                        {formatDate(e.createdAt)} · to {e.to} · {e.kind === "ACKNOWLEDGEMENT" ? "automatic acknowledgement" : `${e.kind === "BULK" ? "email to several founders, " : ""}sent by ${e.sentBy?.name ?? "the team"}`}
                         {e.error ? ` · didn't send` : ""}
                       </p>
                       <details className="mt-1 text-xs">

@@ -1,18 +1,33 @@
 "use client";
 
-// Sends a bulk email a few at a time (each request stays short), showing progress. If the
-// page is closed part-way, the rest wait here until someone presses "Send the rest".
+// Sends a bulk email (to angels or to founders) a few at a time (each request stays short),
+// showing progress. If the page is closed part-way, the rest wait here until someone
+// presses "Send the rest". The page passes in its own send and retry server actions.
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { Spinner, buttonClass } from "@/components/ui";
+import type { ActionResult } from "@/lib/action-result";
 import { actionErrorMessage } from "@/lib/stale-version";
-import { retryMemberEmail, sendMemberEmailBatch } from "../actions";
 
 type Counts = { sent: number; failed: number; pending: number; sending: number };
 
-export function SendProgress({ id, total, initial, autoStart }: { id: string; total: number; initial: Counts; autoStart: boolean }) {
+export function SendProgress({
+  id,
+  total,
+  initial,
+  autoStart,
+  sendBatch,
+  retry,
+}: {
+  id: string;
+  total: number;
+  initial: Counts;
+  autoStart: boolean;
+  sendBatch: (id: string) => Promise<{ error: string } | Counts>;
+  retry: (id: string) => Promise<ActionResult>;
+}) {
   const router = useRouter();
   const [counts, setCounts] = useState(initial);
   const [running, setRunning] = useState(false);
@@ -24,7 +39,7 @@ export function SendProgress({ id, total, initial, autoStart }: { id: string; to
     setError(null);
     try {
       for (;;) {
-        const res = await sendMemberEmailBatch(id);
+        const res = await sendBatch(id);
         if ("error" in res) {
           setError(res.error);
           break;
@@ -75,7 +90,7 @@ export function SendProgress({ id, total, initial, autoStart }: { id: string; to
               pendingLabel="Queuing…"
               confirm="Try again for the ones that didn't send (or were interrupted)? Anyone interrupted part-way might, rarely, get two copies."
               run={async () => {
-                const r = await retryMemberEmail(id);
+                const r = await retry(id);
                 if (!r.error) {
                   setCounts((c) => ({ ...c, pending: c.pending + c.failed + c.sending, failed: 0, sending: 0 }));
                 }

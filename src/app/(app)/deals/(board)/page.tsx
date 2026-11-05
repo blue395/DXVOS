@@ -128,8 +128,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           <Link href="/deals/opportunities" className={buttonClass("secondary")}>
             Opportunities pack
           </Link>
-          <Link href="/deals/submissions" className={buttonClass("secondary")}>
-            Website submissions
+          <Link href="/deals/founder-emails" className={buttonClass("secondary")}>
+            Email founders
           </Link>
           <Link href="/deals/new" className={buttonClass("accent")}>
             + New venture

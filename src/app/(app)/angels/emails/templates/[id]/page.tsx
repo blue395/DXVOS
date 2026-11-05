@@ -14,8 +14,8 @@ export default async function TemplatePage({ params }: PageProps<"/angels/emails
   const founder = !!template?.key?.startsWith("founder-");
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <Link href={founder ? "/deals/submissions" : "/angels/emails"} className="text-sm text-dxv-green hover:underline">
-        {founder ? "← Website submissions" : "← Email angels"}
+      <Link href={founder ? "/deals/founder-emails" : "/angels/emails"} className="text-sm text-dxv-green hover:underline">
+        {founder ? "← Email founders" : "← Email angels"}
       </Link>
       <div>
         <h1 className="text-2xl font-semibold text-dxv-green">{template ? template.name : "New template"}</h1>

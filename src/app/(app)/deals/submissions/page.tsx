@@ -1,100 +1,59 @@
 import Link from "next/link";
-import { Card, buttonClass, formatDate, formatDateTime } from "@/components/ui";
+import { Card, formatDate } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { appOrigin } from "@/lib/mail";
-import { templateProblems } from "@/lib/member-email";
 import { formatGbpCompact } from "@/lib/pipeline";
 import { CopyLink } from "./copy-link";
-import { SendDigestButton } from "./send-digest";
 
 export const metadata = { title: "Website submissions · DXV OS" };
 
 // Founders who applied through the public /apply page: what came in, what the AI made of
 // each deck (a suggestion: the team decides), and whether the founder was thanked.
 export default async function SubmissionsPage() {
-  const [subs, templates, lastDigest] = await requireAdminWith(() =>
-    Promise.all([
-      db.founderSubmission.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 100,
-        include: {
-          venture: {
-            select: {
-              id: true,
-              name: true,
-              currentStage: true,
-              deckAnalyses: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, screen: true } },
-              founderEmails: { where: { kind: "ACKNOWLEDGEMENT" }, select: { error: true } },
-            },
+  const subs = await requireAdminWith(() =>
+    db.founderSubmission.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: {
+        venture: {
+          select: {
+            id: true,
+            name: true,
+            currentStage: true,
+            deckAnalyses: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, screen: true } },
+            founderEmails: { where: { kind: "ACKNOWLEDGEMENT" }, select: { error: true } },
           },
         },
-      }),
-      db.emailTemplate.findMany({ where: { key: { startsWith: "founder-" } }, orderBy: { key: "asc" } }),
-      db.founderSubmission.findFirst({ where: { digestedAt: { not: null } }, orderBy: { digestedAt: "desc" }, select: { digestedAt: true } }),
-    ]),
+      },
+    }),
   );
   const link = `${appOrigin() ?? ""}/apply`;
   const hourAgo = new Date().getTime() - 3_600_000;
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <Link href="/deals" className="text-sm text-dxv-green hover:underline">
-        ← Deals
+      <Link href="/deals/founder-emails" className="text-sm text-dxv-green hover:underline">
+        ← Email founders
       </Link>
       <div>
         <h1 className="text-2xl font-semibold text-dxv-green">Website submissions</h1>
         <p className="text-sm text-black/60">
           Founders apply on DXV&apos;s application page. Each submission lands in Submitted on the board, the AI reads the deck and suggests an eligibility
-          verdict (the team decides), and the founder gets an acknowledgement from angels@diversityx.vc.
+          verdict (the team decides), and the founder gets an acknowledgement from angels@diversityx.vc. The founder email templates and the partners&apos;
+          digest are on Email founders.
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Your application link">
-          <div className="space-y-2 text-sm">
-            <CopyLink url={link} />
-            <p className="text-black/60">
-              Add it to the Founders page on Squarespace as a button (&ldquo;Submit your deck&rdquo;).{" "}
-              <a href="/apply" target="_blank" rel="noreferrer" className="font-medium text-dxv-green underline">
-                Open the page
-              </a>
-            </p>
-          </div>
-        </Card>
-        <Card title="Partners' digest">
-          <div className="space-y-2 text-sm">
-            <p className="text-black/65">
-              Each morning (8am UK summer time, 7am in winter) every partner gets one email listing new submissions with the AI&apos;s suggested
-              verdict. Nothing is sent on days with none.
-              {lastDigest?.digestedAt && ` Last sent ${formatDateTime(lastDigest.digestedAt)}.`}
-            </p>
-            <SendDigestButton />
-          </div>
-        </Card>
-      </div>
-
-      <Card title="Founder emails">
-        <p className="mb-3 text-sm text-black/60">
-          The acknowledgement goes automatically. Decision emails are drafted from these on the deal page (Founder comms → Draft email to the
-          founder): a partner checks and sends each one.
-        </p>
-        <ul className="divide-y divide-black/10">
-          {templates.map((t) => {
-            const problems = templateProblems(t);
-            return (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span>
-                  <span className="font-medium">{t.name}</span>
-                  <span className="block text-xs text-black/55">{t.subject}</span>
-                  {problems.length > 0 && <span className="mt-1 block rounded bg-dxv-yellow/40 px-2 py-0.5 text-xs">Needs finishing: {problems.join(" ")}</span>}
-                </span>
-                <Link href={`/angels/emails/templates/${t.id}`} className={buttonClass("secondary")}>
-                  Edit
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <Card title="Your application link">
+        <div className="space-y-2 text-sm">
+          <CopyLink url={link} />
+          <p className="text-black/60">
+            Add it to the Founders page on Squarespace as a button (&ldquo;Submit your deck&rdquo;).{" "}
+            <a href="/apply" target="_blank" rel="noreferrer" className="font-medium text-dxv-green underline">
+              Open the page
+            </a>
+          </p>
+        </div>
       </Card>
 
       <Card title={`Submissions (${subs.length})`}>
