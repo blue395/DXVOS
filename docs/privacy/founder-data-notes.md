@@ -63,10 +63,10 @@ earlier box ("using it when assessing my application, and tracking who DXV sees 
 their answers stay as they are unless Kevin advises asking again. The consent box sits above
 the tick boxes, as in Kevin's layout.
 **Retention.** Founders' diversity answers on their application are deleted 24 months after
-they applied (daily retention job; the consent date stays as the record). **Open question for
-Blue/Kevin:** the same answers are also copied to the deal's Founder diversity, which feeds
-portfolio reporting (including to the British Business Bank). The notice's "24 months after
-collection" could be read to cover that copy too; it is NOT deleted automatically yet.
+they applied (daily retention job; the consent date stays as the record). **Decided (Blue,
+2026-11-05):** only the application answers expire. The copy on the deal's Founder diversity
+stays, because reporting to partners such as the British Business Bank is aggregated and
+anonymised.
 **Privacy notice.** Published by DXV OS at `/privacy` (public), with member terms at `/terms`;
 every in-app link points there unless NEXT_PUBLIC_PRIVACY_NOTICE_URL / NEXT_PUBLIC_TERMS_URL
 say otherwise. Invites stay paused until the controller details (legal name, company number,

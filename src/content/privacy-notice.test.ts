@@ -13,6 +13,7 @@ describe("privacy notice", () => {
       "the data protection lead's name",
     ]);
     expect(privacyNoticeGaps(filled)).toEqual([]);
+    expect(privacyNoticeGaps()).toEqual([]); // DXV's own details are in, so invites aren't held up by the notice
   });
   it("has no square-bracketed placeholders once the facts are filled in", () => {
     const strings: string[] = [];
