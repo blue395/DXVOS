@@ -160,6 +160,18 @@ describe("retention and erasure", () => {
     expect((await loadMyDiversity(bob)).answers).toEqual([]);
   });
 
+  it("deletes a category's answers 24 months after they were given, and only that category", async () => {
+    await db.angel.update({ where: { id: bob }, data: { archivedAt: null } });
+    await saveMyDiversity(bob, form([["q_gender", "Man"], ["consent_gender_background", "on"], ["q_religion", "Sikh"], ["consent_religion", "on"]]), "profile_edit");
+    const old = new Date(Date.now() - 731 * 86_400_000);
+    await as("dxv_diversity_system", null, (q) => q.diversityConsent.updateMany({ where: { subjectId: bobSubject, category: "religion" }, data: { givenAt: old } }));
+    const out = await runDiversityRetention();
+    expect(out.expiredCategories).toBe(1);
+    const d = await loadMyDiversity(bob);
+    expect(d.answers.map((a) => a.value)).toEqual(["Man"]);
+    expect(d.consents.find((c) => c.category === "religion")?.status).toBe("withdrawn");
+  });
+
   it("account erasure deletes answers but keeps the consent record", async () => {
     await db.angel.update({ where: { id: bob }, data: { archivedAt: null } });
     await saveMyDiversity(bob, form([["q_gender", "Man"], ["consent_gender_background", "on"]]), "profile_edit");

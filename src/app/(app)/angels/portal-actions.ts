@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { complianceReady } from "@/lib/compliance";
+import { complianceReady, inviteBlockReason } from "@/lib/compliance";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
 import { emailSentLink, linkOrigin, type EmailOutcome } from "@/lib/send-link";
 import { sendWelcomeEmail } from "@/lib/member-emails";
@@ -29,7 +29,7 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET",
   ]);
   if (!angel || angel.archivedAt) return { error: "Angel not found." };
   if (kind === "INVITE") {
-    if (!ready.ready) return { error: "Approve the investor statements and member terms first (Angels → Statements & terms)." };
+    if (!ready.ready) return { error: inviteBlockReason(ready) ?? "Invites are paused." };
     if (!angel.email) return { error: "Add their email first: it becomes their login." };
     if (angel.user) return { error: "They already have a login. Use a password reset link instead." };
     const clash = await loginClash(angel.email, "Use Link to a team login below: one login for the team app and their member portal.");
@@ -102,7 +102,7 @@ export async function inviteNewAngel(input: { name: string; email: string }, sen
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const { name, email } = parsed.data;
   const [ready, existing] = await Promise.all([complianceReady(), db.angel.findUnique({ where: { email }, select: { id: true, name: true } })]);
-  if (!ready.ready) return { error: "Approve the investor statements and member terms first (Angels → Statements & terms)." };
+  if (!ready.ready) return { error: inviteBlockReason(ready) ?? "Invites are paused." };
   if (existing) return { error: `${existing.name} is already in the directory with that email: invite them from their page.`, existingAngelId: existing.id };
   const clash = await loginClash(email, "Partners get member access from the Angel View button in Partner View.");
   if (clash) return { error: clash };

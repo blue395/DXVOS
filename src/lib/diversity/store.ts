@@ -14,6 +14,7 @@ import { db } from "@/lib/db";
 import { CONSENT_VERSION } from "./consent-v1";
 import {
   DIVERSITY_CATEGORIES,
+  DIVERSITY_KEEP_DAYS,
   byCategory,
   parseDiversityForm,
   planDiversitySave,
@@ -177,30 +178,30 @@ export function eraseDiversityForAngel(angelId: string, method: ConsentMethod): 
 /** Retention (docs/privacy/launch-pack.md): returns how many members / rows each rule touched. */
 export function runDiversityRetention(now = new Date()) {
   return scoped({ role: "dxv_diversity_system" }, "retention", async (tx) => {
-    const yearAgo = new Date(now.getTime() - 365 * 86_400_000);
     const sixYearsAgo = new Date(now.getTime() - 6 * 365 * 86_400_000);
-    // Answers of members who left (archived / erased) or haven't been active for 12 months.
-    const stale = await tx.diversitySubject.findMany({
+    const collectedBefore = new Date(now.getTime() - DIVERSITY_KEEP_DAYS * 86_400_000);
+    // Answers of members who left (archived / erased): every category.
+    const left = await tx.diversitySubject.findMany({
       where: {
         consents: { some: { status: "given" } },
-        OR: [
-          { angelId: null },
-          { angel: { OR: [{ archivedAt: { not: null } }, { erasedAt: { not: null } }] } },
-          { angel: { AND: [{ OR: [{ user: { is: null } }, { user: { is: { OR: [{ lastSignInAt: null }, { lastSignInAt: { lt: yearAgo } }] } } }] }, { portalViews: { none: { createdAt: { gte: yearAgo } } } }, { updatedAt: { lt: yearAgo } }] } },
-        ],
+        OR: [{ angelId: null }, { angel: { OR: [{ archivedAt: { not: null } }, { erasedAt: { not: null } }] } }],
       },
       select: { id: true },
     });
-    for (const s of stale) {
+    for (const s of left) {
       const given = await tx.diversityConsent.findMany({ where: { subjectId: s.id, status: "given" }, select: { category: true } });
       for (const { category } of given) await withdraw(tx, s.id, category, "retention", now);
     }
+    // Kevin's rule (privacy notice, 2026-11-05): answers are deleted 24 months after they were
+    // collected. Changing a category's answers consents again, which restarts its clock.
+    const expired = await tx.diversityConsent.findMany({ where: { status: "given", givenAt: { lt: collectedBefore } }, select: { subjectId: true, category: true } });
+    for (const c of expired) await withdraw(tx, c.subjectId, c.category, "retention", now);
     const pending = await tx.diversityPending.deleteMany({ where: { expiresAt: { lt: now } } });
     // Consent records: kept for the life of the related data plus six years.
     const oldConsents = await tx.diversityConsent.deleteMany({ where: { status: "withdrawn", withdrawnAt: { lt: sixYearsAgo } } });
     const oldLog = await tx.diversityConsentLog.deleteMany({ where: { at: { lt: sixYearsAgo } } });
     const oldAccess = await tx.diversityAccessLog.deleteMany({ where: { at: { lt: sixYearsAgo } } });
-    return { staleMembers: stale.length, pendingDeleted: pending.count, consentsDeleted: oldConsents.count, logRowsDeleted: oldLog.count + oldAccess.count };
+    return { staleMembers: left.length, expiredCategories: expired.length, pendingDeleted: pending.count, consentsDeleted: oldConsents.count, logRowsDeleted: oldLog.count + oldAccess.count };
   });
 }
 

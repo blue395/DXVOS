@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
-import { complianceReady } from "@/lib/compliance";
+import { complianceReady, inviteBlockReason } from "@/lib/compliance";
 import { mailConfigured } from "@/lib/mail";
 import { InviteForm } from "./invite-form";
 
@@ -25,13 +25,14 @@ export default async function InviteAngelPage() {
         {ready.ready ? (
           <InviteForm canEmail={mailConfigured()} />
         ) : (
-          <p className="rounded bg-dxv-yellow/40 px-2 py-1 text-sm">
-            Approve the investor statements and member terms before inviting anyone:{" "}
-            <Link href="/angels/statements" className="font-medium text-dxv-green underline">
-              Statements &amp; terms
-            </Link>
-            .
-          </p>
+          <div className="space-y-1 rounded bg-dxv-yellow/40 px-2 py-1 text-sm">
+            <p>{inviteBlockReason(ready)}</p>
+            {ready.missing.length > 0 && (
+              <Link href="/angels/statements" className="font-medium text-dxv-green underline">
+                Statements &amp; terms
+              </Link>
+            )}
+          </div>
         )}
       </Card>
       <p className="text-xs text-black/50">

@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { requireAdmin } from "@/lib/auth";
-import { complianceReady } from "@/lib/compliance";
+import { complianceReady, inviteBlockReason } from "@/lib/compliance";
 import { db } from "@/lib/db";
 import { appOrigin, mailConfigured, sendMail } from "@/lib/mail";
 import { firstNameOf, renderMemberEmail, templateProblems } from "@/lib/member-email";
@@ -112,8 +112,9 @@ export async function createMemberEmail(input: {
   const dealMaterial = attachments.some((a) => a.opportunityPackId);
   const { send: people } = attachmentRecipients(inGroup, dealMaterial, dealMaterial ? await angelIdsWithDealAccess() : new Set());
   if (people.length === 0) return { error: "None of them has a current investor statement, so the opportunities pack can't go to them." };
-  if (people.some((p) => !p.hasLogin) && !(await complianceReady()).ready) {
-    return { error: "Some of them aren't on the platform yet, and invites are paused until the investor statements and member terms are approved." };
+  if (people.some((p) => !p.hasLogin)) {
+    const ready = await complianceReady();
+    if (!ready.ready) return { error: `Some of them aren't on the platform yet, and invites are paused. ${inviteBlockReason(ready)}` };
   }
   const email = await db.memberEmail.create({
     data: {

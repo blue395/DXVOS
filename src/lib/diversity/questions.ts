@@ -35,6 +35,9 @@ export type Question = {
   hint?: string;
 };
 
+/** Members' answers are deleted this long after they're given (Kevin's privacy notice, 2026-11-05: 24 months after collection). */
+export const DIVERSITY_KEEP_DAYS = 730;
+
 export const SELF_DESCRIBE = "__self__";
 export const SELF_MAX = 60;
 
