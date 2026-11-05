@@ -37,3 +37,19 @@ angels@diversityx.vc through Google Workspace (DXV's existing mail provider); no
 processor. **For Kevin to check:** that the founder privacy wording covers DXV contacting
 founders about the process (pitch sessions, updates) after they apply, and whether emails to
 declined founders (e.g. future events) need a separate basis or an opt-out line.
+
+## 2026-11-05: founder diversity names follow Kevin's wording
+
+**What changed.** Kevin signed off the founder wording, privacy policy and DPIA, asking that
+the founder diversity categories read: Female Founder, Person of Colour Founder,
+Neurodivergent Founder, Disabled Founder, Founder from socio-economic disadvantaged
+background, LGBTQIA+ Founder, First time founder over 50. The platform's list now uses these
+names; earlier themes with no match (Immigrant, Not university educated, Experienced
+homelessness, Experienced Care) stay. Answers already stored were renamed to the matching new
+name ("Ethnic Minority" and "Global majority" both became Person of Colour Founder), keeping
+any detail the founder gave in brackets. Issued memos keep the wording they were issued with.
+**New category.** "First time founder over 50" is new (age is a protected characteristic, not
+special category data). **Members.** Members' questions and consent wording are unchanged
+(no re-consent needed). Insights now also shows members' combined figures under the same
+headings, worked out from existing answers, under the same small-number rule: no new data
+and no new recipient.

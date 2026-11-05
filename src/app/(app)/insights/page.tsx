@@ -4,7 +4,7 @@ import { formatDate } from "@/components/ui";
 import { requireAdminWith } from "@/lib/auth";
 import { loadInsights } from "@/lib/insights";
 import { rawDiversityCounts } from "@/lib/diversity/store";
-import { DIVERSITY_REPORT_LABELS, singleCharacteristicReport } from "@/lib/diversity/report";
+import { DIVERSITY_REPORT_LABELS, FEWER, memberHeadlines, singleCharacteristicReport } from "@/lib/diversity/report";
 import { INSIGHT_PERIODS, formatGbp, formatGbpCompact, parseInsightPeriod, stageLabel } from "@/lib/pipeline";
 
 export const metadata = { title: "Insights · DXV OS" };
@@ -15,9 +15,11 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
   const sp = await searchParams;
   const period = parseInsightPeriod(sp.period);
   const periodLabel = INSIGHT_PERIODS.find((p) => p.days === period)!.label;
-  const [{ growth, engagement, investment, dealflow, nudges, hasVisits }, diversity] = await requireAdminWith(() =>
-    Promise.all([loadInsights(period), rawDiversityCounts().then(singleCharacteristicReport)]),
+  const [{ growth, engagement, investment, dealflow, nudges, hasVisits }, rawDiversity] = await requireAdminWith(() =>
+    Promise.all([loadInsights(period), rawDiversityCounts()]),
   );
+  const diversity = singleCharacteristicReport(rawDiversity);
+  const headlines = memberHeadlines(rawDiversity);
   const gbp = (n: number) => formatGbpCompact(n);
 
   return (
@@ -283,6 +285,23 @@ export default async function InsightsPage({ searchParams }: PageProps<"/insight
           <p className="text-sm text-black/55">Not enough answers yet to show anything (fewer than 10 people per question).</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
+            {headlines.some((h) => h.count !== FEWER) && (
+              <Panel
+                title="Members under the founder headings"
+                note="The same headings DXV uses for founders, worked out from members' answers. Members aren't asked their age; self-described answers aren't counted."
+              >
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-black/5">
+                    {headlines.map((h) => (
+                      <tr key={h.label}>
+                        <td className="py-1 pr-2">{h.label}</td>
+                        <td className="py-1 text-right tabular-nums text-black/70">{h.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Panel>
+            )}
             {diversity
               .filter((q) => !q.hidden)
               .map((q) => (

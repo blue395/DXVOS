@@ -1,6 +1,7 @@
 // The small-number rule, with synthetic counts only.
 import { describe, expect, it } from "vitest";
-import { FEWER, countOf, crossTab, singleCharacteristicReport, type RawCount } from "./report";
+import { FEWER, MEMBER_HEADLINES, countOf, crossTab, memberHeadlines, singleCharacteristicReport, type RawCount } from "./report";
+import { DIVERSITY_QUESTIONS } from "./questions";
 
 const rows = (question: string, respondents: number, counts: Record<string, number>): RawCount[] =>
   Object.entries(counts).map(([value, n]) => ({ question, value, n, respondents }));
@@ -38,5 +39,41 @@ describe("small-number rule", () => {
     expect(ok.allowed).toBe(true);
     expect(crossTab([{ a: "Woman", b: "No", n: 12 }, { a: "Woman", b: "Yes", n: 9 }, { a: "Man", b: "No", n: 15 }, { a: "Man", b: "Yes", n: 11 }], ["Woman", "Man"], ["No", "Yes"]).allowed).toBe(false);
     expect(crossTab([{ a: "Woman", b: "No", n: 40 }], ["Woman", "Man"], ["No"]).allowed).toBe(false);
+  });
+});
+
+describe("member headline figures (founders' headings)", () => {
+  const r = (question: string, value: string, n: number, respondents: number): RawCount => ({ question, value, n, respondents });
+  it("only uses answers the questions really offer; Person of Colour = every ethnic group except White ones", () => {
+    for (const h of MEMBER_HEADLINES) {
+      const q = DIVERSITY_QUESTIONS.find((x) => x.key === h.question)!;
+      const options = q.groups.flatMap((g) => g.options);
+      for (const v of h.values) expect(options).toContain(v);
+    }
+    const ethnic = DIVERSITY_QUESTIONS.find((q) => q.key === "ethnic_group")!;
+    const nonWhite = ethnic.groups.filter((g) => g.label !== "White").flatMap((g) => g.options);
+    expect(MEMBER_HEADLINES.find((h) => h.label === "Person of Colour")!.values.sort()).toEqual(nonWhite.sort());
+  });
+  it("adds up shown answers, and hides a heading if any answer in it is hidden", () => {
+    const raw = [
+      r("disability", "No", 40, 70),
+      r("disability", "Yes, disability", 12, 70),
+      r("disability", "Yes, neurodivergent", 14, 70),
+      r("disability", "Yes, both", 4, 70),
+      r("gender", "Woman", 22, 45),
+      r("gender", "Man", 23, 45),
+    ];
+    const h = Object.fromEntries(memberHeadlines(raw).map((x) => [x.label, x.count]));
+    expect(h.Female).toBe(22);
+    // "Yes, both" is under 10, so neither heading that includes it can be shown.
+    expect(h.Disabled).toBe(FEWER);
+    expect(h.Neurodivergent).toBe(FEWER);
+    expect(h["Person of Colour"]).toBe(FEWER); // nobody answered: hidden
+  });
+  it("shows overlapping headings when every part is shown", () => {
+    const raw = [r("disability", "No", 40, 76), r("disability", "Yes, disability", 12, 76), r("disability", "Yes, neurodivergent", 14, 76), r("disability", "Yes, both", 10, 76)];
+    const h = Object.fromEntries(memberHeadlines(raw).map((x) => [x.label, x.count]));
+    expect(h.Disabled).toBe(22);
+    expect(h.Neurodivergent).toBe(24);
   });
 });

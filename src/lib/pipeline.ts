@@ -597,6 +597,7 @@ export const ANGEL_TAG_SUGGESTIONS = ["First-time angel", "Founder", "Operator",
 export const DIVERSITY_TAG_WORDS = [
   "disabled", "neurodiverse", "neurodivergent", "lgbtq+", "lgbt", "lgbtq", "female angel", "woman angel", "not university educated",
   "experienced care", "experienced homelessness", "low socio-economic background", "immigrant",
+  "lgbtqia+", "person of colour", "first time founder over 50", "socio-economic disadvantaged background",
 ];
 
 /** Tags with any diversity characteristic removed (team form, CSV import, profile). */
@@ -1575,24 +1576,61 @@ export function diversityBreakdown(holdings: { diversityThemes?: string[] | null
 }
 
 function cleanTheme(t: string): string | null {
-  const s = t.replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
+  const s = canonicalFounderTheme(t).replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
   return !s || /^(not stated|none|n\/a|unknown|not recorded)$/i.test(s) ? null : s;
 }
 
 /** DXV's founder diversity themes (the Playbook's list, without the guidance in brackets). */
 export const FOUNDER_DIVERSITY_THEMES = [
+  // Kevin's wording (2026-11-05), used for founders everywhere.
   "Female Founder",
-  "LGBTQ+",
-  "Disability",
-  "Ethnic Minority",
+  "Person of Colour Founder",
+  "Neurodivergent Founder",
+  "Disabled Founder",
+  "Founder from socio-economic disadvantaged background",
+  "LGBTQIA+ Founder",
+  "First time founder over 50",
+  // DXV's earlier themes with no match in Kevin's list: kept.
   "Immigrant",
-  "Low socio-economic background",
-  "Neurodiversity",
   "Not university educated",
-  "Global majority",
   "Experienced homelessness",
   "Experienced Care",
 ] as const;
+
+/**
+ * Earlier names for founder diversity themes and the name each became (Kevin, 2026-11-05).
+ * Keys are lower case. "Global majority" folds into Person of Colour Founder. Stored data was
+ * renamed by migration 20261106090000_founder_diversity_names; this catches anything typed or
+ * written with an old name since (AI memo themes, imports).
+ */
+export const FOUNDER_DIVERSITY_RENAMES: Record<string, string> = {
+  "ethnic minority": "Person of Colour Founder",
+  "global majority": "Person of Colour Founder",
+  neurodiversity: "Neurodivergent Founder",
+  disability: "Disabled Founder",
+  "low socio-economic background": "Founder from socio-economic disadvantaged background",
+  "lgbtq+": "LGBTQIA+ Founder",
+};
+
+/** A founder diversity theme under its current name, keeping any detail in brackets ("Neurodiversity (ADHD)" → "Neurodivergent Founder (ADHD)"). */
+export function canonicalFounderTheme(theme: string): string {
+  const t = theme.replace(/\s+/g, " ").trim();
+  const key = t.replace(/\s*\(.*?\)\s*/g, " ").trim().toLowerCase();
+  const renamed = FOUNDER_DIVERSITY_RENAMES[key];
+  if (!renamed) return t;
+  const detail = /\(.*\)/.exec(t)?.[0];
+  return detail ? `${renamed} ${detail}` : renamed;
+}
+
+/** A list of founder diversity themes under their current names, duplicates removed (first kept). */
+export function canonicalFounderThemes(themes: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const raw of themes) {
+    const t = canonicalFounderTheme(raw);
+    if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
+}
 
 /** The first sentence or two of some text, for a short "what they do" (at most `max` characters). */
 export function firstSentences(text: string | null | undefined, n = 2, max = 280): string | null {

@@ -5,7 +5,7 @@
 import { z } from "zod";
 import type { Gate, Stage } from "@/generated/prisma/enums";
 import { normaliseCompanyName } from "./deal-import";
-import { FOUNDER_DIVERSITY_THEMES, SECTORS } from "./pipeline";
+import { FOUNDER_DIVERSITY_THEMES, SECTORS, canonicalFounderThemes } from "./pipeline";
 
 export const COMPANY_STAGES = ["Pre-Seed", "Seed"] as const; // the same labels as the rest of DXV OS (pipeline.ts)
 
@@ -48,7 +48,7 @@ export const SubmissionSchema = z
     ...d,
     // Diversity answers are only kept with explicit consent (special-category data).
     diversityThemes: d.diversityConsent
-      ? [...new Set([...d.diversityThemes, diversityOther ?? ""].filter((t) => t && t !== "Prefer not to say" && t !== "Other"))]
+      ? canonicalFounderThemes([...d.diversityThemes, diversityOther ?? ""].filter((t) => t && t !== "Prefer not to say" && t !== "Other"))
       : [],
   }));
 export type SubmissionInput = z.input<typeof SubmissionSchema>;

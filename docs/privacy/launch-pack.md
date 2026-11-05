@@ -84,7 +84,7 @@ Diversity answers are used only in aggregate, and no individual answer leaves th
 
 **Small-number rule for reports**
 
-With around 50 members, a group like "disabled and LGBTQ+" may be one or two people, so a statistic can identify someone.
+With around 50 members, a group like "disabled and LGBTQIA+" may be one or two people, so a statistic can identify someone.
 
 - Never publish a figure for a group of fewer than 10 people; report it as "fewer than 10" or merge it into a wider category
 - Do not publish two overlapping breakdowns that let a small group be found by subtraction

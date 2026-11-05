@@ -780,8 +780,8 @@ describe("my portfolio", () => {
     ]);
     expect(b.themes).toEqual([
       { label: "Female Founder", count: 2 },
-      { label: "Ethnic Minority", count: 1 },
-      { label: "Neurodiversity", count: 1 },
+      { label: "Neurodivergent Founder", count: 1 }, // old names count under Kevin's wording (2026-11-05)
+      { label: "Person of Colour Founder", count: 1 },
     ]);
     expect(b.notRecorded).toBe(2);
   });
