@@ -41,3 +41,14 @@ describe("shareable sign-up links", () => {
     expect(p.text).toContain("already in the directory as Sam Synthetic (member)");
   });
 });
+
+describe("already on DXV with a different login email", () => {
+  it("hints at the login address, partly hidden", async () => {
+    const { maskEmail } = await import("./pipeline");
+    expect(maskEmail("blue@socialventurise.com")).toBe("bl••@socialventurise.com");
+    expect(maskEmail("ab@x.io")).toBe("a••@x.io");
+    const m = joinAlreadyMemberEmail({ name: "Blue", signInUrl: "https://dxv.example/login", loginEmailHint: maskEmail("blue@socialventurise.com") });
+    expect(m.text).toContain("your login uses a different email address: bl••@socialventurise.com");
+    expect(m.text).not.toContain("blue@socialventurise.com");
+  });
+});

@@ -120,12 +120,17 @@ export function joinConfirmEmail(opts: { name: string; link: string; hours: numb
   });
 }
 
-/** Shareable sign-up link, for someone who already has a DXV login: sign in instead. */
-export function joinAlreadyMemberEmail(opts: { name: string; signInUrl: string }) {
+/**
+ * Shareable sign-up link, for someone who already has a DXV login: sign in instead. When
+ * their record's login uses a different email, `loginEmailHint` (partly hidden) says which.
+ */
+export function joinAlreadyMemberEmail(opts: { name: string; signInUrl: string; loginEmailHint?: string | null }) {
   return linkEmail({
     subject: "You already have DXV access",
     name: opts.name,
-    lead: 'Someone (hopefully you) asked to join DXV with this email, and you already have a login. Sign in below. Forgotten your password? Use "Forgot your password?" on the sign-in page.',
+    lead: opts.loginEmailHint
+      ? `Someone (hopefully you) asked to join DXV with this email. You're already on DXV, but your login uses a different email address: ${opts.loginEmailHint}. Sign in with that address (or "Continue with Google" if it's a Google account). Not sure of the password? Use "Email me a sign-in link" or "Forgot your password?" on the sign-in page, with that address.`
+      : 'Someone (hopefully you) asked to join DXV with this email, and you already have a login. Sign in below. Forgotten your password? Use "Forgot your password?" on the sign-in page.',
     action: "Sign in to DXV",
     link: opts.signInUrl,
     small: "If you didn't ask, you can ignore this email: nothing has changed.",
