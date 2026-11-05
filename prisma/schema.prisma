@@ -95,6 +95,8 @@ model User {
   memberRounds             MemberRound[]
   memberEventsCreated      MemberEvent[]           @relation("MemberEventCreatedBy")
   memberEventsUpdated      MemberEvent[]           @relation("MemberEventUpdatedBy")
+  memberJoinLinks          MemberJoinLink[]        @relation("MemberJoinLinkCreatedBy")
+  joinRequestsDecided      MemberJoinRequest[]     @relation("MemberJoinRequestDecidedBy")
   founderBulkEmails        FounderBulkEmail[]      @relation("FounderBulkEmailCreatedBy")
   syndicateHoldingsAdded   SyndicateHolding[]      @relation("SyndicateHoldingCreatedBy")
   syndicateHoldingsEdited  SyndicateHolding[]      @relation("SyndicateHoldingUpdatedBy")
@@ -905,8 +907,62 @@ model Angel {
   ageConfirmedAt      DateTime?
   /// Retention: when we warned them their account would be deleted after 24 months without activity.
   inactivityWarnedAt  DateTime?
+  joinRequests        MemberJoinRequest[]
 
   @@index([status])
+}
+
+// ── Shareable sign-up links (Blue, 2026-11-05) ─────────────────────────────
+// A link partners share (e.g. in the members' WhatsApp group). Anyone with it can ask to
+// join: they confirm their email, a partner approves, and only then do they get the normal
+// one-time invite (onboarding, terms, investor statement). The link itself is never stored:
+// it's the id plus an HMAC of it (joinLinkToken()), so it can be shown again and can't be
+// rebuilt from the database. Switched off, never deleted.
+model MemberJoinLink {
+  id          String              @id @default(cuid())
+  label       String // where it was shared, e.g. "WhatsApp group, Nov 2026"
+  expiresAt   DateTime
+  maxUses     Int? // confirmed requests allowed (null: no cap)
+  revokedAt   DateTime?
+  createdById String
+  createdBy   User                @relation("MemberJoinLinkCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime            @default(now())
+  requests    MemberJoinRequest[]
+}
+
+enum JoinRequestStatus {
+  UNCONFIRMED // waiting for them to confirm their email
+  PENDING // email confirmed: waiting for a partner
+  APPROVED // invite sent
+  DECLINED
+  HAS_LOGIN // they already had a login: sent a sign-in email instead, nothing to approve
+}
+
+// One request to join through a shareable link. Requests that never became members are
+// deleted after 90 days (retention.ts); approved ones are linked to their angel record and
+// erased with it.
+model MemberJoinRequest {
+  id               String            @id @default(cuid())
+  linkId           String
+  link             MemberJoinLink    @relation(fields: [linkId], references: [id])
+  name             String
+  email            String // lower case
+  status           JoinRequestStatus @default(UNCONFIRMED)
+  confirmTokenHash String?           @unique // SHA-256 of the one-time "confirm your email" token
+  confirmExpiresAt DateTime?
+  confirmedAt      DateTime?
+  ipHash           String? // keyed hash, rate limiting only
+  angelId          String? // the directory record it matched, or the one approval created
+  angel            Angel?            @relation(fields: [angelId], references: [id], onDelete: SetNull)
+  decidedById      String?
+  decidedBy        User?             @relation("MemberJoinRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedAt        DateTime?
+  createdAt        DateTime          @default(now())
+
+  @@index([linkId, status])
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+  @@index([ipHash, createdAt])
 }
 
 // Append-only: each signed investor statement, with the file if there is one.

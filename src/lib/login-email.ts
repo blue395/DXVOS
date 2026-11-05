@@ -107,3 +107,41 @@ export function inactivityWarningEmail(opts: { name: string; deleteOn: string; s
     small: "Amounts from any investments you made through DXV are kept, without your name, for our records. Questions? Reply to this email.",
   });
 }
+
+/** Shareable sign-up link: "confirm your email" (the first step of asking to join). */
+export function joinConfirmEmail(opts: { name: string; link: string; hours: number }) {
+  return linkEmail({
+    subject: "Confirm your email to join DXV",
+    name: opts.name,
+    lead: "Thanks for asking to join the DXV angel syndicate. Please confirm this is your email. The DXV team then reviews your request and emails you a personal sign-up link.",
+    action: "Confirm my email",
+    link: opts.link,
+    small: `The link works once, for ${opts.hours} hours. If you didn't ask to join DXV, you can ignore this email.`,
+  });
+}
+
+/** Shareable sign-up link, for someone who already has a DXV login: sign in instead. */
+export function joinAlreadyMemberEmail(opts: { name: string; signInUrl: string }) {
+  return linkEmail({
+    subject: "You already have DXV access",
+    name: opts.name,
+    lead: 'Someone (hopefully you) asked to join DXV with this email, and you already have a login. Sign in below. Forgotten your password? Use "Forgot your password?" on the sign-in page.',
+    action: "Sign in to DXV",
+    link: opts.signInUrl,
+    small: "If you didn't ask, you can ignore this email: nothing has changed.",
+  });
+}
+
+/** To partners: someone confirmed their email through a shareable link and is waiting for approval. */
+export function joinRequestPartnerEmail(opts: { partnerName: string; name: string; email: string; label: string; matched: string | null; reviewUrl: string }) {
+  return linkEmail({
+    subject: `Join request: ${opts.name}`,
+    name: opts.partnerName,
+    lead: `${opts.name} (${opts.email}) asked to join DXV through the link "${opts.label}" and has confirmed their email. ${
+      opts.matched ? `They're already in the directory as ${opts.matched}, so approving links them to that record.` : "They're not in the directory yet: approving adds them as a Prospect."
+    } Approve to email them a personal sign-up link, or decline.`,
+    action: "Review join requests",
+    link: opts.reviewUrl,
+    small: "They only get a sign-up link once a partner approves.",
+  });
+}

@@ -267,3 +267,17 @@ A breach is any loss, leak, alteration or unauthorised access to personal data, 
 | 7. Review | Within 30 days | Lessons learned, update the DPIA, ROPA and security checklist |
 
 Keep an internal breach log for every incident, including ones you decide not to report, with the facts, effects, actions and the reasoning for the reporting decision.
+
+## Note for the privacy notice / DPIA: shareable sign-up links (2026-11-05)
+
+**What changed.** Partners can share a sign-up link (e.g. in the members' WhatsApp group).
+Anyone with it can ask to join by giving their **name and email**. We email them to confirm
+the address; a partner then approves or declines; approved people get the normal invite and
+onboarding (member terms, investor statement). **Data.** No new kind of data: the same name
+and email we already hold for invited members, plus a scrambled IP for rate limiting. **Use.**
+Handling their request only. **Retention.** Requests that never become members (unconfirmed,
+declined, already had a login, or never decided) are deleted after 90 days; approved ones
+stay with the member's record and are erased with it. **Recipients.** None new (Google
+Workspace sends the emails). **For Kevin:** the privacy notice's member row ("You, or DXV
+when we invite you") covers this; consider adding "or when you ask to join through a link we
+shared".

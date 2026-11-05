@@ -65,7 +65,9 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
   if (mode === "remove") {
     await db.$transaction([
       db.angelInvite.deleteMany({ where: { angelId } }),
+      db.memberJoinRequest.deleteMany({ where: { angelId } }), // their sign-up-link requests (name, email)
       db.angelNote.deleteMany({ where: { angelId } }),
+    db.memberJoinRequest.deleteMany({ where: { angelId } }), // their sign-up-link requests (name, email)
       db.angelEvent.deleteMany({ where: { angelId } }),
       db.angel.delete({ where: { id: angelId } }),
       db.teamEvent.create({ data: { email: "angel record", kind: "angel-removed", detail: `Removed an angel record with no history (${angelId})`, actorId: actor.id } }),

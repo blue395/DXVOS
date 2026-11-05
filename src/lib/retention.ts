@@ -5,6 +5,7 @@ import "server-only";
 //   Diversity answers: consent withdrawn (immediate), member left, or 24 months after collection;
 //     carried-over answers 60 days; consent records and access logs 6 years. (store.ts)
 //   Founders' diversity answers on their application: 24 months after they applied.
+//   Sign-up-link requests that never became members: 90 days.
 //   Password sign-in attempts: 30 days. Emailed sign-in link records (hold the IP): 90 days.
 //   Inactive members: 24 months with no activity -> warning email -> 30 days -> smart
 //     erasure (deleteAngelRecord). ONLY when RETENTION_DELETE_INACTIVE=on; until then it
@@ -14,7 +15,7 @@ import "server-only";
 import { db } from "./db";
 import { appOrigin, mailConfigured, sendMail } from "./mail";
 import { inactivityWarningEmail } from "./login-email";
-import { INACTIVE_WARNING_DAYS, inactivityAction } from "./pipeline";
+import { INACTIVE_WARNING_DAYS, JOIN_REQUEST_KEEP_DAYS, inactivityAction } from "./pipeline";
 import { runDiversityRetention } from "./diversity/store";
 import { DIVERSITY_KEEP_DAYS } from "./diversity/questions";
 import { deleteAngelRecord } from "./angel-erasure";
@@ -25,7 +26,7 @@ const latest = (...ds: (Date | null | undefined)[]) => new Date(Math.max(...ds.f
 
 export async function runRetention(now = new Date()) {
   const live = process.env.RETENTION_DELETE_INACTIVE === "on";
-  const [diversity, founderDiversity, attempts, links, angels] = await Promise.all([
+  const [diversity, founderDiversity, joinRequests, attempts, links, angels] = await Promise.all([
     runDiversityRetention(now),
     // Founders' diversity answers on their application: deleted 24 months after they submitted
     // (founder wording, Kevin 2026-11-05). The consent date stays as the record that it was given.
@@ -33,6 +34,9 @@ export async function runRetention(now = new Date()) {
       where: { createdAt: { lt: new Date(now.getTime() - DIVERSITY_KEEP_DAYS * DAY) }, NOT: { diversityThemes: { isEmpty: true } } },
       data: { diversityThemes: [] },
     }),
+    // Sign-up-link requests from people who never became members (unconfirmed, declined,
+    // already had a login, or still waiting): 90 days. Approved ones go with the angel's record.
+    db.memberJoinRequest.deleteMany({ where: { status: { not: "APPROVED" }, createdAt: { lt: new Date(now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY) } } }),
     db.loginAttempt.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * DAY) } } }),
     db.loginLink.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 90 * DAY) } } }),
     db.angel.findMany({
@@ -81,5 +85,5 @@ export async function runRetention(now = new Date()) {
       if (!("error" in out)) inactive.deleted++;
     }
   }
-  return { live, diversity, founderApplicationsCleared: founderDiversity.count, loginAttemptsDeleted: attempts.count, loginLinksDeleted: links.count, inactive };
+  return { live, diversity, founderApplicationsCleared: founderDiversity.count, joinRequestsDeleted: joinRequests.count, loginAttemptsDeleted: attempts.count, loginLinksDeleted: links.count, inactive };
 }

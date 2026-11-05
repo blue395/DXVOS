@@ -10,10 +10,8 @@ import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { complianceReady, inviteBlockReason } from "@/lib/compliance";
 import { INVITE_DAYS, newInviteToken } from "@/lib/invite-token";
-import { emailSentLink, linkOrigin, type EmailOutcome } from "@/lib/send-link";
-import { sendWelcomeEmail } from "@/lib/member-emails";
-import { usesWelcomeEmail } from "@/lib/pipeline";
-import type { AngelStatus } from "@/generated/prisma/enums";
+import { linkOrigin, type EmailOutcome } from "@/lib/send-link";
+import { emailAndLog, issueAngelLink, loginClash } from "@/lib/angel-invites";
 
 export type InviteLinkResult = { error: string } | ({ ok: true; link: string; expiresAt: string } & EmailOutcome);
 
@@ -40,48 +38,12 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET",
     if (angel.user.disabledAt) return { error: "Their access is revoked. Restore it first." };
   }
 
-  const { token, tokenHash } = newInviteToken();
-  const expiresAt = new Date(Date.now() + INVITE_DAYS * 86_400_000);
-  await db.$transaction([
-    db.angelInvite.updateMany({ where: { angelId, kind, usedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
-    db.angelInvite.create({ data: { angelId, kind, tokenHash, expiresAt, createdById: admin.id } }),
-    db.angelEvent.create({
-      data: { angelId, kind: kind === "INVITE" ? "invited" : "reset-link", detail: `Link valid for ${INVITE_DAYS} days`, actorId: admin.id },
-    }),
-  ]);
-  const link = `${await linkOrigin()}/join/${token}`;
+  const { link, expiresAt } = await issueAngelLink(angelId, kind, admin.id);
   // An invite goes to the angel's email (their future login); a reset to their login's email.
   const to = kind === "INVITE" ? angel.email : angel.user?.email;
   const emailed = send && to ? await emailAndLog(kind === "INVITE" ? "MEMBER_INVITE" : "RESET", to, angel, link, expiresAt, admin) : {};
   revalidatePath(`/angels/${angelId}`);
   return { ok: true, link, expiresAt: expiresAt.toISOString(), ...emailed };
-}
-
-/** Email a link the team just made, and note it in the angel's activity when it goes. */
-async function emailAndLog(
-  kind: "MEMBER_INVITE" | "RESET",
-  to: string,
-  angel: { id: string; name: string; status: AngelStatus },
-  link: string,
-  expiresAt: Date,
-  admin: { id: string; name: string },
-): Promise<EmailOutcome> {
-  // New applicants (Prospects) get the team's welcome email; everyone else the standard invite.
-  if (kind === "MEMBER_INVITE" && usesWelcomeEmail(angel.status)) return sendWelcomeEmail(angel, to, link, admin.id);
-  const out = await emailSentLink(kind, to, { name: angel.name, link, expiresAt, sentBy: admin.name });
-  if (out.emailedTo) {
-    await db.angelEvent.create({
-      data: { angelId: angel.id, kind: "link-emailed", detail: `${kind === "RESET" ? "Password reset link" : "Invite"} emailed to ${to}`, actorId: admin.id },
-    });
-  }
-  return out;
-}
-
-/** Why this email can't be given a new portal login (null: it can). */
-async function loginClash(email: string, teamHint: string): Promise<string | null> {
-  const clash = await db.user.findUnique({ where: { email }, select: { role: true } });
-  if (!clash) return null;
-  return clash.role === "ADMIN" ? `That email is a DXV team login. ${teamHint}` : "That email already has a portal login.";
 }
 
 export type NewInviteResult = { error: string; existingAngelId?: string } | ({ ok: true; angelId: string; link: string; expiresAt: string } & EmailOutcome);
