@@ -165,7 +165,7 @@ The periods are proposed defaults to confirm, not legal minimums. The principle:
 
 | Data | Keep for | Deletion trigger | How |
 | --- | --- | --- | --- |
-| Diversity data | While consent stands and the member is active | Consent withdrawn, member leaves, or \[12 months\] after last activity | Delete the row; aggregate figures already published stay, as they are anonymous |
+| Diversity data | While consent stands, at most 24 months after collection (Kevin, 2026-11-05) | Consent withdrawn, member leaves, or 24 months after the answers were given | Delete the row; aggregate figures already published stay |
 | Account and profile data | Life of membership | Member leaves or asks for erasure | Delete the account; keep a minimal suppression record so they are not re-added |
 | Deal activity and EOIs | Life of membership plus \[6 years\] | End of period | Delete or anonymise. Check whether investment records need a longer period for tax or SPV purposes |
 | Consent records | Life of the related data plus \[6 years\] | End of period | Delete |

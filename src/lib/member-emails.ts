@@ -97,7 +97,7 @@ export async function sendNextBatch(memberEmailId: string, actorId: string) {
       const invite = !r.angel.user;
       if (invite) {
         ready ??= (await complianceReady()).ready;
-        if (!ready) throw new Error("Invites are paused until the statements and member terms are approved.");
+        if (!ready) throw new Error("Invites are paused: see Angels → Invite an angel for what's missing.");
         link = await freshInviteLink(r.angel.id, actorId, `Sign-up link in member email "${email.subject}"`);
       }
       const unsub = await unsubscribeUrl(r.angel.id);

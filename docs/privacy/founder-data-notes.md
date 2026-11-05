@@ -53,3 +53,21 @@ special category data). **Members.** Members' questions and consent wording are 
 (no re-consent needed). Insights now also shows members' combined figures under the same
 headings, worked out from existing answers, under the same small-number rule: no new data
 and no new recipient.
+
+## 2026-11-05: Kevin's signed-off wording goes live
+
+**Application form.** The "Founder diversity (optional)" section and its consent box now use
+Kevin's signed-off wording (`src/content/founder-application.ts`, version
+`founder-diversity-v2 (2026-11-05)`). Founders who applied before this date consented to the
+earlier box ("using it when assessing my application, and tracking who DXV sees and backs");
+their answers stay as they are unless Kevin advises asking again. The consent box sits above
+the tick boxes, as in Kevin's layout.
+**Retention.** Founders' diversity answers on their application are deleted 24 months after
+they applied (daily retention job; the consent date stays as the record). **Open question for
+Blue/Kevin:** the same answers are also copied to the deal's Founder diversity, which feeds
+portfolio reporting (including to the British Business Bank). The notice's "24 months after
+collection" could be read to cover that copy too; it is NOT deleted automatically yet.
+**Privacy notice.** Published by DXV OS at `/privacy` (public), with member terms at `/terms`;
+every in-app link points there unless NEXT_PUBLIC_PRIVACY_NOTICE_URL / NEXT_PUBLIC_TERMS_URL
+say otherwise. Invites stay paused until the controller details (legal name, company number,
+registered address, data protection lead) are filled in.

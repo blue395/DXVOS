@@ -21,7 +21,7 @@ import {
   profileAnswer,
 } from "@/lib/pipeline";
 import { addAngelNote, updateAngel } from "../actions";
-import { complianceReady } from "@/lib/compliance";
+import { complianceReady, inviteBlockReason } from "@/lib/compliance";
 import { mailConfigured } from "@/lib/mail";
 import { angelHistory } from "@/lib/angel-erasure";
 import { DeleteAngelForm } from "./delete-angel";
@@ -233,10 +233,12 @@ export default async function AngelPage({ params }: PageProps<"/angels/[id]">) {
               )}
               {!ready.ready && (
                 <p className="rounded bg-dxv-yellow/30 px-2 py-1 text-xs">
-                  Invites are paused until the investor statements and member terms are approved.{" "}
-                  <Link href="/angels/statements" className="font-medium underline">
-                    Review them
-                  </Link>
+                  Invites are paused. {inviteBlockReason(ready)}{" "}
+                  {ready.missing.length > 0 && (
+                    <Link href="/angels/statements" className="font-medium underline">
+                      Review them
+                    </Link>
+                  )}
                 </p>
               )}
               {!angel.user && ready.ready && (

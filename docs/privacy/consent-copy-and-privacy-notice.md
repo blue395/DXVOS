@@ -87,6 +87,8 @@ Rules for the build:
 
 ## Privacy notice
 
+> **Superseded (2026-11-05).** The published notice is Kevin's signed-off "DXV privacy policy" (website and platform), served by DXV OS at `/privacy` from `src/content/privacy-notice.ts`. The draft below is kept for history only.
+
 *Publish at a public URL and link it from sign-up and the footer. Last updated: \[date\]. Version: \[1\].*
 
 ### Who we are
@@ -125,7 +127,7 @@ We share data only with service providers that process it for us under contract:
 
 ### How long we keep your data
 
-- Diversity answers: until you withdraw consent, leave, or \[12 months\] after you were last active
+- Diversity answers: until you withdraw consent or leave, and at most 24 months after you gave them (Kevin, 2026-11-05)
 - Account and activity data: while you are a member, and up to \[6 years\] afterwards where we need it for records \[confirm\]
 - Consent records: as long as the related data, plus \[6 years\] \[confirm\]
 - Security logs: \[90 days\]

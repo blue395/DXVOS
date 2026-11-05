@@ -3,6 +3,8 @@
 // The founder application: details + PDF deck. Three steps on submit: check the details
 // (and get a private upload slot), upload the deck straight to storage, then file it.
 
+import { FOUNDER_DIVERSITY_INTRO, FOUNDER_DIVERSITY_PICK, founderDiversityConsent } from "@/content/founder-application";
+import { PRIVACY_EMAIL, PRIVACY_NOTICE_URL } from "@/lib/legal-links";
 import { useState } from "react";
 import { Spinner, buttonClass, inputClass } from "@/components/ui";
 import { COMPANY_STAGES } from "@/lib/founder-intake";
@@ -171,10 +173,16 @@ export function ApplyForm({ formToken, diversityOptions, sectorOptions }: { form
 
       <fieldset className="space-y-2 rounded-lg border border-black/10 p-4" disabled={busy}>
         <legend className="px-1 text-sm font-semibold uppercase tracking-wide text-dxv-green">Founder diversity (optional)</legend>
-        <p className="text-sm text-black/65">
-          DXV exists to back Underestimated Founders, and we actively look for diverse founding teams: what you share here is part of how we
-          assess fit with our mission. Tick any that describe your founding team, only if you&apos;re happy to share.
-        </p>
+        <div className="space-y-2 text-sm text-black/65">
+          {FOUNDER_DIVERSITY_INTRO.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+        </div>
+        <label className="flex items-start gap-2 rounded-md bg-dxv-green/[0.04] p-3 text-sm">
+          <input type="checkbox" name="diversityConsent" className="mt-1 accent-dxv-green" />
+          <span>{founderDiversityConsent(PRIVACY_EMAIL)}</span>
+        </label>
+        <p className="text-sm font-medium text-black/75">{FOUNDER_DIVERSITY_PICK}</p>
         <div className="group space-y-2">
           <div className="flex flex-wrap gap-2">
             {[...diversityOptions.filter((t) => t !== "Prefer not to say"), "Other", "Prefer not to say"].map((t) => (
@@ -189,20 +197,17 @@ export function ApplyForm({ formToken, diversityOptions, sectorOptions }: { form
             <input name="diversityOther" maxLength={60} className={inputClass} />
           </label>
         </div>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="diversityConsent" className="mt-1 accent-dxv-green" />
-          <span>
-            I consent to DXV recording the founder diversity information I&apos;ve shared, using it when assessing my application, and tracking who
-            DXV sees and backs. I can ask for it to be removed at any time.
-          </span>
-        </label>
       </fieldset>
 
       <fieldset className="space-y-3" disabled={busy}>
         <p className="text-xs text-black/60">
           How we use your details: DXV uses the information and deck you share to assess your application, to keep in touch about it, and to learn
           from our dealflow. Your deck is shared only with the DXV team and, if your company progresses, with DXV&apos;s certified angel members. We
-          keep applications on file, and you can ask us to update or delete your details by emailing angels@diversityx.vc.
+          keep applications on file, and you can ask us to update or delete your details by emailing {PRIVACY_EMAIL}. Our{" "}
+          <a href={PRIVACY_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="text-dxv-green underline">
+            privacy notice
+          </a>{" "}
+          explains more, including your rights.
         </p>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="privacyConsent" required className="mt-1 accent-dxv-green" />
