@@ -105,7 +105,7 @@ export async function createMemberEmail(input: {
   // Attachments: only my own uploaded drafts. An opportunities pack is deal material, so it
   // goes only to members who can see deals (a current investor statement).
   const attachments = attachmentIds.length
-    ? await db.memberEmailAttachment.findMany({ where: { id: { in: attachmentIds }, createdById: me.id, memberEmailId: null, uploadedAt: { not: null } } })
+    ? await db.memberEmailAttachment.findMany({ where: { id: { in: attachmentIds }, createdById: me.id, memberEmailId: null, founderBulkEmailId: null, uploadedAt: { not: null } } })
     : [];
   if (attachments.length !== attachmentIds.length) return { error: "An attachment is missing. Remove it and attach it again." };
   if (attachments.reduce((n, a) => n + a.sizeBytes, 0) > MAX_ATTACHMENTS_BYTES) return { error: "Attachments can be 15 MB in total." };

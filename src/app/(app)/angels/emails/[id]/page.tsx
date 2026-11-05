@@ -6,7 +6,8 @@ import { EmailPreview } from "@/components/email-preview";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { MEMBER_EMAIL_AUDIENCES } from "@/lib/pipeline";
-import { SendProgress } from "./send-progress";
+import { SendProgress } from "@/components/send-progress";
+import { retryMemberEmail, sendMemberEmailBatch } from "../actions";
 
 export const metadata = { title: "Email · DXV OS" };
 
@@ -45,7 +46,7 @@ export default async function MemberEmailPage({ params, searchParams }: PageProp
           </p>
         )}
       </div>
-      <SendProgress id={email.id} total={email.recipients.length} initial={counts} autoStart={sp.send === "1"} />
+      <SendProgress id={email.id} total={email.recipients.length} initial={counts} autoStart={sp.send === "1"} sendBatch={sendMemberEmailBatch} retry={retryMemberEmail} />
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-lg border border-black/10 bg-white p-4">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-dxv-green">Who it went to</h2>

@@ -4,8 +4,22 @@
 
 import { renderMemberEmail } from "@/lib/member-email";
 
-export function EmailPreview({ subject, body, firstName, link, bulk }: { subject: string; body: string; firstName: string; link: string; bulk: boolean }) {
-  const mail = renderMemberEmail({ subject, body }, { first_name: firstName, platform_link: link }, bulk ? { unsubscribeUrl: "#unsubscribe" } : {});
+export function EmailPreview({
+  subject,
+  body,
+  firstName,
+  link,
+  company,
+  bulk,
+}: {
+  subject: string;
+  body: string;
+  firstName: string;
+  link?: string;
+  company?: string;
+  bulk: boolean;
+}) {
+  const mail = renderMemberEmail({ subject, body }, { first_name: firstName, platform_link: link, company }, bulk ? { unsubscribeUrl: "#unsubscribe" } : {});
   return (
     <div className="overflow-hidden rounded-lg border border-black/15 bg-white">
       <p className="border-b border-black/10 bg-black/[0.03] px-3 py-2 text-sm">
