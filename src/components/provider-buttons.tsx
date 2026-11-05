@@ -8,6 +8,7 @@ import { ActionForm, SubmitButton } from "./action-form";
 import type { OAuthProvider } from "@/generated/prisma/enums";
 import { signOutOtherDevices } from "@/app/login/actions";
 import { disconnectIdentity, keepMyEmail, startProviderConnect, startProviderJoin, startProviderSignIn, switchToIdentityEmail } from "@/app/login/oauth-actions";
+import { startInstantJoin } from "@/app/join/open/actions";
 
 const LABEL: Record<OAuthProvider, string> = { GOOGLE: "Google", MICROSOFT: "Microsoft" };
 
@@ -30,6 +31,21 @@ export function ProviderJoinButtons({ token, providers, agreed }: { token: strin
     <div className="space-y-2">
       {providers.map((p) => (
         <ActionForm key={p} action={startProviderJoin.bind(null, token, p)} resetOnSuccess={false}>
+          <input type="hidden" name="terms" value={agreed ? "on" : ""} />
+          <input type="hidden" name="adult" value={agreed ? "on" : ""} />
+          <ProviderSubmit provider={p} />
+        </ActionForm>
+      ))}
+    </div>
+  );
+}
+
+/** Instant shareable links: the same buttons, starting a Google/Microsoft sign-up through the link. */
+export function InstantJoinButtons({ token, providers, agreed }: { token: string; providers: OAuthProvider[]; agreed: boolean }) {
+  return (
+    <div className="space-y-2">
+      {providers.map((p) => (
+        <ActionForm key={p} action={startInstantJoin.bind(null, token, p)} resetOnSuccess={false}>
           <input type="hidden" name="terms" value={agreed ? "on" : ""} />
           <input type="hidden" name="adult" value={agreed ? "on" : ""} />
           <ProviderSubmit provider={p} />

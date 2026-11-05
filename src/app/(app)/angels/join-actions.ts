@@ -9,7 +9,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { approveJoinRequest, declineJoinRequest } from "@/lib/join-links";
-import { JOIN_LINK_DAY_OPTIONS } from "@/lib/pipeline";
+import { JOIN_INSTANT_DEFAULT_USES, JOIN_LINK_DAY_OPTIONS, joinLinkSettingsProblem } from "@/lib/pipeline";
 
 const LinkSchema = z.object({
   label: z.string().trim().min(2, 'Say where you\'ll share it, e.g. "WhatsApp group, Nov 2026"').max(80),
@@ -25,8 +25,13 @@ export async function createJoinLink(_prev: ActionResult, formData: FormData): P
   const me = await requireAdmin();
   const parsed = LinkSchema.safeParse({ label: formData.get("label"), days: formData.get("days"), maxUses: String(formData.get("maxUses") ?? "") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+  const instant = formData.get("mode") === "instant";
+  // Instant links (no partner approval) are always capped and short-lived.
+  const maxUses = instant ? (parsed.data.maxUses ?? JOIN_INSTANT_DEFAULT_USES) : parsed.data.maxUses;
+  const problem = joinLinkSettingsProblem({ instant, days: parsed.data.days, maxUses });
+  if (problem) return { error: problem };
   await db.memberJoinLink.create({
-    data: { label: parsed.data.label, expiresAt: new Date(Date.now() + parsed.data.days * 86_400_000), maxUses: parsed.data.maxUses, createdById: me.id },
+    data: { label: parsed.data.label, instant, expiresAt: new Date(Date.now() + parsed.data.days * 86_400_000), maxUses, createdById: me.id },
   });
   revalidatePath("/angels/invite");
   return { ok: true };

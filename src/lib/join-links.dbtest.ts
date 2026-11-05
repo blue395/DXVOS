@@ -4,19 +4,30 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { hashInviteToken, newInviteToken } from "./invite-token";
-import { approveJoinRequest, confirmJoinEmail, declineJoinRequest, issueJoinFormToken, joinLinkToken, loadJoinLink, requestToJoin } from "./join-links";
+import { findUsableInvite } from "@/app/join/[token]/invite";
+import {
+  approveJoinRequest,
+  completeInstantProviderJoin,
+  confirmJoinEmail,
+  declineJoinRequest,
+  issueJoinFormToken,
+  joinLinkToken,
+  loadJoinLink,
+  requestToJoin,
+} from "./join-links";
 
 const stamp = Date.now();
 let admin: { id: string; name: string };
 const formToken = () => issueJoinFormToken(Date.now() - 10_000);
 const mail = (who: string) => `${who}-${stamp}@example.test`;
 
-async function link(data: { maxUses?: number; revoked?: boolean } = {}) {
+async function link(data: { maxUses?: number; revoked?: boolean; instant?: boolean } = {}) {
   const l = await db.memberJoinLink.create({
     data: {
       label: `Test link ${stamp}`,
       expiresAt: new Date(Date.now() + 86_400_000),
       maxUses: data.maxUses ?? null,
+      instant: data.instant ?? false,
       revokedAt: data.revoked ? new Date() : null,
       createdById: admin.id,
     },
@@ -28,7 +39,7 @@ async function link(data: { maxUses?: number; revoked?: boolean } = {}) {
 async function confirmedRequest(linkId: string, name: string, email: string) {
   const { token, tokenHash } = newInviteToken();
   await db.memberJoinRequest.create({ data: { linkId, name, email, confirmTokenHash: tokenHash, confirmExpiresAt: new Date(Date.now() + 3_600_000) } });
-  expect(await confirmJoinEmail(token)).toBe("confirmed");
+  expect(await confirmJoinEmail(token)).toEqual({ outcome: "confirmed" });
   return db.memberJoinRequest.findFirstOrThrow({ where: { email, status: "PENDING" } });
 }
 
@@ -115,13 +126,13 @@ describe("asking to join", () => {
     await db.memberJoinRequest.create({
       data: { linkId: id, name: "Once Synthetic", email: mail("once"), confirmTokenHash: tokenHash, confirmExpiresAt: new Date(Date.now() + 60_000) },
     });
-    expect(await confirmJoinEmail(token)).toBe("confirmed");
-    expect(await confirmJoinEmail(token)).toBe("invalid");
+    expect(await confirmJoinEmail(token)).toEqual({ outcome: "confirmed" });
+    expect(await confirmJoinEmail(token)).toEqual({ outcome: "invalid" });
     const late = newInviteToken();
     await db.memberJoinRequest.create({
       data: { linkId: id, name: "Late Synthetic", email: mail("late"), confirmTokenHash: late.tokenHash, confirmExpiresAt: new Date(Date.now() - 1) },
     });
-    expect(await confirmJoinEmail(late.token)).toBe("invalid");
+    expect(await confirmJoinEmail(late.token)).toEqual({ outcome: "invalid" });
     expect(hashInviteToken(late.token)).toBe(late.tokenHash);
   });
 });
@@ -161,5 +172,58 @@ describe("a partner's decision", () => {
     expect(await declineJoinRequest(r.id, admin.id)).toEqual({ ok: true });
     expect(await db.angel.count({ where: { email: mail("declined") } })).toBe(0);
     expect("error" in (await approveJoinRequest(r.id, admin))).toBe(true);
+  });
+});
+
+describe("instant links", () => {
+  async function instantConfirm(linkId: string, name: string, email: string) {
+    const { token, tokenHash } = newInviteToken();
+    await db.memberJoinRequest.create({ data: { linkId, name, email, confirmTokenHash: tokenHash, confirmExpiresAt: new Date(Date.now() + 3_600_000) } });
+    return confirmJoinEmail(token);
+  }
+
+  it("confirming the email goes straight to set-up: a usable invite, no partner needed", async () => {
+    const { id } = await link({ instant: true, maxUses: 10 });
+    const out = await instantConfirm(id, "Instant Synthetic", mail("instant"));
+    expect(out.outcome).toBe("setup");
+    const invite = await findUsableInvite((out as { inviteToken: string }).inviteToken);
+    expect(invite?.angel.email).toBe(mail("instant"));
+    const angel = await db.angel.findFirstOrThrow({ where: { email: mail("instant") } });
+    expect(angel.status).toBe("PROSPECT");
+    expect((await db.memberJoinRequest.findFirstOrThrow({ where: { email: mail("instant") } })).status).toBe("APPROVED");
+  });
+
+  it("someone already in the directory keeps their one record", async () => {
+    const existing = await db.angel.create({ data: { name: "Instant Directory", email: mail("instantdir"), status: "MEMBER", createdById: admin.id } });
+    const { id } = await link({ instant: true, maxUses: 10 });
+    const out = await instantConfirm(id, "Instant Directory", mail("instantdir"));
+    expect(out.outcome).toBe("setup");
+    expect(await db.angel.count({ where: { email: mail("instantdir") } })).toBe(1);
+    expect((await findUsableInvite((out as { inviteToken: string }).inviteToken))?.angel.id).toBe(existing.id);
+  });
+
+  it("stops at its cap: the next person can't get in", async () => {
+    const { id, token } = await link({ instant: true, maxUses: 1 });
+    expect((await instantConfirm(id, "First Instant", mail("capone"))).outcome).toBe("setup");
+    expect((await loadJoinLink(token))?.state).toBe("full");
+    expect((await instantConfirm(id, "Second Instant", mail("captwo"))).outcome).toBe("invalid");
+    expect(await db.angel.count({ where: { email: mail("captwo") } })).toBe(0);
+  });
+
+  it("Google/Microsoft: refuses unverified emails, non-instant links, and team logins", async () => {
+    const instant = await link({ instant: true, maxUses: 10 });
+    const approve = await link();
+    const id = (email: string | null, subject = `sub-${email}-${stamp}`) => ({
+      provider: "GOOGLE" as const,
+      subject,
+      email,
+      anyEmail: email,
+      name: "Prov Synthetic",
+      hostedDomain: null,
+    });
+    expect(await completeInstantProviderJoin(instant.id, id(null, `none-${stamp}`), null)).toEqual({ problem: "unverified" });
+    expect(await completeInstantProviderJoin(approve.id, id(mail("prov")), null)).toEqual({ problem: "link" });
+    expect(await completeInstantProviderJoin(instant.id, id(`jp-${stamp}@example.test`), null)).toEqual({ problem: "team" });
+    expect(await db.angel.count({ where: { email: mail("prov") } })).toBe(0);
   });
 });

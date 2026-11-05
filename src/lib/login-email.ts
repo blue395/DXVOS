@@ -150,3 +150,17 @@ export function joinRequestPartnerEmail(opts: { partnerName: string; name: strin
     small: "They only get a sign-up link once a partner approves.",
   });
 }
+
+/** To partners: someone joined through an instant link (nothing to approve; for awareness). */
+export function joinInstantPartnerEmail(opts: { partnerName: string; name: string; email: string; label: string; matched: string | null; angelUrl: string }) {
+  return linkEmail({
+    subject: `New member signing up: ${opts.name}`,
+    name: opts.partnerName,
+    lead: `${opts.name} (${opts.email}) has signed up through the instant link "${opts.label}" and is setting up their account now. ${
+      opts.matched ? `They were already in the directory as ${opts.matched}, so they've been linked to that record.` : "They've been added as a new member."
+    } They'll see deals once they've signed their investor statement on the platform. If they shouldn't be here, switch off their access from their page.`,
+    action: "Open their record",
+    link: opts.angelUrl,
+    small: "Instant links are capped and expire. Switch a link off any time on Angels → Invite an angel.",
+  });
+}

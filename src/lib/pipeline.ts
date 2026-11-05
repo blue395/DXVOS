@@ -1929,6 +1929,19 @@ export function joinLinkState(link: { revokedAt: Date | null; expiresAt: Date; m
   return "open";
 }
 
+/** Instant links (no partner approval) are always capped and short-lived (Blue, 2026-11-05). */
+export const JOIN_INSTANT_DEFAULT_USES = 10;
+export const JOIN_INSTANT_MAX_USES = 50;
+export const JOIN_INSTANT_MAX_DAYS = 30;
+
+/** Why a new shareable link's settings aren't allowed (null: fine). Instant links get the default cap if none is given. */
+export function joinLinkSettingsProblem(s: { instant: boolean; days: number; maxUses: number | null }): string | null {
+  if (!s.instant) return null;
+  if (s.days > JOIN_INSTANT_MAX_DAYS) return `Instant links work for ${JOIN_INSTANT_MAX_DAYS} days at most.`;
+  if (s.maxUses !== null && s.maxUses > JOIN_INSTANT_MAX_USES) return `Instant links allow ${JOIN_INSTANT_MAX_USES} sign-ups at most.`;
+  return null;
+}
+
 /** An email partly hidden for a hint: "blue@socialventurise.com" → "bl••@socialventurise.com". */
 export function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
