@@ -922,7 +922,11 @@ model MemberJoinLink {
   id          String              @id @default(cuid())
   label       String // where it was shared, e.g. "WhatsApp group, Nov 2026"
   expiresAt   DateTime
-  maxUses     Int? // confirmed requests allowed (null: no cap)
+  maxUses     Int? // confirmed requests allowed (null: no cap; instant links always have one)
+  // Instant (Blue, 2026-11-05): no partner approval. A verified email (Google/Microsoft, or our
+  // one confirm email) goes straight into set-up and onboarding; the investor statement still
+  // gates deals. Always capped (JOIN_INSTANT_MAX_USES) and short-lived (JOIN_INSTANT_MAX_DAYS).
+  instant     Boolean             @default(false)
   revokedAt   DateTime?
   createdById String
   createdBy   User                @relation("MemberJoinLinkCreatedBy", fields: [createdById], references: [id])

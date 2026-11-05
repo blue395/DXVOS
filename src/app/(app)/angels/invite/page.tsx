@@ -3,7 +3,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CopyLink } from "@/components/copy-link";
 import { Card, Field, formatDate, formatDateTime, inputClass } from "@/components/ui";
 import { loadJoinLinkAdmin } from "@/lib/join-link-admin";
-import { JOIN_LINK_DAY_OPTIONS } from "@/lib/pipeline";
+import { JOIN_INSTANT_DEFAULT_USES, JOIN_INSTANT_MAX_DAYS, JOIN_INSTANT_MAX_USES, JOIN_LINK_DAY_OPTIONS } from "@/lib/pipeline";
 import { createJoinLink } from "../join-actions";
 import { JoinRequestButtons, SwitchOffLinkButton } from "./join-link-parts";
 import { requireAdminWith } from "@/lib/auth";
@@ -90,6 +90,26 @@ export default async function InviteAngelPage() {
             their record.
           </p>
           <ActionForm action={createJoinLink} className="grid gap-3 rounded-lg border border-black/10 p-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+            <fieldset className="space-y-1.5 sm:col-span-4">
+              <legend className="mb-1 text-sm font-medium">How people get in</legend>
+              <label className="flex items-start gap-2">
+                <input type="radio" name="mode" value="approve" defaultChecked className="mt-1 accent-dxv-green" />
+                <span>
+                  <strong>Approve first</strong>
+                  <span className="block text-xs text-black/55">They confirm their email, a partner approves, then they get their sign-up link. For links that might travel.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="radio" name="mode" value="instant" className="mt-1 accent-dxv-green" />
+                <span>
+                  <strong>Instant</strong>
+                  <span className="block text-xs text-black/55">
+                    Straight into set-up after a verified email (Google, Microsoft or one confirm email); partners are told. Capped at {JOIN_INSTANT_DEFAULT_USES} sign-ups
+                    unless you set a number (up to {JOIN_INSTANT_MAX_USES}), and works {JOIN_INSTANT_MAX_DAYS} days at most. For trusted groups.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
             <Field label="Where you'll share it">
               <input name="label" required maxLength={80} placeholder="WhatsApp group, Nov 2026" className={inputClass} />
             </Field>
@@ -103,7 +123,7 @@ export default async function InviteAngelPage() {
               </select>
             </Field>
             <Field label="Max sign-ups (optional)">
-              <input name="maxUses" inputMode="numeric" placeholder="No limit" className={`${inputClass} sm:w-32`} />
+              <input name="maxUses" inputMode="numeric" placeholder="No limit (instant: 10)" className={`${inputClass} sm:w-44`} />
             </Field>
             <SubmitButton pendingLabel="Creating…" doneLabel="Created">
               Create link
@@ -118,7 +138,8 @@ export default async function InviteAngelPage() {
                       <span className="font-medium">{l.label}</span>{" "}
                       <span className={`rounded-full px-2 py-0.5 text-xs ${l.state === "open" ? "bg-dxv-green text-white" : "bg-black/5 text-black/60"}`}>
                         {STATE_LABEL[l.state]}
-                      </span>
+                      </span>{" "}
+                      <span className="rounded-full bg-dxv-yellow px-2 py-0.5 text-xs text-dxv-green">{l.instant ? "Instant" : "Approve first"}</span>
                       <span className="block text-xs text-black/55">
                         {l.state === "open" ? `Works until ${formatDate(l.expiresAt)}` : `Until ${formatDate(l.expiresAt)}`} · {l.used}
                         {l.maxUses ? ` of ${l.maxUses}` : ""} confirmed · {l.approved} approved{l.waiting ? ` · ${l.waiting} waiting` : ""} · made by{" "}

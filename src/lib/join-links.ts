@@ -16,13 +16,21 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { db } from "./db";
 import { complianceReady, inviteBlockReason } from "./compliance";
+import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { emailAndLog, issueAngelLink, loginClash } from "./angel-invites";
+import { connectIdentity, findUserForSignIn, touchIdentity } from "./identities";
+import { SYSTEM_USER_ID } from "./founder-submissions";
+import { createSession } from "./session";
+import type { ProviderIdentity } from "./oauth";
+import type { AngelStatus } from "@/generated/prisma/enums";
+import { createLoginFromInvite, findUsableInvite } from "@/app/join/[token]/invite";
 import { hashIp } from "./client-ip";
 import { formTimingOk } from "./founder-intake";
 import { hashInviteToken, isInviteTokenShape, newInviteToken } from "./invite-token";
-import { joinAlreadyMemberEmail, joinConfirmEmail, joinRequestPartnerEmail } from "./login-email";
+import { joinAlreadyMemberEmail, joinConfirmEmail, joinInstantPartnerEmail, joinRequestPartnerEmail } from "./login-email";
 import { appOrigin, mailConfigured, sendMail } from "./mail";
-import { JOIN_CONFIRM_HOURS, joinLinkState, joinRequestLimitError, maskEmail, type JoinLinkState } from "./pipeline";
+import { canSignIn, JOIN_CONFIRM_HOURS, joinLinkState, joinRequestLimitError, maskEmail, type JoinLinkState } from "./pipeline";
 import type { EmailOutcome } from "./send-link";
 
 const HOUR = 3_600_000;
@@ -59,7 +67,7 @@ function joinFormTime(token: string): number | null {
 const COUNTED = ["PENDING", "APPROVED", "DECLINED"] as const;
 
 /** The link a token opens, and whether it's taking requests. */
-export async function loadJoinLink(token: string): Promise<{ id: string; label: string; state: JoinLinkState } | null> {
+export async function loadJoinLink(token: string): Promise<{ id: string; label: string; instant: boolean; state: JoinLinkState } | null> {
   const id = joinLinkIdFrom(token);
   if (!id) return null;
   const link = await db.memberJoinLink.findUnique({
@@ -67,6 +75,7 @@ export async function loadJoinLink(token: string): Promise<{ id: string; label: 
     select: {
       id: true,
       label: true,
+      instant: true,
       expiresAt: true,
       maxUses: true,
       revokedAt: true,
@@ -74,7 +83,7 @@ export async function loadJoinLink(token: string): Promise<{ id: string; label: 
     },
   });
   if (!link) return null;
-  return { id: link.id, label: link.label, state: joinLinkState(link, link._count.requests) };
+  return { id: link.id, label: link.label, instant: link.instant, state: joinLinkState(link, link._count.requests) };
 }
 
 export const LINK_STATE_MESSAGE: Record<Exclude<JoinLinkState, "open">, string> = {
@@ -157,27 +166,165 @@ export async function requestToJoin(
   return { ok: true };
 }
 
-export type ConfirmOutcome = "confirmed" | "invalid";
+/** "setup": instant link, go straight to their set-up page; "confirmed": waiting for a partner. */
+export type ConfirmOutcome = { outcome: "setup"; inviteToken: string } | { outcome: "confirmed" } | { outcome: "invalid" };
 
-/** They pressed "Confirm my email": the request goes to the partners (and matches an existing record). */
+/**
+ * They pressed "Confirm my email". Instant links: they're let in there and then (straight to
+ * set-up). Approve-first links (or anything an instant link can't settle on its own): the
+ * request goes to the partners, matched to any existing directory record.
+ */
 export async function confirmJoinEmail(token: string): Promise<ConfirmOutcome> {
-  if (!isInviteTokenShape(token)) return "invalid";
+  const invalid = { outcome: "invalid" } as const;
+  if (!isInviteTokenShape(token)) return invalid;
   const req = await db.memberJoinRequest.findUnique({ where: { confirmTokenHash: hashInviteToken(token) }, include: { link: true } });
-  if (!req || req.status !== "UNCONFIRMED" || !req.confirmExpiresAt || req.confirmExpiresAt < new Date()) return "invalid";
+  if (!req || req.status !== "UNCONFIRMED" || !req.confirmExpiresAt || req.confirmExpiresAt < new Date()) return invalid;
   const used = await db.memberJoinRequest.count({ where: { linkId: req.linkId, status: { in: [...COUNTED] } } });
-  if (joinLinkState(req.link, used) !== "open") return "invalid";
+  if (joinLinkState(req.link, used) !== "open") return invalid;
   const angel = await db.angel.findFirst({
     where: { email: { equals: req.email, mode: "insensitive" }, erasedAt: null },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, archivedAt: true, user: { select: { id: true } } },
   });
   // Claimed once: two clicks (or an email scanner and a person) can't both confirm.
   const claimed = await db.memberJoinRequest.updateMany({
     where: { id: req.id, status: "UNCONFIRMED" },
     data: { status: "PENDING", confirmedAt: new Date(), confirmTokenHash: null, angelId: angel?.id ?? null },
   });
-  if (claimed.count !== 1) return "invalid";
-  await notifyPartners({ name: req.name, email: req.email, label: req.link.label, matched: angel ? `${angel.name} (${angel.status.toLowerCase()})` : null });
-  return "confirmed";
+  if (claimed.count !== 1) return invalid;
+  const matched = angel ? `${angel.name} (${angel.status.toLowerCase()})` : null;
+  if (req.link.instant && !angel?.archivedAt && !angel?.user && (await complianceReady()).ready) {
+    const admitted = await admitInstantly({ requestId: req.id, link: req.link, name: req.name, email: req.email, angel, matched });
+    if (admitted) return { outcome: "setup", inviteToken: admitted.inviteToken };
+  }
+  await notifyPartners({ name: req.name, email: req.email, label: req.link.label, matched });
+  return { outcome: "confirmed" };
+}
+
+/**
+ * Let someone in through an instant link: their existing directory record (no login yet) or a
+ * new Prospect gets a one-time invite (used straight away, not emailed), the request is marked
+ * approved (it counts towards the link's cap), and the partners are told. Null if the record
+ * can't take a login (a partner then decides).
+ */
+async function admitInstantly(r: {
+  requestId: string;
+  link: { id: string; label: string };
+  name: string;
+  email: string;
+  angel: { id: string; name: string; status: AngelStatus } | null;
+  matched: string | null;
+}): Promise<{ inviteToken: string; angelId: string } | null> {
+  if (await loginClash(r.email, "")) return null;
+  const angel =
+    r.angel ??
+    (await db.angel.create({
+      data: { name: r.name, email: r.email, status: "PROSPECT", source: `Sign-up link: ${r.link.label}`, createdById: SYSTEM_USER_ID },
+      select: { id: true, name: true, status: true },
+    }));
+  await db.memberJoinRequest.update({ where: { id: r.requestId }, data: { status: "APPROVED", angelId: angel.id, decidedAt: new Date() } });
+  const { link } = await issueAngelLink(angel.id, "INVITE", SYSTEM_USER_ID, `Signed up through the instant link "${r.link.label}"`);
+  await notifyPartnersInstant({ name: r.name, email: r.email, label: r.link.label, matched: r.matched, angelId: angel.id });
+  return { inviteToken: link.slice(link.lastIndexOf("/") + 1), angelId: angel.id };
+}
+
+async function notifyPartnersInstant(r: { name: string; email: string; label: string; matched: string | null; angelId: string }) {
+  const origin = appOrigin();
+  if (!origin || !mailConfigured()) return;
+  const partners = await db.user.findMany({ where: { role: "ADMIN", disabledAt: null }, select: { email: true, name: true } });
+  await Promise.all(
+    partners.map((p) =>
+      sendMail({ to: p.email, ...joinInstantPartnerEmail({ partnerName: p.name, ...r, angelUrl: `${origin}/angels/${r.angelId}` }) }).catch(() =>
+        console.error("Join notification failed"),
+      ),
+    ),
+  );
+}
+
+/** Why an instant Google/Microsoft sign-up can't go ahead, in words for the link page. */
+export const INSTANT_PROVIDER_PROBLEM = {
+  unverified: "That account doesn't confirm its email address. Please sign up with your email instead.",
+  existing: "You're already on DXV: sign in with your existing login (use \"Email me a sign-in link\" if you're not sure of it).",
+  paused: "Sign-up is paused just now. Please try again later, or email angels@diversityx.vc.",
+  taken: "That Google or Microsoft account is already connected to another DXV login.",
+  link: "This sign-up link no longer works. Ask the DXV team for a new one.",
+  team: "DXV team accounts can't sign up as members here.",
+} as const;
+export type InstantProviderProblem = keyof typeof INSTANT_PROVIDER_PROBLEM;
+
+/**
+ * Google/Microsoft sign-up through an instant link (they ticked the member terms and 18+ on
+ * the link page before leaving). The provider vouches for the email, so there's no confirm
+ * email: an existing login just signs in; otherwise their record (or a new Prospect) gets a
+ * login connected to that account and they go straight into onboarding.
+ */
+export async function completeInstantProviderJoin(
+  linkId: string,
+  identity: ProviderIdentity,
+  ip: string | null,
+): Promise<{ go: string } | { problem: InstantProviderProblem }> {
+  const link = await db.memberJoinLink.findUnique({
+    where: { id: linkId },
+    select: {
+      id: true,
+      label: true,
+      instant: true,
+      expiresAt: true,
+      maxUses: true,
+      revokedAt: true,
+      _count: { select: { requests: { where: { status: { in: [...COUNTED] } } } } },
+    },
+  });
+  if (!link || !link.instant || joinLinkState(link, link._count.requests) !== "open") return { problem: "link" };
+  const found = await findUserForSignIn(identity);
+  if (found) {
+    if (found.user.role === "ADMIN") return { problem: "team" };
+    if (!canSignIn(found.user)) return { problem: "existing" };
+    if (found.newlyConnected) await connectIdentity(found.user, identity);
+    else await touchIdentity(identity);
+    await createSession(found.user.id);
+    return { go: "/portal" };
+  }
+  const email = identity.email;
+  if (!email) return { problem: "unverified" };
+  if (!(await complianceReady()).ready) return { problem: "paused" };
+  const angel = await db.angel.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, erasedAt: null },
+    select: { id: true, name: true, status: true, archivedAt: true, user: { select: { id: true } } },
+  });
+  if (angel?.user || angel?.archivedAt) return { problem: "existing" };
+  const taken = await db.loginIdentity.findUnique({
+    where: { provider_subject: { provider: identity.provider, subject: identity.subject } },
+    select: { removedAt: true },
+  });
+  if (taken && !taken.removedAt) return { problem: "taken" };
+
+  const name = (identity.name ?? "").trim() || email.split("@")[0];
+  const req = await db.memberJoinRequest.create({
+    data: { linkId: link.id, name, email, status: "PENDING", confirmedAt: new Date(), ipHash: ip ? hashIp(ip) : null },
+  });
+  const admitted = await admitInstantly({
+    requestId: req.id,
+    link,
+    name,
+    email,
+    angel,
+    matched: angel ? `${angel.name} (${angel.status.toLowerCase()})` : null,
+  });
+  if (!admitted) return { problem: "existing" };
+  const invite = await findUsableInvite(admitted.inviteToken);
+  if (!invite) return { problem: "link" };
+  const unusable = await bcrypt.hash(randomBytes(32).toString("base64url"), 12);
+  const made = await createLoginFromInvite(
+    invite,
+    unusable,
+    ip,
+    `Set up their login with ${identity.provider === "GOOGLE" ? "Google" : "Microsoft"} (instant link "${link.label}")`,
+  );
+  if ("error" in made) return { problem: "existing" };
+  const user = await db.user.findUniqueOrThrow({ where: { id: made.userId }, select: { id: true, email: true, role: true, angelId: true } });
+  await connectIdentity(user, identity);
+  await createSession(user.id);
+  return { go: "/portal" };
 }
 
 async function notifyPartners(r: { name: string; email: string; label: string; matched: string | null }) {

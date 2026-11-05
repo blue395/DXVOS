@@ -58,7 +58,12 @@ export function enabledProviders(): OAuthProvider[] {
 const callbackUrl = (p: OAuthProvider) => `${appOrigin()}/api/auth/callback/${providerSlug(p)}`;
 
 /** What the person is doing: signing in, connecting an account while signed in, or setting up their login from an invite. */
-export type OAuthIntent = { kind: "signin" } | { kind: "connect"; userId: string; returnTo: string } | { kind: "join"; inviteToken: string };
+export type OAuthIntent =
+  | { kind: "signin" }
+  | { kind: "connect"; userId: string; returnTo: string }
+  | { kind: "join"; inviteToken: string }
+  // Signing up through an instant shareable link (src/lib/join-links.ts).
+  | { kind: "join-link"; linkId: string };
 
 const COOKIE = "dxv_oauth";
 const COOKIE_PATH = "/api/auth";

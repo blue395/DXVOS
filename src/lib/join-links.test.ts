@@ -52,3 +52,26 @@ describe("already on DXV with a different login email", () => {
     expect(m.text).not.toContain("blue@socialventurise.com");
   });
 });
+
+describe("instant links are capped and short-lived", () => {
+  it("refuses long or uncapped-above-the-limit instant links; approve-first links are free", async () => {
+    const { joinLinkSettingsProblem, JOIN_INSTANT_MAX_DAYS, JOIN_INSTANT_MAX_USES } = await import("./pipeline");
+    expect(joinLinkSettingsProblem({ instant: true, days: 30, maxUses: 10 })).toBeNull();
+    expect(joinLinkSettingsProblem({ instant: true, days: 90, maxUses: 10 })).toMatch(`${JOIN_INSTANT_MAX_DAYS} days`);
+    expect(joinLinkSettingsProblem({ instant: true, days: 7, maxUses: 51 })).toMatch(`${JOIN_INSTANT_MAX_USES} sign-ups`);
+    expect(joinLinkSettingsProblem({ instant: false, days: 90, maxUses: null })).toBeNull();
+  });
+  it("tells partners who signed up, escaped", async () => {
+    const { joinInstantPartnerEmail } = await import("./login-email");
+    const m = joinInstantPartnerEmail({
+      partnerName: "Blue",
+      name: "<i>Sam</i>",
+      email: "sam@example.test",
+      label: "WhatsApp",
+      matched: null,
+      angelUrl: "https://dxv.example/angels/a1",
+    });
+    expect(m.html).not.toContain("<i>Sam");
+    expect(m.text).toContain("signed up through the instant link");
+  });
+});

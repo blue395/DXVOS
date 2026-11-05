@@ -27,6 +27,7 @@ export async function loadJoinLinkAdmin() {
       return {
         id: l.id,
         label: l.label,
+        instant: l.instant,
         url: `${origin}/join/open/${joinLinkToken(l.id)}`,
         state: joinLinkState(l, used),
         expiresAt: l.expiresAt,

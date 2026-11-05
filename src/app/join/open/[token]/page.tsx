@@ -1,7 +1,11 @@
 import { connection } from "next/server";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, inputClass } from "@/components/ui";
-import { issueJoinFormToken, LINK_STATE_MESSAGE, loadJoinLink } from "@/lib/join-links";
+import { ComplianceTextView } from "@/components/compliance-text";
+import { db } from "@/lib/db";
+import { INSTANT_PROVIDER_PROBLEM, issueJoinFormToken, LINK_STATE_MESSAGE, loadJoinLink, type InstantProviderProblem } from "@/lib/join-links";
+import { enabledProviders } from "@/lib/oauth";
+import { InstantJoin } from "./instant-join";
 import { PRIVACY_NOTICE_URL } from "@/lib/legal-links";
 import { AuthCard } from "../../../login/auth-card";
 import { askToJoin } from "../actions";
@@ -32,8 +36,42 @@ export default async function JoinOpenPage({ params, searchParams }: PageProps<"
             We&apos;ve sent you an email from angels@diversityx.vc. Open it and confirm your email address (check your spam folder if it isn&apos;t there in a
             few minutes).
           </p>
-          <p>The DXV team then reviews your request and emails you a personal link to set up your account.</p>
+          <p>
+            {link.instant
+              ? "The link takes you straight to setting up your account."
+              : "The DXV team then reviews your request and emails you a personal link to set up your account."}
+          </p>
           <p className="text-black/60">Already have a DXV login? We&apos;ve emailed you a link to sign in instead.</p>
+        </div>
+      </AuthCard>
+    );
+  }
+  if (link.instant) {
+    const terms = await db.complianceText.findFirst({ where: { kind: "MEMBER_TERMS", status: "APPROVED" }, orderBy: { version: "desc" } });
+    const problem =
+      typeof sp.problem === "string" && sp.problem in INSTANT_PROVIDER_PROBLEM ? INSTANT_PROVIDER_PROBLEM[sp.problem as InstantProviderProblem] : null;
+    return (
+      <AuthCard subtitle="Join the DXV angel syndicate">
+        <div className="space-y-4">
+          <p className="text-sm text-black/70">
+            Set up your account in a few minutes: create your login, confirm your details and complete your investor statement. You&apos;ll see deals as soon as
+            your statement is signed.
+          </p>
+          {problem && (
+            <p role="alert" className="rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-2 text-sm">
+              {problem}
+            </p>
+          )}
+          {terms ? (
+            <InstantJoin
+              token={token}
+              providers={enabledProviders()}
+              formToken={issueJoinFormToken()}
+              terms={<ComplianceTextView title={terms.title} body={terms.body} criteria={[]} />}
+            />
+          ) : (
+            <p className="text-sm text-black/70">Sign-up is paused just now. Please try again later.</p>
+          )}
         </div>
       </AuthCard>
     );

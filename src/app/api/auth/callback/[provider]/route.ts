@@ -15,6 +15,7 @@ import { createSession } from "@/lib/session";
 import { teamRefusal } from "@/lib/team-signin";
 import { db } from "@/lib/db";
 import { createLoginFromInvite, findUsableInvite } from "@/app/join/[token]/invite";
+import { completeInstantProviderJoin, joinLinkToken } from "@/lib/join-links";
 
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/auth/callback/[provider]">) {
   const { provider: slug } = await ctx.params;
@@ -63,6 +64,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/auth/cal
     await connectIdentity(user, identity);
     await createSession(user.id);
     return go("/portal");
+  }
+
+  // Signing up through an instant shareable link: the provider vouches for the email.
+  if (intent.kind === "join-link") {
+    const out = await completeInstantProviderJoin(intent.linkId, identity, clientIp(request.headers));
+    return "go" in out ? go(out.go) : go(`/join/open/${joinLinkToken(intent.linkId)}?problem=${out.problem}`);
   }
 
   // Signing in.
