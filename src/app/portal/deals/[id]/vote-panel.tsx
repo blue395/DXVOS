@@ -12,7 +12,8 @@ export function VotePanel({ deal, now = new Date() }: { deal: DealRoom; now?: Da
   if (!deal.voteKind) return null;
   const pre = deal.voteKind === "pre-selection";
   const voting = pre ? deal.voting : null;
-  const closed = !!voting?.closesAt && now >= voting.closesAt;
+  // Before a partner opens voting (after the live pitch session) and after the deadline: no form.
+  const closed = !!voting?.notOpen || (!!voting?.closesAt && now >= voting.closesAt);
   // Every vote used on other deals: this one can only be "No" until they free one up.
   const full = !!voting && voting.round !== null && !voting.used.has(deal.id) && voting.used.size >= voting.limit;
   const mine = pre ? deal.myPreSelection : deal.myEoi;

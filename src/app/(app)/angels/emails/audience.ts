@@ -8,13 +8,13 @@ import { angelIdsWithDealAccess } from "@/lib/portal-deals";
 export async function loadAudiences() {
   const [angels, dealAccess] = await Promise.all([
     db.angel.findMany({
-    where: { archivedAt: null },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, status: true, archivedAt: true, emailOptOutAt: true, user: { select: { id: true } } },
+      where: { archivedAt: null },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true, status: true, archivedAt: true, emailOptOutAt: true, user: { select: { id: true } } },
     }),
     angelIdsWithDealAccess(), // who may receive deal material (an opportunities pack)
   ]);
-  const rows = angels.map((a) => ({ ...a, hasLogin: !!a.user }));
+  const rows = angels.map((a) => ({ ...a, hasLogin: !!a.user, dealAccess: dealAccess.has(a.id) }));
   return MEMBER_EMAIL_AUDIENCES.map((aud) => {
     const r = memberEmailAudience(rows, aud.key);
     return {

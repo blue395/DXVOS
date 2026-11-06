@@ -206,9 +206,9 @@ export async function castPreSelectionVote(ventureId: string, _prev: ActionResul
   const ctx = await votableDeal(ventureId, "pre-selection");
   if ("error" in ctx) return { error: ctx.error };
   const interested = parsed.data.interested === "yes";
-  // At most 3 "yes" votes per round, and none after the round's deadline (checked here, not just in the page).
+  // At most 3 "yes" votes per round, none before a partner opens voting or after the round's deadline (checked here, not just in the page).
   const voting = await memberRoundVoting(ctx.angel.id, ctx.room.round);
-  const refusal = preSelectionVoteRefusal({ ventureId, interested }, voting.used, { number: voting.round, closesAt: voting.closesAt });
+  const refusal = preSelectionVoteRefusal({ ventureId, interested }, voting.used, { number: voting.round, closesAt: voting.closesAt, notOpen: voting.notOpen });
   if (refusal) return { error: refusal };
   await db.$transaction([
     db.preSelectionVote.create({

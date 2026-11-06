@@ -358,9 +358,7 @@ export function investedGbp(v: { investedAmountGbp: number | null; finalInvestme
  * Live deals: not declined and not yet invested. Investments: deals at Investment
  * Complete (or S/EIS). Investment total: their paid final investment tickets.
  */
-export function dashboardMetrics(
-  ventures: { currentStage: Stage; investedAmountGbp: number | null; finalInvestments: FinalLike[] }[],
-): DashboardMetrics {
+export function dashboardMetrics(ventures: { currentStage: Stage; investedAmountGbp: number | null; finalInvestments: FinalLike[] }[]): DashboardMetrics {
   const invested = ventures.filter((v) => isInvestedStage(v.currentStage));
   return {
     liveDeals: ventures.filter((v) => isActiveStage(v.currentStage)).length,
@@ -604,9 +602,23 @@ export const ANGEL_TAG_SUGGESTIONS = ["First-time angel", "Founder", "Operator",
 
 /** The old "About you" diversity pills: never kept as tags (they need the member's own consent). */
 export const DIVERSITY_TAG_WORDS = [
-  "disabled", "neurodiverse", "neurodivergent", "lgbtq+", "lgbt", "lgbtq", "female angel", "woman angel", "not university educated",
-  "experienced care", "experienced homelessness", "low socio-economic background", "immigrant",
-  "lgbtqia+", "person of colour", "first time founder over 50", "socio-economic disadvantaged background",
+  "disabled",
+  "neurodiverse",
+  "neurodivergent",
+  "lgbtq+",
+  "lgbt",
+  "lgbtq",
+  "female angel",
+  "woman angel",
+  "not university educated",
+  "experienced care",
+  "experienced homelessness",
+  "low socio-economic background",
+  "immigrant",
+  "lgbtqia+",
+  "person of colour",
+  "first time founder over 50",
+  "socio-economic disadvantaged background",
 ];
 
 /** Tags with any diversity characteristic removed (team form, CSV import, profile). */
@@ -681,7 +693,10 @@ export function findDuplicateAngels<T extends { id: string; name: string; email:
   const out: T[][] = [];
   for (const g of groups.values()) {
     if (g.length < 2) continue;
-    const sig = g.map((a) => a.id).sort().join(",");
+    const sig = g
+      .map((a) => a.id)
+      .sort()
+      .join(",");
     if (!seen.has(sig)) {
       seen.add(sig);
       out.push(g);
@@ -720,7 +735,12 @@ export function angelTotals(
 
 /** Onboarding answers (what the angel tells us about themselves). */
 export const TICKET_RANGES = ["Under £1k", "£1k to £2k", "£2k to £5k", "£5k to £10k", "£10k to £25k", "£25k+"] as const;
-export const EXPERIENCE_LEVELS = ["I haven't made an angel investment yet", "1 to 5 angel investments", "6 or more angel investments", "I invest professionally"] as const;
+export const EXPERIENCE_LEVELS = [
+  "I haven't made an angel investment yet",
+  "1 to 5 angel investments",
+  "6 or more angel investments",
+  "I invest professionally",
+] as const;
 /**
  * DXV's sectors (Blue, 2026-10-21): ONE list for a deal's sector (chosen from a drop-down on
  * the apply form, the deal page and both portfolios) and for the sectors angels say interest
@@ -765,36 +785,102 @@ export const SECTOR_SUGGESTIONS = SECTORS.filter((s) => s !== "Other");
 /** Other spellings of each sector, as a key: lower case, letters and digits only ("Health Tech" is "healthtech"). */
 export const SECTOR_ALIASES: Record<string, Sector | null> = {
   ...Object.fromEntries(SECTORS.map((s) => [sectorKey(s), s])),
-  health: "Healthtech", healthcare: "Healthtech", digitalhealth: "Healthtech", medtech: "Healthtech", mentalhealth: "Healthtech", wellbeing: "Healthtech", healthandwellbeing: "Healthtech",
-  finance: "Fintech", financialservices: "Fintech", wealthtech: "Fintech", regtech: "Fintech", payments: "Fintech",
+  health: "Healthtech",
+  healthcare: "Healthtech",
+  digitalhealth: "Healthtech",
+  medtech: "Healthtech",
+  mentalhealth: "Healthtech",
+  wellbeing: "Healthtech",
+  healthandwellbeing: "Healthtech",
+  finance: "Fintech",
+  financialservices: "Fintech",
+  wealthtech: "Fintech",
+  regtech: "Fintech",
+  payments: "Fintech",
   insurance: "Insurtech",
   womenshealth: "Femtech",
-  climatetech: "Climate", cleantech: "Climate", greentech: "Climate", sustainability: "Climate", energy: "Climate", cleanenergy: "Climate",
-  education: "Edtech", learning: "Edtech",
-  d2c: "Consumer", dtc: "Consumer", consumergoods: "Consumer", cpg: "Consumer", beauty: "Consumer",
-  retail: "E-commerce", onlineretail: "E-commerce",
-  saas: "B2B SaaS", software: "B2B SaaS", enterprisesoftware: "B2B SaaS", b2b: "B2B SaaS",
-  artificialintelligence: "AI", machinelearning: "AI", ml: "AI", aiml: "AI", aiandmachinelearning: "AI", generativeai: "AI",
-  robotics: "Deeptech", quantum: "Deeptech", space: "Deeptech",
-  biotech: "Biotech & life sciences", lifesciences: "Biotech & life sciences", biotechnology: "Biotech & life sciences", pharma: "Biotech & life sciences",
-  cyber: "Cybersecurity", security: "Cybersecurity", infosec: "Cybersecurity",
-  property: "Proptech", realestate: "Proptech", construction: "Proptech", contech: "Proptech",
-  foodtech: "Food", foodanddrink: "Food", foodandbeverage: "Food",
-  agtech: "Agritech", agriculture: "Agritech",
-  creative: "Creative industries", media: "Creative industries", music: "Creative industries", mediaandentertainment: "Creative industries",
-  games: "Gaming", esports: "Gaming",
-  govtech: "Govtech", publicsector: "Govtech", civictech: "Govtech",
-  hardware: "Hardware & IoT", iot: "Hardware & IoT", internetofthings: "Hardware & IoT",
-  hrtech: "HR tech", hr: "HR tech", futureofwork: "HR tech", worktech: "HR tech", recruitment: "HR tech",
-  legal: "Legaltech", lawtech: "Legaltech",
-  supplychain: "Logistics", logisticsandsupplychain: "Logistics",
+  climatetech: "Climate",
+  cleantech: "Climate",
+  greentech: "Climate",
+  sustainability: "Climate",
+  energy: "Climate",
+  cleanenergy: "Climate",
+  education: "Edtech",
+  learning: "Edtech",
+  d2c: "Consumer",
+  dtc: "Consumer",
+  consumergoods: "Consumer",
+  cpg: "Consumer",
+  beauty: "Consumer",
+  retail: "E-commerce",
+  onlineretail: "E-commerce",
+  saas: "B2B SaaS",
+  software: "B2B SaaS",
+  enterprisesoftware: "B2B SaaS",
+  b2b: "B2B SaaS",
+  artificialintelligence: "AI",
+  machinelearning: "AI",
+  ml: "AI",
+  aiml: "AI",
+  aiandmachinelearning: "AI",
+  generativeai: "AI",
+  robotics: "Deeptech",
+  quantum: "Deeptech",
+  space: "Deeptech",
+  biotech: "Biotech & life sciences",
+  lifesciences: "Biotech & life sciences",
+  biotechnology: "Biotech & life sciences",
+  pharma: "Biotech & life sciences",
+  cyber: "Cybersecurity",
+  security: "Cybersecurity",
+  infosec: "Cybersecurity",
+  property: "Proptech",
+  realestate: "Proptech",
+  construction: "Proptech",
+  contech: "Proptech",
+  foodtech: "Food",
+  foodanddrink: "Food",
+  foodandbeverage: "Food",
+  agtech: "Agritech",
+  agriculture: "Agritech",
+  creative: "Creative industries",
+  media: "Creative industries",
+  music: "Creative industries",
+  mediaandentertainment: "Creative industries",
+  games: "Gaming",
+  esports: "Gaming",
+  govtech: "Govtech",
+  publicsector: "Govtech",
+  civictech: "Govtech",
+  hardware: "Hardware & IoT",
+  iot: "Hardware & IoT",
+  internetofthings: "Hardware & IoT",
+  hrtech: "HR tech",
+  hr: "HR tech",
+  futureofwork: "HR tech",
+  worktech: "HR tech",
+  recruitment: "HR tech",
+  legal: "Legaltech",
+  lawtech: "Legaltech",
+  supplychain: "Logistics",
+  logisticsandsupplychain: "Logistics",
   marketplace: "Marketplaces",
-  transport: "Mobility", automotive: "Mobility",
-  sport: "Sport & fitness", sports: "Sport & fitness", sportstech: "Sport & fitness", fitness: "Sport & fitness", sporttech: "Sport & fitness",
-  travel: "Travel & hospitality", hospitality: "Travel & hospitality", traveltech: "Travel & hospitality",
-  blockchain: "Web3", crypto: "Web3", web3andblockchain: "Web3",
+  transport: "Mobility",
+  automotive: "Mobility",
+  sport: "Sport & fitness",
+  sports: "Sport & fitness",
+  sportstech: "Sport & fitness",
+  fitness: "Sport & fitness",
+  sporttech: "Sport & fitness",
+  travel: "Travel & hospitality",
+  hospitality: "Travel & hospitality",
+  traveltech: "Travel & hospitality",
+  blockchain: "Web3",
+  crypto: "Web3",
+  web3andblockchain: "Web3",
   // Too generic to be a sector: cleared, so the team picks a real one.
-  impact: null, socialimpact: null,
+  impact: null,
+  socialimpact: null,
 };
 
 export function sectorKey(s: string): string {
@@ -867,7 +953,10 @@ export const PORTAL_STATE_LABELS: Record<PortalState, string> = {
  * Empty becomes null.
  */
 export function cleanPhone(s: string | null | undefined): string | null {
-  const t = (s ?? "").replace(/^[\s'‘’`]+/, "").replace(/\s+/g, " ").trim();
+  const t = (s ?? "")
+    .replace(/^[\s'‘’`]+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return t || null;
 }
 
@@ -1089,7 +1178,16 @@ export function ticketStats(tickets: { investor: string; ventureId: string; tick
   };
 }
 
-const PIPELINE_ORDER: Stage[] = ["SUBMITTED", "ELIGIBILITY_SCREEN", "PARTNER_REVIEW", "PITCH_SELECTION", "PITCH_OUTCOME", "INVESTMENT_COMMITMENTS", "DUE_DILIGENCE", "INVESTMENT_COMPLETE"];
+const PIPELINE_ORDER: Stage[] = [
+  "SUBMITTED",
+  "ELIGIBILITY_SCREEN",
+  "PARTNER_REVIEW",
+  "PITCH_SELECTION",
+  "PITCH_OUTCOME",
+  "INVESTMENT_COMMITMENTS",
+  "DUE_DILIGENCE",
+  "INVESTMENT_COMPLETE",
+];
 const orderOf = (s: Stage) => PIPELINE_ORDER.indexOf(s === "SEIS_CERTIFICATE" ? "INVESTMENT_COMPLETE" : s);
 
 /** Of the deals that came in, how many got at least as far as each stage (furthest stage reached, declined deals included). */
@@ -1099,7 +1197,9 @@ export function stageReach(deals: { stagesReached: Stage[] }[]): { key: Stage; l
 }
 
 /** Median whole days deals spent in each stage they left (from their stage history). */
-export function medianDaysInStage(changes: { ventureId: string; toStage: Stage; changedAt: Date }[]): { key: Stage; label: string; days: number | null; deals: number }[] {
+export function medianDaysInStage(
+  changes: { ventureId: string; toStage: Stage; changedAt: Date }[],
+): { key: Stage; label: string; days: number | null; deals: number }[] {
   const byVenture = Map.groupBy(changes, (c) => c.ventureId);
   const spans = new Map<Stage, number[]>();
   for (const list of byVenture.values()) {
@@ -1144,19 +1244,55 @@ export function insightNudges(n: {
 }): Nudge[] {
   const out: Nudge[] = [];
   const s = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
-  if (n.welcomeNeedsFinishing) out.push({ text: "The welcome email for new applicants isn't finished", detail: "Add the WhatsApp link so invites can go out with it.", href: "/angels/emails", action: "Finish it" });
+  if (n.welcomeNeedsFinishing)
+    out.push({
+      text: "The welcome email for new applicants isn't finished",
+      detail: "Add the WhatsApp link so invites can go out with it.",
+      href: "/angels/emails",
+      action: "Finish it",
+    });
   if (n.membersNotOnPlatform > 0)
-    out.push({ text: `${s(n.membersNotOnPlatform, "member isn't", "members aren't")} on the platform yet`, detail: "They can't see or vote on deals until they sign up.", href: "/angels/emails/new", action: "Email them a sign-up link" });
+    out.push({
+      text: `${s(n.membersNotOnPlatform, "member isn't", "members aren't")} on the platform yet`,
+      detail: "They can't see or vote on deals until they sign up.",
+      href: "/angels/emails/new",
+      action: "Email them a sign-up link",
+    });
   if (n.invitesUnusedOver7Days > 0)
-    out.push({ text: `${s(n.invitesUnusedOver7Days, "invite has", "invites have")} gone unused for over a week`, detail: "A personal nudge often helps; links last 14 days.", href: "/angels?filter=members", action: "Review members" });
+    out.push({
+      text: `${s(n.invitesUnusedOver7Days, "invite has", "invites have")} gone unused for over a week`,
+      detail: "A personal nudge often helps; links last 14 days.",
+      href: "/angels?filter=members",
+      action: "Review members",
+    });
   if (n.membersNeedingStatement > 0)
-    out.push({ text: `${s(n.membersNeedingStatement, "member needs", "members need")} a current investor statement`, detail: "Without one they can't see live deals.", href: "/angels?filter=action", action: "See who" });
+    out.push({
+      text: `${s(n.membersNeedingStatement, "member needs", "members need")} a current investor statement`,
+      detail: "Without one they can't see live deals.",
+      href: "/angels?filter=action",
+      action: "See who",
+    });
   if (n.quietMembers > 0)
-    out.push({ text: `${s(n.quietMembers, "member who can see deals hasn't", "members who can see deals haven't")} visited in 30 days`, detail: "Listed under Engagement below.", href: "#quiet", action: "See who" });
+    out.push({
+      text: `${s(n.quietMembers, "member who can see deals hasn't", "members who can see deals haven't")} visited in 30 days`,
+      detail: "Listed under Engagement below.",
+      href: "#quiet",
+      action: "See who",
+    });
   for (const d of n.lowTurnoutDeals)
-    out.push({ text: `Only ${d.turnoutPct}% of eligible members have voted on ${d.name}`, detail: "A reminder before the vote closes can lift turnout.", href: `/deals/${d.id}`, action: "Open the deal" });
+    out.push({
+      text: `Only ${d.turnoutPct}% of eligible members have voted on ${d.name}`,
+      detail: "A reminder before the vote closes can lift turnout.",
+      href: `/deals/${d.id}`,
+      action: "Open the deal",
+    });
   if (n.prospectsNotInvited > 0)
-    out.push({ text: `${s(n.prospectsNotInvited, "prospect hasn't", "prospects haven't")} been invited yet`, detail: "Prospects join as members when they sign up.", href: "/angels?filter=prospects", action: "Invite them" });
+    out.push({
+      text: `${s(n.prospectsNotInvited, "prospect hasn't", "prospects haven't")} been invited yet`,
+      detail: "Prospects join as members when they sign up.",
+      href: "/angels?filter=prospects",
+      action: "Invite them",
+    });
   return out;
 }
 
@@ -1194,6 +1330,7 @@ export function scrubAuditSnapshot(snapshot: unknown): unknown {
 export const MEMBER_EMAIL_AUDIENCES = [
   { key: "members-not-on-platform", label: "Members not yet on the platform", note: "Each gets their own sign-up link." },
   { key: "members-on-platform", label: "Members on the platform", note: "Their link goes to the sign-in page." },
+  { key: "deal-access", label: "Members who can see deals", note: "On the platform with a current investor statement (e.g. voting is open)." },
   { key: "all-members", label: "All members", note: "Sign-up links for those not on yet." },
   { key: "prospects", label: "Prospects", note: "People interested in joining." },
   { key: "lapsed", label: "Lapsed members", note: "Former members." },
@@ -1201,7 +1338,14 @@ export const MEMBER_EMAIL_AUDIENCES = [
 export type MemberEmailAudience = (typeof MEMBER_EMAIL_AUDIENCES)[number]["key"];
 export const isMemberEmailAudience = (k: string): k is MemberEmailAudience => MEMBER_EMAIL_AUDIENCES.some((a) => a.key === k);
 
-type AudienceAngel = { status: AngelStatus; archivedAt: Date | null; email: string | null; emailOptOutAt: Date | null; hasLogin: boolean };
+type AudienceAngel = {
+  status: AngelStatus;
+  archivedAt: Date | null;
+  email: string | null;
+  emailOptOutAt: Date | null;
+  hasLogin: boolean;
+  dealAccess?: boolean;
+};
 
 /** The angels in an audience, and how many were left out (no email / unsubscribed). */
 export function memberEmailAudience<T extends AudienceAngel>(angels: T[], audience: MemberEmailAudience): { included: T[]; noEmail: number; optedOut: number } {
@@ -1212,6 +1356,8 @@ export function memberEmailAudience<T extends AudienceAngel>(angels: T[], audien
         return a.status === "MEMBER" && !a.hasLogin;
       case "members-on-platform":
         return a.status === "MEMBER" && a.hasLogin;
+      case "deal-access":
+        return a.status === "MEMBER" && a.hasLogin && !!a.dealAccess;
       case "all-members":
         return a.status === "MEMBER";
       case "prospects":
@@ -1251,10 +1397,9 @@ export function microsoftVerifiedEmail(claims: { tid?: unknown; email?: unknown;
  * The connected account whose email to offer as the person's DXV email: connected,
  * provider-verified, different from the current email, and not yet decided on. Newest first.
  */
-export function emailSwitchOffer<T extends { email: string | null; emailVerified: boolean; emailChoiceAt: Date | null; removedAt: Date | null; createdAt: Date }>(
-  currentEmail: string,
-  identities: T[],
-): T | null {
+export function emailSwitchOffer<
+  T extends { email: string | null; emailVerified: boolean; emailChoiceAt: Date | null; removedAt: Date | null; createdAt: Date },
+>(currentEmail: string, identities: T[]): T | null {
   const current = currentEmail.trim().toLowerCase();
   return (
     identities
@@ -1467,7 +1612,10 @@ export function reliefHoldingEnds(investedOn: Date): Date {
  * 100000, "1.5k" → 150000, "2m" → 200000000. Blank → null; anything unreadable → NaN.
  */
 export function parseMoneyMinor(raw: string | null | undefined): number | null {
-  const t = (raw ?? "").trim().toLowerCase().replace(/[£$€,\s]|gbp|usd|eur/g, "");
+  const t = (raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[£$€,\s]|gbp|usd|eur/g, "");
   if (!t) return null;
   const m = t.match(/^(\d+(?:\.\d+)?)(k|m)?$/);
   if (!m) return NaN;
@@ -1478,7 +1626,9 @@ export function parseMoneyMinor(raw: string | null | undefined): number | null {
 /** "£991.83", "$1,000" (whole amounts without pence). */
 export function formatMoneyMinor(minor: number, currency: string = "GBP"): string {
   const whole = minor % 100 === 0;
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(minor / 100);
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(
+    minor / 100,
+  );
 }
 
 export type PortfolioHoldingLike = {
@@ -1585,7 +1735,10 @@ export function diversityBreakdown(holdings: { diversityThemes?: string[] | null
 }
 
 function cleanTheme(t: string): string | null {
-  const s = canonicalFounderTheme(t).replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
+  const s = canonicalFounderTheme(t)
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return !s || /^(not stated|none|n\/a|unknown|not recorded)$/i.test(s) ? null : s;
 }
 
@@ -1624,7 +1777,10 @@ export const FOUNDER_DIVERSITY_RENAMES: Record<string, string> = {
 /** A founder diversity theme under its current name, keeping any detail in brackets ("Neurodiversity (ADHD)" → "Neurodivergent Founder (ADHD)"). */
 export function canonicalFounderTheme(theme: string): string {
   const t = theme.replace(/\s+/g, " ").trim();
-  const key = t.replace(/\s*\(.*?\)\s*/g, " ").trim().toLowerCase();
+  const key = t
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .trim()
+    .toLowerCase();
   const renamed = FOUNDER_DIVERSITY_RENAMES[key];
   if (!renamed) return t;
   const detail = /\(.*\)/.exec(t)?.[0];
@@ -1680,13 +1836,66 @@ export function preSelectionVotesUsed(votes: { ventureId: string; interested: bo
 export function preSelectionVoteRefusal(
   vote: { ventureId: string; interested: boolean },
   used: Set<string>,
-  round: { number: number | null; closesAt: Date | null },
+  round: { number: number | null; closesAt: Date | null; notOpen?: boolean },
   now: Date = new Date(),
 ): string | null {
+  if (round.notOpen) return `Voting for Round ${round.number} opens after the live pitch session.`;
   if (round.closesAt && now >= round.closesAt) return `Voting for Round ${round.number} has closed.`;
   if (!vote.interested || used.has(vote.ventureId) || round.number === null) return null;
   if (used.size >= PRE_SELECTION_VOTE_LIMIT)
     return `You've used your ${PRE_SELECTION_VOTE_LIMIT} votes for Round ${round.number}. Change one of them to "No" to free a vote.`;
+  return null;
+}
+
+// ── When members' pitch-selection votes count (Blue, 2026-11-06) ────────────
+// Members vote for their top 3 only after DXV has presented the round's opportunities live:
+// a partner presses "Open angel votes" (MemberRound.votingOpenedAt). The round open to members
+// takes no votes until then, and only votes cast from that moment count; earlier ones stay on
+// record (append-only) but count for nothing. Rounds that were never opened and aren't the
+// round open to members (older rounds, recorded by the team) count every vote, as before.
+
+/** The member-round rows the voting rules need: the latest (the round open to members) and every opening. */
+export type VoteRounds = {
+  current: { round: number | null; votingOpenedAt: Date | null; votingClosesAt: Date | null } | null;
+  /** Rows with votingOpenedAt set, newest first. */
+  openings: { round: number | null; votingOpenedAt: Date | null }[];
+};
+
+/** When a round's voting was opened, if ever (the latest opening recorded for it). */
+export function roundOpenedAt(round: number | null, r: VoteRounds): Date | null {
+  if (round === null) return null;
+  if (r.current?.round === round && r.current.votingOpenedAt) return r.current.votingOpenedAt;
+  return r.openings.find((o) => o.round === round && o.votingOpenedAt)?.votingOpenedAt ?? null;
+}
+
+/** From when a round's pitch-selection votes count: a time, "all" (ungated, as before), or "none" (not opened yet). */
+export function preSelectionCountsFrom(round: number | null, r: VoteRounds): Date | "all" | "none" {
+  const opened = roundOpenedAt(round, r);
+  if (opened) return opened;
+  return round !== null && r.current?.round === round ? "none" : "all";
+}
+
+/** Whether one pitch-selection vote counts, given its deal's round. */
+export function preSelectionVoteCounts(vote: { createdAt: Date }, round: number | null, r: VoteRounds): boolean {
+  const from = preSelectionCountsFrom(round, r);
+  return from === "all" ? true : from === "none" ? false : vote.createdAt >= from;
+}
+
+/** Where the round open to members stands, for the team's "Open angel votes" page. */
+export type AngelVotingState = "no-round" | "not-open" | "open" | "closed";
+export function angelVotingState(r: VoteRounds, now: Date = new Date()): AngelVotingState {
+  if (!r.current || r.current.round === null) return "no-round";
+  if (!roundOpenedAt(r.current.round, r)) return "not-open";
+  return r.current.votingClosesAt && now >= r.current.votingClosesAt ? "closed" : "open";
+}
+
+/** Why voting can't be opened now, or null. Needs a round open to members, not already opened, and a deadline still ahead. */
+export function openVotingProblem(r: VoteRounds, now: Date = new Date()): string | null {
+  const state = angelVotingState(r, now);
+  if (state === "no-round") return "Choose the round open to members on the Dashboard first.";
+  if (state !== "not-open") return `Voting for Round ${r.current!.round} is already open.`;
+  if (!r.current!.votingClosesAt) return "Set the voting deadline first.";
+  if (r.current!.votingClosesAt <= now) return "The voting deadline has passed. Set a new one first.";
   return null;
 }
 
@@ -1714,7 +1923,13 @@ export function eoiProgress(votes: (EoiLike & { angelId?: string | null })[]): E
   const totalGbp = sum(interested.map((v) => v.maxTicketGbp));
   const interestedCount = interested.length;
   if (interestedCount < EOI_PROGRESS_MIN_INTERESTED) return { show: false };
-  return { show: true, totalGbp, interestedCount, percent: Math.min(100, Math.floor((totalGbp / EOI_MINIMUM_GBP) * 100)), reached: totalGbp >= EOI_MINIMUM_GBP };
+  return {
+    show: true,
+    totalGbp,
+    interestedCount,
+    percent: Math.min(100, Math.floor((totalGbp / EOI_MINIMUM_GBP) * 100)),
+    reached: totalGbp >= EOI_MINIMUM_GBP,
+  };
 }
 
 export type BoardInvolvement = "invested" | "committed" | "voted" | null;
@@ -1738,7 +1953,15 @@ export const BOARD_INVOLVEMENT_LABELS: Record<Exclude<BoardInvolvement, null>, s
 /** Europe/London's offset from UTC at an instant, in minutes (0 in winter, 60 in summer). */
 function londonOffsetMinutes(at: Date): number {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
       .formatToParts(at)
       .map((p) => [p.type, p.value]),
   );
@@ -1894,7 +2117,12 @@ export const ASSESSMENT_STATUS_LABELS: Record<AssessmentStatus, string> = {
  * an assessment stage, or a DXV Review Issue has been issued). `aiDrafts` are effective
  * statuses (effectiveDeckStatus(), so a timed-out job counts as failed).
  */
-export function assessmentStatus(v: { currentStage: Stage; issued: boolean; hasReviewDraft: boolean; aiDrafts: { status: string }[] }): AssessmentStatus | null {
+export function assessmentStatus(v: {
+  currentStage: Stage;
+  issued: boolean;
+  hasReviewDraft: boolean;
+  aiDrafts: { status: string }[];
+}): AssessmentStatus | null {
   if (!(ASSESSMENT_STAGES as readonly Stage[]).includes(v.currentStage) || v.issued) return null;
   if (v.hasReviewDraft) return "in-review";
   if (v.aiDrafts.some((a) => a.status === "PENDING" || a.status === "PROCESSING")) return "drafting";
@@ -1952,7 +2180,9 @@ export function maskEmail(email: string): string {
 
 /** Rate limits on the public join form (null: fine). */
 export function joinRequestLimitError(n: { fromIpLastHour: number; fromEmailLastDay: number; viaLinkLastDay: number }): string | null {
-  if (n.fromIpLastHour >= JOIN_LIMITS.perIpPerHour || n.viaLinkLastDay >= JOIN_LIMITS.perLinkPerDay) return "We've had a lot of requests just now. Please try again later.";
-  if (n.fromEmailLastDay >= JOIN_LIMITS.perEmailPerDay) return "We've already had a few requests from this email today. Check your inbox (and spam) for our email.";
+  if (n.fromIpLastHour >= JOIN_LIMITS.perIpPerHour || n.viaLinkLastDay >= JOIN_LIMITS.perLinkPerDay)
+    return "We've had a lot of requests just now. Please try again later.";
+  if (n.fromEmailLastDay >= JOIN_LIMITS.perEmailPerDay)
+    return "We've already had a few requests from this email today. Check your inbox (and spam) for our email.";
   return null;
 }

@@ -28,20 +28,27 @@ import {
   gatesCrossed,
   teamCardOneLiner,
   type DealSection,
+  preSelectionCountsFrom,
+  preSelectionVoteCounts,
 } from "@/lib/pipeline";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Reveal } from "@/components/reveal";
-import { Card, CommsBadge, ExportLinks, Field, StageBadge, buttonClass, WarningIcon, commsLabel, formatDate, formatDateTime, inputClass } from "@/components/ui";
+import {
+  Card,
+  CommsBadge,
+  ExportLinks,
+  Field,
+  StageBadge,
+  buttonClass,
+  WarningIcon,
+  commsLabel,
+  formatDate,
+  formatDateTime,
+  inputClass,
+} from "@/components/ui";
 import { CommsStatus } from "@/generated/prisma/enums";
 import type { FounderComm } from "@/generated/prisma/client";
-import {
-  addDDItem,
-  declineVenture,
-  addPreSelectionVote,
-  moveVentureForm,
-  updateFounderComm,
-  updateVenture,
-} from "../../actions";
+import { addDDItem, declineVenture, addPreSelectionVote, moveVentureForm, updateFounderComm, updateVenture } from "../../actions";
 import { VentureFields } from "../../venture-fields";
 import { StageMover } from "../stage-mover";
 import { DocumentItem, DocumentsCard, type DocRow } from "../documents-card";
@@ -55,12 +62,12 @@ import { AdvanceButton, SectionNav, type NavItem } from "../deal-nav";
 import { CommitmentsCard, FinalInvestmentCard, type AuditEntry } from "../investment-sections";
 import { AngelsCard } from "../angels-card";
 import { AdoptOneLinerButton } from "../one-liner-button";
-import { angelIdsWithDealAccess } from "@/lib/portal-deals";
+import { angelIdsWithDealAccess, loadVoteRounds } from "@/lib/portal-deals";
 
 export default async function DealReviewPage({ params }: PageProps<"/deals/[id]">) {
   const { id } = await params;
 
-  const [v, { _max }, angelNames, withAccess, aliases, founderTemplates] = await requireAdminWith(() =>
+  const [v, { _max }, angelNames, withAccess, aliases, founderTemplates, voteRounds] = await requireAdminWith(() =>
     Promise.all([
       db.venture.findUnique({
         where: { id },
@@ -113,7 +120,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       angelNameOptions(),
       angelIdsWithDealAccess(),
       aliasMap(),
-      db.emailTemplate.findMany({ where: { key: { in: ["founder-progress", "founder-decline"] }, archivedAt: null }, select: { key: true, subject: true, body: true } }),
+      db.emailTemplate.findMany({
+        where: { key: { in: ["founder-progress", "founder-decline"] }, archivedAt: null },
+        select: { key: true, subject: true, body: true },
+      }),
+      loadVoteRounds(),
     ]),
   );
   if (!v) notFound();
@@ -123,7 +134,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
 
   // The EOI window opens when the deal (most recently) entered Investment Commitments.
   const commitments = commitmentTotal(v.investmentVotes);
-  const currentPreSelectionIds = new Set(latestVotePerAngel(v.preSelectionVotes).map((x) => x.id));
+  // Members' votes count only from when the round's voting was opened (after the live presentation).
+  const countedPreSelection = v.preSelectionVotes.filter((x) => preSelectionVoteCounts(x, v.round, voteRounds));
+  const preSelectionCountsFromWhen = preSelectionCountsFrom(v.round, voteRounds);
+  const currentPreSelectionIds = new Set(latestVotePerAngel(countedPreSelection).map((x) => x.id));
+  const countedPreSelectionIds = new Set(countedPreSelection.map((x) => x.id));
   const preSelectionInterested = v.preSelectionVotes.filter((x) => currentPreSelectionIds.has(x.id) && x.interested).length;
   const ddDone = v.ddItems.filter((i) => i.completedAt).length;
   const issueNo = issueNumbers(v.memoVersions.filter((m) => m.kind === "REVIEWED_MEMO"));
@@ -135,7 +150,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
     aiSummary: (v.deckAnalyses.find((a) => a.screen)?.screen as { oneLineSummary?: string } | null | undefined)?.oneLineSummary,
     description: v.description,
   });
-
 
   // Layout follows the dealflow: sections that matter at this stage start open and
   // are marked "Now"; the rest collapse to a one-line summary (rules in pipeline.ts).
@@ -195,7 +209,10 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           <StageBadge stage={v.currentStage} />
           <span className="text-sm text-black/55">{daysSince(v.stageEnteredAt, now)} days in stage</span>
           {v.importedAt && (
-            <span className="rounded-full bg-black/10 px-2.5 py-0.5 text-xs font-medium" title={`Added by the historical import on ${formatDate(v.importedAt)}`}>
+            <span
+              className="rounded-full bg-black/10 px-2.5 py-0.5 text-xs font-medium"
+              title={`Added by the historical import on ${formatDate(v.importedAt)}`}
+            >
               Imported from past records
             </span>
           )}
@@ -221,8 +238,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
         </p>
         {isInvestedStage(v.currentStage) && invested === 0 && (
           <p className="mt-2 inline-block rounded border-l-4 border-dxv-yellow bg-dxv-yellow/20 px-3 py-1 text-sm">
-            No paid tickets yet: tick payments in <a href="#final-investment" className="font-medium underline">Final investment</a> so this
-            deal counts towards the dashboard&apos;s Investment Total.
+            No paid tickets yet: tick payments in{" "}
+            <a href="#final-investment" className="font-medium underline">
+              Final investment
+            </a>{" "}
+            so this deal counts towards the dashboard&apos;s Investment Total.
           </p>
         )}
         {v.currentStage === "PASSED" && v.passReason && (
@@ -242,8 +262,8 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             <Reveal label="Decline" buttonClassName={declinePillClass}>
               <ActionForm action={declineVenture.bind(null, v.id)} className="space-y-3">
                 <p className="text-sm">
-                  Decline <strong>{v.name}</strong> at <strong>{stageLabel(v.currentStage)}</strong>. The deal is kept (for dealflow
-                  learning) and a founder update is flagged as owed in Founder comms.
+                  Decline <strong>{v.name}</strong> at <strong>{stageLabel(v.currentStage)}</strong>. The deal is kept (for dealflow learning) and a founder
+                  update is flagged as owed in Founder comms.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Reason *">
@@ -282,7 +302,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* ── Main column ── */}
         <div className="min-w-0 space-y-6">
-
           {/* Page follows the dealflow: eligibility, assessment, memo, votes, commitments, DD. */}
           <EligibilityCard
             ventureId={v.id}
@@ -306,9 +325,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             memoSummary={latestMemoName ? `Latest memo: ${latestMemoName}` : null}
           >
             {v.memoVersions.length === 0 ? (
-              <p className="text-sm text-black/55">
-                No memo yet. Mark a DXV Review Draft complete to issue one, or upload a memo file below.
-              </p>
+              <p className="text-sm text-black/55">No memo yet. Mark a DXV Review Draft complete to issue one, or upload a memo file below.</p>
             ) : (
               <ul className="divide-y divide-black/10">
                 {v.memoVersions.map((m, i) => (
@@ -352,8 +369,18 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             }}
             actions={<span className="text-xs text-black/55">{preSelectionInterested} interested · pitch selection stage</span>}
           >
+            {preSelectionCountsFromWhen === "none" ? (
+              <p className="mb-3 rounded-md bg-dxv-yellow/30 px-3 py-2 text-sm">
+                Members&apos; voting for Round {v.round} isn&apos;t open yet. Open it from Deals → Open angel votes after the live presentation; only votes from
+                then count.
+              </p>
+            ) : preSelectionCountsFromWhen !== "all" ? (
+              <p className="mb-3 text-xs text-black/55">
+                Voting for Round {v.round} opened {formatDateTime(preSelectionCountsFromWhen)}: only votes from then count.
+              </p>
+            ) : null}
             <VoteList
-              votes={v.preSelectionVotes.map((x) => ({ ...x, current: currentPreSelectionIds.has(x.id) }))}
+              votes={v.preSelectionVotes.map((x) => ({ ...x, current: currentPreSelectionIds.has(x.id), beforeOpening: !countedPreSelectionIds.has(x.id) }))}
               emptyText="No votes yet. Record each angel's vote on whether this venture should pitch."
             />
             <div className="mt-4 border-t border-black/10 pt-4">
@@ -376,12 +403,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
             </div>
           </Card>
 
-          <CommitmentsCard
-            ventureId={v.id}
-            votes={v.investmentVotes}
-            audits={audits("INVESTMENT_VOTE")}
-            collapse={collapse("commitments")}
-          />
+          <CommitmentsCard ventureId={v.id} votes={v.investmentVotes} audits={audits("INVESTMENT_VOTE")} collapse={collapse("commitments")} />
 
           <Card
             title="Due Diligence"
@@ -390,7 +412,11 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
               ...collapse("dd"),
               summary: v.ddItems.length ? `${ddDone}/${v.ddItems.length} items done` : "No DD items yet",
             }}
-            actions={<span className="text-xs text-black/55">{ddDone}/{v.ddItems.length} done</span>}
+            actions={
+              <span className="text-xs text-black/55">
+                {ddDone}/{v.ddItems.length} done
+              </span>
+            }
           >
             <DDDocumentPanel ventureId={v.id} stage={v.currentStage} latest={v.ddReportJobs[0] ?? null} />
             {v.ddItems.length === 0 ? (
@@ -459,7 +485,6 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
           />
 
           <DocumentsCard ventureId={v.id} docs={docs} collapse={collapse("documents")} />
-
         </div>
 
         {/* ── Sidebar ── */}
@@ -562,7 +587,7 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                 )}
               </div>
             )}
-                      {v.founderEmails.length > 0 && (
+            {v.founderEmails.length > 0 && (
               <details className="mt-3 border-t border-black/10 pt-3 text-sm">
                 <summary className="cursor-pointer text-dxv-green">Emails to the founder ({v.founderEmails.length})</summary>
                 <ul className="mt-2 space-y-2">
@@ -570,7 +595,10 @@ export default async function DealReviewPage({ params }: PageProps<"/deals/[id]"
                     <li key={e.id} className="rounded-md bg-black/[0.03] p-2">
                       <p className="font-medium">{e.subject}</p>
                       <p className="text-xs text-black/55">
-                        {formatDate(e.createdAt)} · to {e.to} · {e.kind === "ACKNOWLEDGEMENT" ? "automatic acknowledgement" : `${e.kind === "BULK" ? "email to several founders, " : ""}sent by ${e.sentBy?.name ?? "the team"}`}
+                        {formatDate(e.createdAt)} · to {e.to} ·{" "}
+                        {e.kind === "ACKNOWLEDGEMENT"
+                          ? "automatic acknowledgement"
+                          : `${e.kind === "BULK" ? "email to several founders, " : ""}sent by ${e.sentBy?.name ?? "the team"}`}
                         {e.error ? ` · didn't send` : ""}
                       </p>
                       <details className="mt-1 text-xs">
@@ -644,6 +672,8 @@ type VoteRow = {
   createdAt: Date;
   recordedBy: { name: string };
   current: boolean;
+  /** Cast before the round's voting was opened: kept on record, doesn't count. */
+  beforeOpening?: boolean;
 };
 
 function VoteList({ votes, emptyText, showTicket }: { votes: VoteRow[]; emptyText: string; showTicket?: boolean }) {
@@ -663,7 +693,7 @@ function VoteList({ votes, emptyText, showTicket }: { votes: VoteRow[]; emptyTex
           <tr key={x.id} className={x.current ? "" : "text-black/40"}>
             <td className="py-1.5">
               {x.angelName}
-              {!x.current && <span className="ml-1.5 text-xs">(superseded)</span>}
+              {!x.current && <span className="ml-1.5 text-xs">{x.beforeOpening ? "(before voting opened: doesn't count)" : "(superseded)"}</span>}
               {x.note && <p className="text-xs text-black/50">{x.note}</p>}
             </td>
             <td className="py-1.5">{x.interested ? "Interested" : "Not interested"}</td>
@@ -729,7 +759,19 @@ function CommItem({ c, draft }: { c: CommRow; draft?: CommDraft }) {
 }
 
 /** What the founder told DXV on the website form (kept exactly as they gave it). */
-function WebsiteSubmission({ s }: { s: { createdAt: Date; linkedinUrl: string | null; heardFrom: string | null; pitch: string; resubmission: boolean; previousVentureId: string | null; diversityConsentAt: Date | null } }) {
+function WebsiteSubmission({
+  s,
+}: {
+  s: {
+    createdAt: Date;
+    linkedinUrl: string | null;
+    heardFrom: string | null;
+    pitch: string;
+    resubmission: boolean;
+    previousVentureId: string | null;
+    diversityConsentAt: Date | null;
+  };
+}) {
   return (
     <div className="mb-3 space-y-1 rounded-md bg-dxv-green/[0.04] p-3 text-sm">
       <p className="font-medium text-dxv-green">

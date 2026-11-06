@@ -5,11 +5,13 @@ import { db } from "@/lib/db";
 import { loadDealRoom, loadMemberBoard, memberRoundVoting } from "./portal-deals";
 
 let partner: string, me: string;
+let started: Date; // before every vote below
 const deals: Record<string, string> = {};
 const others: string[] = [];
 
 beforeAll(async () => {
   const stamp = Date.now();
+  started = new Date(stamp);
   partner = (await db.user.create({ data: { name: "Synthetic Partner", email: `vp-${stamp}@example.test`, passwordHash: "x", role: "ADMIN" } })).id;
   me = (await db.angel.create({ data: { name: "Synthetic Voter", email: `voter-${stamp}@example.test`, createdById: partner } })).id;
   for (let i = 0; i < 6; i++) others.push((await db.angel.create({ data: { name: `Synthetic Angel ${i}`, createdById: partner } })).id);
@@ -42,6 +44,15 @@ describe("pitch-selection votes per round", () => {
   it("uses the deadline only for the round open to members", async () => {
     const closes = new Date(Date.now() + 86_400_000);
     await db.memberRound.create({ data: { round: 71, votingClosesAt: closes, byId: partner } });
+    // The round open to members, before a partner opens voting: no votes count and none are taken.
+    const shut = await memberRoundVoting(me, 71);
+    expect(shut.notOpen).toBe(true);
+    expect(shut.used.size).toBe(0);
+    expect((await loadDealRoom(deals.A, me))?.myPreSelection).toBeNull();
+    expect((await memberRoundVoting(me, 72)).notOpen).toBe(false); // other rounds as before
+    // Opened before these votes were cast (so they count from here on).
+    await db.memberRound.create({ data: { round: 71, votingClosesAt: closes, votingOpenedAt: started, byId: partner } });
+    expect((await memberRoundVoting(me, 71)).notOpen).toBe(false);
     expect((await memberRoundVoting(me, 71)).closesAt?.getTime()).toBe(closes.getTime());
     expect((await memberRoundVoting(me, 72)).closesAt).toBeNull();
     const room = await loadDealRoom(deals.D, me);
@@ -71,5 +82,19 @@ describe("expressions of interest towards £25k", () => {
     expect(card(deals.C)?.involvement).toBeNull();
     expect(card(deals["Other round"])).toBeUndefined(); // not the round open to members
     expect(board.voting.used.size).toBe(2);
+  });
+});
+
+describe("opening voting after the live presentation", () => {
+  it("leaves earlier votes on record but uncounted, and counts new ones", async () => {
+    const closes = new Date(Date.now() + 86_400_000);
+    const before = await db.preSelectionVote.count({ where: { angelId: me } });
+    await db.memberRound.create({ data: { round: 71, votingClosesAt: closes, votingOpenedAt: new Date(), byId: partner } });
+    expect((await memberRoundVoting(me, 71)).used.size).toBe(0);
+    expect((await loadMemberBoard(me)).cards.find((c) => c.id === deals.A)?.involvement).toBeNull();
+    expect(await db.preSelectionVote.count({ where: { angelId: me } })).toBe(before); // nothing deleted
+    await db.preSelectionVote.create({ data: { ventureId: deals.D, angelName: "Synthetic Voter", angelId: me, interested: true, recordedById: partner } });
+    expect([...(await memberRoundVoting(me, 71)).used]).toEqual([deals.D]);
+    expect((await loadDealRoom(deals.D, me))?.myPreSelection?.interested).toBe(true);
   });
 });

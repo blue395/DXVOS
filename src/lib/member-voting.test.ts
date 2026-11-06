@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  angelVotingState,
   boardInvolvement,
+  memberEmailAudience,
+  openVotingProblem,
+  preSelectionCountsFrom,
+  preSelectionVoteCounts,
+  roundOpenedAt,
+  type VoteRounds,
   dateToLondonLocal,
   eoiProgress,
   EOI_MINIMUM_GBP,
@@ -184,5 +191,59 @@ describe("memo Round and Stage pills", () => {
     expect(choiceFrom(f, "stage")).toBe("Series B");
     expect(choiceFrom(f, "round")).toBe("Round 4");
     expect(choiceFrom(f, "missing")).toBeNull();
+  });
+});
+
+describe("voting opens after the live presentation", () => {
+  const opened = t("2026-11-12T20:00:00Z");
+  const closes = t("2026-11-19T18:00:00Z");
+  const before = { createdAt: t("2026-11-10T09:00:00Z") };
+  const after = { createdAt: t("2026-11-12T20:05:00Z") };
+  const shut: VoteRounds = { current: { round: 4, votingOpenedAt: null, votingClosesAt: closes }, openings: [] };
+  const open: VoteRounds = { current: { round: 4, votingOpenedAt: opened, votingClosesAt: closes }, openings: [{ round: 4, votingOpenedAt: opened }] };
+
+  it("the round open to members counts no votes until it's opened, then only votes from then", () => {
+    expect(preSelectionCountsFrom(4, shut)).toBe("none");
+    expect(preSelectionVoteCounts(before, 4, shut)).toBe(false);
+    expect(preSelectionVoteCounts(before, 4, open)).toBe(false);
+    expect(preSelectionVoteCounts(after, 4, open)).toBe(true);
+  });
+  it("older rounds that were never opened count every vote, as before; opened ones keep their opening", () => {
+    expect(preSelectionCountsFrom(1, shut)).toBe("all");
+    expect(preSelectionCountsFrom(null, shut)).toBe("all");
+    const moved: VoteRounds = { current: { round: 5, votingOpenedAt: null, votingClosesAt: null }, openings: open.openings };
+    expect(preSelectionVoteCounts(before, 4, moved)).toBe(false);
+    expect(roundOpenedAt(4, moved)).toEqual(opened);
+  });
+  it("refuses votes before opening and after the deadline", () => {
+    expect(preSelectionVoteRefusal({ ventureId: "a", interested: true }, new Set(), { number: 4, closesAt: closes, notOpen: true }, after.createdAt)).toMatch(
+      /opens after the live pitch session/,
+    );
+  });
+  it("knows where voting stands, and when it can be opened", () => {
+    const now = t("2026-11-13T09:00:00Z");
+    expect(angelVotingState({ current: null, openings: [] }, now)).toBe("no-round");
+    expect(angelVotingState(shut, now)).toBe("not-open");
+    expect(angelVotingState(open, now)).toBe("open");
+    expect(angelVotingState(open, t("2026-11-20T09:00:00Z"))).toBe("closed");
+    expect(openVotingProblem(shut, now)).toBeNull();
+    expect(openVotingProblem(open, now)).toMatch(/already open/);
+    expect(openVotingProblem({ current: { round: 4, votingOpenedAt: null, votingClosesAt: null }, openings: [] }, now)).toMatch(/deadline first/);
+    expect(openVotingProblem({ current: { round: 4, votingOpenedAt: null, votingClosesAt: t("2026-11-01T00:00:00Z") }, openings: [] }, now)).toMatch(/passed/);
+  });
+});
+
+describe("email audience: members who can see deals", () => {
+  it("is members on the platform with deal access only", () => {
+    const base = { status: "MEMBER" as const, archivedAt: null, email: "a@example.test", emailOptOutAt: null, hasLogin: true };
+    const r = memberEmailAudience(
+      [
+        { ...base, dealAccess: true },
+        { ...base, dealAccess: false },
+        { ...base, hasLogin: false, dealAccess: true },
+      ],
+      "deal-access",
+    );
+    expect(r.included).toHaveLength(1);
   });
 });

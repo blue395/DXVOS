@@ -21,7 +21,10 @@ import {
   boardInvolvement,
   eoiProgress,
   nextOnboardingStep,
+  preSelectionCountsFrom,
+  preSelectionVoteCounts,
   preSelectionVotesUsed,
+  type VoteRounds,
   PRE_SELECTION_VOTE_LIMIT,
   resolveAngelId,
   type AngelDealPhase,
@@ -65,53 +68,12 @@ export type DealListItem = {
 
 /** Every deal members can see now, newest share first; with `angelId`, that angel's own vote status on each. */
 export async function listSharedDeals(angelId: string | null = null): Promise<DealListItem[]> {
-  const rows = await db.venture.findMany({
-    where: {
-      sharedWithAngelsAt: { not: null },
-      currentStage: { in: VISIBLE_STAGES },
-    },
-    orderBy: { sharedWithAngelsAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      sector: true,
-      oneLiner: true,
-      currentStage: true,
-      sharedWithAngelsAt: true,
-      preSelectionVotes: angelId
-        ? {
-            where: { angelId },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { interested: true },
-          }
-        : false,
-      investmentVotes: angelId
-        ? {
-            where: { angelId, removedAt: null },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { interested: true, maxTicketGbp: true },
-          }
-        : false,
-      // The latest uploaded deck (members see it from Member Pitch Selection on, like the deal room).
-      documents: {
-        where: {
-          category: "DECK",
-          uploadedAt: { not: null },
-          archivedAt: null,
-        },
-        orderBy: { uploadedAt: "desc" },
-        take: 1,
-        select: { id: true, fileName: true, mimeType: true },
-      },
-    },
-  });
+  const [rows, rounds] = await Promise.all([listSharedRows(angelId), loadVoteRounds()]);
   return rows.flatMap((v) => {
     const phase = angelDealVisibility(v);
     if (!phase) return [];
     const voteKind = angelVoteKind(v.currentStage);
-    const pre = v.preSelectionVotes?.[0];
+    const pre = countedOrNull(v.preSelectionVotes?.[0], v.round, rounds);
     const eoi = v.investmentVotes?.[0];
     const myAnswer =
       voteKind === "pre-selection" && pre
@@ -135,6 +97,57 @@ export async function listSharedDeals(angelId: string | null = null): Promise<De
   });
 }
 
+/** Shared deals and this angel's own latest answers (the query behind listSharedDeals()). */
+const listSharedRows = (angelId: string | null) =>
+  db.venture.findMany({
+    where: {
+      sharedWithAngelsAt: { not: null },
+      currentStage: { in: VISIBLE_STAGES },
+    },
+    orderBy: { sharedWithAngelsAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      sector: true,
+      oneLiner: true,
+      currentStage: true,
+      sharedWithAngelsAt: true,
+      round: true,
+      preSelectionVotes: angelId
+        ? {
+            where: { angelId },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { interested: true, createdAt: true },
+          }
+        : false,
+      investmentVotes: angelId
+        ? {
+            where: { angelId, removedAt: null },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { interested: true, maxTicketGbp: true },
+          }
+        : false,
+      // The latest uploaded deck (members see it from Member Pitch Selection on, like the deal room).
+      documents: {
+        where: {
+          category: "DECK",
+          uploadedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { uploadedAt: "desc" },
+        take: 1,
+        select: { id: true, fileName: true, mimeType: true },
+      },
+    },
+  });
+
+/** A pitch-selection answer only if it counts (cast since its round's voting opened). */
+function countedOrNull<T extends { createdAt: Date }>(vote: T | undefined, round: number | null, rounds: VoteRounds): T | null {
+  return vote && preSelectionVoteCounts(vote, round, rounds) ? vote : null;
+}
+
 /** The round DXV has opened to members' deals board (set on the Dashboard; null = none). */
 export async function currentMemberRound(): Promise<number | null> {
   const latest = await db.memberRound.findFirst({
@@ -144,11 +157,21 @@ export async function currentMemberRound(): Promise<number | null> {
   return latest?.round ?? null;
 }
 
-const latestMemberRound = () =>
-  db.memberRound.findFirst({
-    orderBy: { createdAt: "desc" },
-    select: { round: true, votingClosesAt: true, createdAt: true },
-  });
+/** The member-round rows the voting rules need (pipeline.ts VoteRounds), plus when the latest was set. */
+export async function loadVoteRounds(): Promise<VoteRounds & { setAt: Date | null }> {
+  const [latest, openings] = await Promise.all([
+    db.memberRound.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { round: true, votingClosesAt: true, votingOpenedAt: true, createdAt: true },
+    }),
+    db.memberRound.findMany({
+      where: { votingOpenedAt: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { round: true, votingOpenedAt: true },
+    }),
+  ]);
+  return { current: latest, openings, setAt: latest?.createdAt ?? null };
+}
 
 /** A member's pitch-selection votes on deals that belong to a round (for the 3-per-round limit). */
 const myRoundVotes = (angelId: string) =>
@@ -170,25 +193,26 @@ export type RoundVoting = {
   used: Set<string>;
   /** The deadline, when the team has set one for this round (the round open to members). */
   closesAt: Date | null;
+  /** The round open to members, before a partner has opened voting (after the live presentation): no votes yet. */
+  notOpen: boolean;
 };
 
-function roundVoting(
-  round: number | null,
-  votes: Awaited<ReturnType<typeof myRoundVotes>>,
-  latest: { round: number | null; votingClosesAt: Date | null } | null,
-): RoundVoting {
+function roundVoting(round: number | null, votes: Awaited<ReturnType<typeof myRoundVotes>>, rounds: VoteRounds): RoundVoting {
+  // Only votes cast since the round's voting opened count (earlier ones stay on record).
+  const counted = votes.filter((v) => v.venture.round === round && preSelectionVoteCounts(v, round, rounds));
   return {
     round,
     limit: PRE_SELECTION_VOTE_LIMIT,
-    used: round === null ? new Set() : preSelectionVotesUsed(votes.filter((v) => v.venture.round === round)),
-    closesAt: round !== null && latest?.round === round ? latest.votingClosesAt : null,
+    used: round === null ? new Set() : preSelectionVotesUsed(counted),
+    closesAt: round !== null && rounds.current?.round === round ? rounds.current.votingClosesAt : null,
+    notOpen: preSelectionCountsFrom(round, rounds) === "none",
   };
 }
 
 /** The voting state for one deal's round, for the vote action (checked on every vote). */
 export async function memberRoundVoting(angelId: string, round: number | null): Promise<RoundVoting> {
-  const [votes, latest] = await Promise.all([round === null ? Promise.resolve([]) : myRoundVotes(angelId), latestMemberRound()]);
-  return roundVoting(round, votes, latest);
+  const [votes, rounds] = await Promise.all([round === null ? Promise.resolve([]) : myRoundVotes(angelId), loadVoteRounds()]);
+  return roundVoting(round, votes, rounds);
 }
 
 export type MemberBoardCard = {
@@ -220,8 +244,8 @@ export async function loadMemberBoard(angelId: string): Promise<{
 }> {
   // One round trip: the latest round choice, every live deal in any round (memberBoardCards()
   // keeps the chosen round's) and this member's own votes and tickets, together.
-  const [latest, rows, myVotes, eois, finals, aliases] = await Promise.all([
-    latestMemberRound(),
+  const [rounds, rows, myVotes, eois, finals, aliases] = await Promise.all([
+    loadVoteRounds(),
     db.venture.findMany({
       where: { round: { not: null }, currentStage: { not: "PASSED" } },
       orderBy: { stageEnteredAt: "asc" },
@@ -263,10 +287,10 @@ export async function loadMemberBoard(angelId: string): Promise<{
     }),
     aliasMap(),
   ]);
-  const round = latest?.round ?? null;
+  const round = rounds.current?.round ?? null;
   const cards = memberBoardCards(rows, round);
-  const voting = roundVoting(round, myVotes, latest);
-  const votedYes = preSelectionVotesUsed(myVotes);
+  const voting = roundVoting(round, myVotes, rounds);
+  const votedYes = preSelectionVotesUsed(myVotes.filter((v) => preSelectionVoteCounts(v, v.venture.round, rounds)));
   return {
     round,
     voting,
@@ -274,7 +298,7 @@ export async function loadMemberBoard(angelId: string): Promise<{
       round === null
         ? null
         : boardLastUpdated(
-            latest?.createdAt ?? null,
+            rounds.setAt,
             cards.map((c) => c.updatedAt),
           ),
     cards: cards.map((c) => {
@@ -368,7 +392,7 @@ const docSelect = {
  * ask to see it as a committed member).
  */
 export async function loadDealRoom(ventureId: string, angelId: string | null, opts: { previewCommitted?: boolean } = {}): Promise<DealRoom | null> {
-  const [v, eois, finals, aliases, myVotes, latestRound] = await Promise.all([
+  const [v, eois, finals, aliases, myVotes, rounds] = await Promise.all([
     db.venture.findUnique({
       where: { id: ventureId },
       select: {
@@ -436,7 +460,7 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
       : [],
     angelId ? aliasMap() : new Map<string, string>(),
     angelId ? myRoundVotes(angelId) : [],
-    latestMemberRound(),
+    loadVoteRounds(),
   ]);
   if (!v) return null;
   const phase = angelDealVisibility(v);
@@ -495,9 +519,9 @@ export async function loadDealRoom(ventureId: string, angelId: string | null, op
     ddOpen: dd.open,
     committed,
     voteKind,
-    voting: voteKind === "pre-selection" && angelId ? roundVoting(v.round, myVotes, latestRound) : null,
+    voting: voteKind === "pre-selection" && angelId ? roundVoting(v.round, myVotes, rounds) : null,
     progress: voteKind === "eoi" ? eoiProgress(eois) : null,
-    myPreSelection: v.preSelectionVotes?.[0] ?? null,
+    myPreSelection: countedOrNull(v.preSelectionVotes?.[0], v.round, rounds),
     myEoi: v.investmentVotes?.[0] ?? null,
   };
 }
