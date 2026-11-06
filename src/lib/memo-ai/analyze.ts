@@ -1,12 +1,12 @@
 // Sends the deck + DXV OS context to Claude; returns a validated, house-styled memo.
 import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { lenientOutputFormat } from "../ai-choices";
 import { applyHouseStyle } from "../deck-ai/render";
 import { renderContext, type MemoContext } from "./context";
 import { DEFAULT_ASSESSMENT } from "../playbook/defaults";
 import { buildMemoPrompt, buildMemoUserInstructions } from "../playbook/prompts";
 import { MEMO_AI_MODEL } from "./prompt";
-import { memoContentSchema, MemoFormatError, normaliseScores, type MemoContent } from "./schema";
+import { lenientMemoContentSchema, memoContentSchema, MemoFormatError, normaliseScores, type MemoContent } from "./schema";
 import { withDataNote } from "../ai-untrusted";
 
 export type MemoAnalysisResult = { memo: MemoContent; model: string; inputTokens: number; outputTokens: number };
@@ -46,7 +46,7 @@ export async function analyzeMemo(client: Anthropic, pdf: Buffer, context: MemoC
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(memoContentSchema(criteria)) },
+    output_config: { format: lenientOutputFormat(memoContentSchema(criteria), lenientMemoContentSchema(criteria)) },
   });
 
   if (response.stop_reason === "refusal") throw new MemoFormatError("Claude declined to assess this deck.");

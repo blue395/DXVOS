@@ -1,6 +1,7 @@
 // Shape of the AI's DD plan (structured outputs + zod). Shared with the worker.
 import { z } from "zod";
 import { DD_AREAS } from "./prompt";
+import { lenientChoice } from "../ai-choices";
 
 export const DDAreaSchema = z.object({
   area: z.enum(DD_AREAS),
@@ -15,6 +16,11 @@ export const DDPlanSchema = z.object({
   areas: z.array(DDAreaSchema),
   priorityRisks: z.array(z.string()),
   documentsRequested: z.array(z.string()),
+});
+
+/** How Claude's plan is read: an area name that's a near-miss ("legal & IP") maps onto DXV's list (src/lib/ai-choices.ts). */
+export const LenientDDPlanSchema = DDPlanSchema.extend({
+  areas: z.array(DDAreaSchema.extend({ area: lenientChoice(DD_AREAS) })),
 });
 
 export type DDArea = z.infer<typeof DDAreaSchema>;

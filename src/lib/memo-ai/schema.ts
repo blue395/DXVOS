@@ -1,6 +1,7 @@
 // The memo's shape: enforced by structured outputs, then validated with zod.
 // Shared with the Netlify worker (no Next-only imports).
 import { z } from "zod";
+import { lenientChoice } from "../ai-choices";
 
 /** Playbook version 0's eleven scoring criteria (DXV's template order). The criteria in use
  *  now come from the Playbook; each memo keeps the criteria it was scored against. */
@@ -47,6 +48,13 @@ export const MemoContentSchema = z.object({
   }),
   followUpQuestions: z.array(z.string()),
 });
+
+/** How Claude's memo is read: criterion names that are near-misses map onto this run's names (src/lib/ai-choices.ts). */
+export function lenientMemoContentSchema(criteria: readonly string[]) {
+  return MemoContentSchema.extend({
+    scores: z.array(ScoreSchema.extend({ criterion: lenientChoice(criteria as [string, ...string[]]) })),
+  });
+}
 
 /** The shape Claude must return: scores limited to this run's criteria names. */
 export function memoContentSchema(criteria: readonly string[]) {
