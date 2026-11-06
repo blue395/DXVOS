@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginLinkEmail, sentLinkEmail } from "./login-email";
+import { loginLinkEmail, sentLinkEmail, statementSignedTeamEmail } from "./login-email";
 
 describe("loginLinkEmail", () => {
   it("says what the link does, how long it lasts, and escapes names", () => {
@@ -16,12 +16,38 @@ describe("loginLinkEmail", () => {
 
 describe("sentLinkEmail", () => {
   it("names who sent it and when the link stops working", () => {
-    const m = sentLinkEmail("MEMBER_INVITE", { name: "Grace Hopper", link: "https://os.example/join/abc", expiresAt: new Date("2026-10-15T12:00:00Z"), sentBy: "Blue O'Connor" });
+    const m = sentLinkEmail("MEMBER_INVITE", {
+      name: "Grace Hopper",
+      link: "https://os.example/join/abc",
+      expiresAt: new Date("2026-10-15T12:00:00Z"),
+      sentBy: "Blue O'Connor",
+    });
     expect(m.subject).toBe("Your invitation to the DXV members' portal");
     expect(m.text).toContain("Blue has invited you");
     expect(m.text).toContain("until 15 October");
     expect(m.html).toContain("Blue has invited you"); // no apostrophe in the name here
     expect(sentLinkEmail("RESET", { name: "A", link: "x", expiresAt: new Date(), sentBy: "Anna C" }).subject).toBe("Set a new DXV password");
     expect(sentLinkEmail("TEAM_INVITE", { name: "A", link: "x", expiresAt: new Date(), sentBy: "Kevin" }).text).toContain("Kevin has invited you to DXV OS");
+  });
+});
+
+describe("statementSignedTeamEmail", () => {
+  const base = { email: "sam@example.test", statement: "High net worth individual statement", angelUrl: "https://os.example/angels/a1", dealAccess: true };
+
+  it("says set-up the first time and renewal after, with a link to the record", () => {
+    const first = statementSignedTeamEmail({ ...base, name: "Sam Synthetic", firstTime: true });
+    expect(first.subject).toBe("New member set up: Sam Synthetic");
+    expect(first.text).toContain("Sam Synthetic (sam@example.test) has finished setting up");
+    expect(first.text).toContain("https://os.example/angels/a1");
+    expect(first.text).toContain("can now see the deals");
+    expect(statementSignedTeamEmail({ ...base, dealAccess: false, name: "Sam Synthetic", firstTime: true }).text).toContain("won't see deals");
+    expect(statementSignedTeamEmail({ ...base, name: "Sam Synthetic", firstTime: false }).subject).toBe("Investor statement renewed: Sam Synthetic");
+  });
+
+  it("keeps a typed name plain: no links or extra lines", () => {
+    const m = statementSignedTeamEmail({ ...base, name: "Sam https://evil.example\n[click](x)", firstTime: true });
+    expect(m.subject).not.toMatch(/https?:|\n|\[/);
+    expect(m.html).not.toContain("evil.example\n");
+    expect(m.text.split("\n")[2]).not.toContain("https://");
   });
 });

@@ -173,6 +173,9 @@ the page says to ask the team for a reset link.
 4. **Redeploy** (Deploys → Trigger deploy), then test: sign out → *Email me a sign-in link* → your
    own email. The email arrives from `angels@diversityx.vc`; replies go to that inbox.
 
+Team inbox notifications (e.g. "New member set up" when a member signs their investor statement)
+go to `angels@diversityx.vc`. To send them somewhere else, set `TEAM_INBOX_EMAIL` (optional).
+
 Limits: Google Workspace sends up to about 2,000 emails a day per account, far above DXV's needs.
 To move to a dedicated email service later (e.g. Resend, Postmark), change the five `SMTP_`/`MAIL_`
 values to theirs: no code change.
