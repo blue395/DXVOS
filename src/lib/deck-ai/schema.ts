@@ -1,6 +1,7 @@
 // The exact shape Claude must return (enforced by the API's structured outputs,
 // then validated again by zod when parsed). Shared with the Netlify worker.
 import { z } from "zod";
+import { lenientChoice, matchChoice } from "../ai-choices";
 
 export const RECOMMENDATIONS = ["Proceed to pipeline", "Decline", "Need more information"] as const;
 export const STAGE_FIT_RATINGS = ["Pre-seed", "Seed", "Series A+", "Pre-deck", "Unclear"] as const;
@@ -40,6 +41,47 @@ export const EligibilityScreenSchema = z.object({
 export const DeckAnalysisOutputSchema = z.object({
   extracted: ExtractedFieldsSchema,
   screen: EligibilityScreenSchema,
+});
+
+/** Near-miss stage labels Claude has used (or might), mapped onto DXV's options. */
+const STAGE_SYNONYMS: Record<string, (typeof STAGE_FIT_RATINGS)[number]> = {
+  preseed: "Pre-seed",
+  "pre seed round": "Pre-seed",
+  "seed round": "Seed",
+  "seed extension": "Seed",
+  "seed plus": "Seed",
+  "seed+": "Seed",
+  "post seed": "Seed",
+  "series a": "Series A+",
+  "series b": "Series A+",
+  "series c": "Series A+",
+  "series a or later": "Series A+",
+  growth: "Series A+",
+  "later stage": "Series A+",
+  idea: "Pre-deck",
+  "idea stage": "Pre-deck",
+  concept: "Pre-deck",
+};
+
+/** A rated criterion: an unrecognised rating becomes "Unclear", and the reasoning keeps what Claude wrote. */
+const ratedCriterion = <T extends string>(allowed: readonly T[], synonyms: Record<string, T> = {}) =>
+  z.object({ rating: z.unknown(), reasoning: z.string() }).transform((o) => {
+    const rating = matchChoice(o.rating, allowed, synonyms);
+    return rating
+      ? { rating, reasoning: o.reasoning }
+      : { rating: "Unclear" as T, reasoning: `${o.reasoning} (The AI's own label was "${String(o.rating)}".)`.trim() };
+  });
+
+/**
+ * How Claude's answer is read (src/lib/ai-choices.ts): the same shape as DeckAnalysisOutputSchema,
+ * which is still what's sent, but a near-miss label no longer fails the whole screen.
+ */
+export const LenientDeckAnalysisOutputSchema = DeckAnalysisOutputSchema.extend({
+  screen: EligibilityScreenSchema.extend({
+    recommendation: lenientChoice(RECOMMENDATIONS, { fallback: "Need more information", synonyms: { proceed: "Proceed to pipeline", "more information needed": "Need more information" } }),
+    stageFit: ratedCriterion(STAGE_FIT_RATINGS, STAGE_SYNONYMS),
+    thesisFit: ratedCriterion(THESIS_FIT_RATINGS),
+  }),
 });
 
 export type ExtractedFields = z.infer<typeof ExtractedFieldsSchema>;

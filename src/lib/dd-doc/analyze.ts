@@ -1,10 +1,10 @@
 // Sends the deck (if stored) + DXV OS context to Claude; returns a validated, house-styled DD plan.
 import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { lenientOutputFormat } from "../ai-choices";
 import { applyHouseStyle } from "../deck-ai/render";
 import { renderDDContext, type DDContext } from "./context";
 import { DD_AI_MODEL, DD_SYSTEM_PROMPT, DD_USER_INSTRUCTIONS } from "./prompt";
-import { DDPlanError, DDPlanSchema, normaliseAreas, type DDPlan } from "./schema";
+import { DDPlanError, DDPlanSchema, LenientDDPlanSchema, normaliseAreas, type DDPlan } from "./schema";
 import { withDataNote } from "../ai-untrusted";
 
 export type DDPlanResult = { plan: DDPlan; model: string; inputTokens: number; outputTokens: number };
@@ -38,7 +38,7 @@ export async function analyzeDD(client: Anthropic, pdf: Buffer | null, context: 
     max_tokens: 16000,
     system: DD_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
-    output_config: { format: zodOutputFormat(DDPlanSchema) },
+    output_config: { format: lenientOutputFormat(DDPlanSchema, LenientDDPlanSchema) },
   });
 
   if (response.stop_reason === "refusal") throw new DDPlanError("Claude declined to draft this DD plan.");

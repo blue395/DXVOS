@@ -1,13 +1,13 @@
 // Sends one deck to Claude and returns validated, house-styled output.
 // The Anthropic client is passed in so tests can substitute a fake one.
 import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { lenientOutputFormat } from "../ai-choices";
 import { DEFAULT_ELIGIBILITY } from "../playbook/defaults";
 import { buildDeckUserInstructions, buildScreeningPrompt } from "../playbook/prompts";
 import type { AiContextSnapshot, EligibilityPlaybook } from "../playbook/schema";
 import { canonicalSector, normaliseCompanyStage } from "../pipeline";
 import { DECK_AI_MODEL } from "./prompt";
-import { DeckAnalysisOutputSchema, type DeckAnalysisOutput } from "./schema";
+import { DeckAnalysisOutputSchema, LenientDeckAnalysisOutputSchema, type DeckAnalysisOutput } from "./schema";
 import { cleanOutput } from "./render";
 import { withDataNote } from "../ai-untrusted";
 
@@ -48,7 +48,7 @@ export async function analyzeDeck(
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(DeckAnalysisOutputSchema) },
+    output_config: { format: lenientOutputFormat(DeckAnalysisOutputSchema, LenientDeckAnalysisOutputSchema) },
   });
 
   if (response.stop_reason === "refusal") {
