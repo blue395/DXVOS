@@ -1165,6 +1165,10 @@ model MemberRound {
   // When members' pitch-selection voting for this round closes (null = no deadline set).
   // Changing it adds a new row, like changing the round.
   votingClosesAt DateTime?
+  // When a partner opened members' voting for this round ("Open angel votes", after the live
+  // presentation). Null = not open yet. Only votes cast from then count. Carried onto later rows
+  // for the same round (deadline changes).
+  votingOpenedAt DateTime?
   byId           String
   by             User      @relation(fields: [byId], references: [id])
   createdAt      DateTime  @default(now())

@@ -107,8 +107,8 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-dxv-green">Deals</h1>
           <p className="text-sm text-black/60">
             {declined
@@ -130,6 +130,9 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           </Link>
           <Link href="/deals/founder-emails" className={buttonClass("secondary")}>
             Email founders
+          </Link>
+          <Link href="/deals/angel-votes" className={buttonClass("secondary")}>
+            Open angel votes
           </Link>
           <Link href="/deals/new" className={buttonClass("accent")}>
             + New venture

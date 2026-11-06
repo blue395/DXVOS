@@ -1,7 +1,18 @@
 import Link from "next/link";
 import { requireAdminWith } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { GATE_LABELS, dateToLondonLocal, daysSince, dashboardBands, dashboardMetrics, formatGbp, formatGbpCompact, memberBoardCards, stagePhase, type DashboardBand } from "@/lib/pipeline";
+import {
+  GATE_LABELS,
+  dateToLondonLocal,
+  daysSince,
+  dashboardBands,
+  dashboardMetrics,
+  formatGbp,
+  formatGbpCompact,
+  memberBoardCards,
+  stagePhase,
+  type DashboardBand,
+} from "@/lib/pipeline";
 import { PHASE_STYLE } from "@/lib/board-style";
 import { MemberRoundSelect } from "./member-round-select";
 import { VotingDeadlineForm } from "./voting-deadline-form";
@@ -117,10 +128,15 @@ export default async function DashboardPage() {
             {offeredRound !== null && (
               // Keyed by the saved value so the box shows the latest deadline after a save or round change.
               <div className="pt-2">
-                <VotingDeadlineForm
-                  key={memberRound?.id}
-                  current={memberRound?.votingClosesAt ? dateToLondonLocal(memberRound.votingClosesAt) : ""}
-                />
+                <VotingDeadlineForm key={memberRound?.id} current={memberRound?.votingClosesAt ? dateToLondonLocal(memberRound.votingClosesAt) : ""} />
+                <p className="mt-1.5 text-xs">
+                  {memberRound?.votingOpenedAt
+                    ? `Voting opened ${formatDate(memberRound.votingOpenedAt)}. `
+                    : "Voting isn't open yet: members vote after the live presentation. "}
+                  <Link href="/deals/angel-votes" className="text-dxv-green underline">
+                    Open angel votes
+                  </Link>
+                </p>
               </div>
             )}
           </div>
@@ -157,7 +173,6 @@ export default async function DashboardPage() {
           </Card>
         </div>
       </div>
-
     </div>
   );
 }
@@ -259,7 +274,11 @@ function Metric({
         <span className={`text-3xl font-semibold tabular-nums leading-none ${muted ? "text-black/70" : "text-dxv-green"}`}>{value}</span>
       </span>
       <span className="mt-2 block text-xs">
-        {alarm ? <span className="rounded-full bg-dxv-yellow px-2 py-0.5 font-semibold text-black ring-1 ring-black/20">! {note}</span> : <span className="text-black/50">{note}</span>}
+        {alarm ? (
+          <span className="rounded-full bg-dxv-yellow px-2 py-0.5 font-semibold text-black ring-1 ring-black/20">! {note}</span>
+        ) : (
+          <span className="text-black/50">{note}</span>
+        )}
       </span>
     </Link>
   );

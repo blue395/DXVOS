@@ -19,7 +19,18 @@ import { DomainError, moveVentureStage } from "@/lib/ventures";
 import { recordDeckDocument } from "@/lib/deck-documents";
 import type { ActionResult } from "@/lib/action-result";
 import type { EntrySnapshot } from "@/lib/audit";
-import { canDecline, canonicalSector, isSector, latestVotePerAngel, normaliseAngelName, PASS_REASON_LABELS, stageLabel, teamCardOneLiner } from "@/lib/pipeline";
+import {
+  canDecline,
+  canonicalSector,
+  isSector,
+  preSelectionCountsFrom,
+  latestVotePerAngel,
+  normaliseAngelName,
+  PASS_REASON_LABELS,
+  stageLabel,
+  teamCardOneLiner,
+} from "@/lib/pipeline";
+import { loadVoteRounds } from "@/lib/portal-deals";
 import { Prisma } from "@/generated/prisma/client";
 import { queueLessonSuggestions } from "@/lib/lesson-triggers";
 import { angelIdForName } from "@/lib/angels";
@@ -144,10 +155,7 @@ const MoveSchema = z.object({
 });
 
 /** Called directly from the kanban board (not a form), hence the plain arguments. */
-export async function moveVenture(
-  ventureId: string,
-  input: { to: Stage; passReason?: PassReason | null; note?: string | null },
-): Promise<ActionResult> {
+export async function moveVenture(ventureId: string, input: { to: Stage; passReason?: PassReason | null; note?: string | null }): Promise<ActionResult> {
   const user = await requireAdmin();
   const parsed = MoveSchema.safeParse(input);
   if (!parsed.success) return { error: firstError(parsed.error) };
@@ -233,6 +241,11 @@ export async function addPreSelectionVote(ventureId: string, _prev: ActionResult
   const user = await requireAdmin();
   const parsed = PreSelectionSchema.safeParse(form(formData));
   if (!parsed.success) return { error: firstError(parsed.error) };
+  // The round open to members takes no votes until a partner opens voting (after the live presentation).
+  const [venture, rounds] = await Promise.all([db.venture.findUnique({ where: { id: ventureId }, select: { round: true } }), loadVoteRounds()]);
+  if (!venture) return { error: "Deal not found." };
+  if (preSelectionCountsFrom(venture.round, rounds) === "none")
+    return { error: `Voting for Round ${venture.round} isn't open yet. Open it from Deals → Open angel votes after the live presentation.` };
 
   await db.preSelectionVote.create({ data: { ventureId, recordedById: user.id, ...parsed.data, angelId: await angelIdForName(parsed.data.angelName) } });
   revalidateDeal(ventureId);
@@ -499,7 +512,10 @@ export async function sendFounderDecisionEmail(commId: string, _prev: ActionResu
   const user = await requireAdmin();
   const parsed = FounderEmailSchema.safeParse(form(formData));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const comm = await db.founderComm.findUnique({ where: { id: commId }, include: { venture: { select: { id: true, name: true, founderNames: true, founderEmail: true, currentStage: true } } } });
+  const comm = await db.founderComm.findUnique({
+    where: { id: commId },
+    include: { venture: { select: { id: true, name: true, founderNames: true, founderEmail: true, currentStage: true } } },
+  });
   if (!comm) return { error: "Founder update not found." };
   if (comm.status !== "NOT_YET_SENT") return { error: "This update has already been sent." };
   const to = comm.venture.founderEmail?.trim();
@@ -513,7 +529,9 @@ export async function sendFounderDecisionEmail(commId: string, _prev: ActionResu
     await sendMail({ to, ...mail });
   } catch (e) {
     console.error("Founder decision email failed", e);
-    await db.founderEmail.create({ data: { ventureId: comm.venture.id, commId, kind: "DECISION", to, subject: mail.subject, body: mail.text, sentById: user.id, error: "Didn't send" } });
+    await db.founderEmail.create({
+      data: { ventureId: comm.venture.id, commId, kind: "DECISION", to, subject: mail.subject, body: mail.text, sentById: user.id, error: "Didn't send" },
+    });
     return { error: "The email didn't send. Check the founder's address and try again." };
   }
   const now = new Date();
@@ -539,7 +557,11 @@ export async function adoptSuggestedOneLiner(ventureId: string): Promise<ActionR
   ]);
   if (!v) return { error: "Deal not found." };
   if (v.oneLiner) return { ok: true };
-  const line = teamCardOneLiner({ oneLiner: null, aiSummary: (screen?.screen as { oneLineSummary?: string } | null)?.oneLineSummary, description: v.description });
+  const line = teamCardOneLiner({
+    oneLiner: null,
+    aiSummary: (screen?.screen as { oneLineSummary?: string } | null)?.oneLineSummary,
+    description: v.description,
+  });
   if (!line) return { error: "There's nothing to suggest yet: write one under Edit venture details." };
   await db.venture.update({ where: { id: ventureId }, data: { oneLiner: line.text.slice(0, 200) } });
   revalidateDeal(ventureId);

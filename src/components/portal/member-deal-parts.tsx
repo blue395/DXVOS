@@ -59,6 +59,7 @@ export function EoiProgressBar({ progress, compact = false }: { progress: EoiPro
 export function VotingStatus({ voting, now = new Date() }: { voting: RoundVoting; now?: Date }) {
   const closed = voting.closesAt && now >= voting.closesAt;
   const left = voting.limit - voting.used.size;
+  if (voting.notOpen) return <span className="text-black/65">Voting opens after the live pitch session: we&apos;ll email you when it does.</span>;
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {voting.round !== null && !closed && (

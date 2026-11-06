@@ -21,7 +21,7 @@ export const HOW_IT_WORKS: {
   {
     title: "Pre-selection vote",
     column: "Member Pitch Selection",
-    text: `DXV shares up to six companies with a deck and memo. Vote for your top ${PRE_SELECTION_VOTE_LIMIT}: the ${PRE_SELECTION_VOTE_LIMIT} companies with the most votes are invited to pitch. You can change your votes until voting closes. A vote is not a commitment to invest.`,
+    text: `DXV shares up to six companies with a deck and memo and presents them at a live session. Voting opens after that session (we'll email you): vote for your top ${PRE_SELECTION_VOTE_LIMIT}: the ${PRE_SELECTION_VOTE_LIMIT} companies with the most votes are invited to pitch. You can change your votes until voting closes. A vote is not a commitment to invest.`,
   },
   {
     title: "Monthly pitch",
@@ -70,7 +70,7 @@ export const FAQ: FaqSection[] = [
       {
         q: "How does the pre-selection vote work?",
         a: [
-          `Each round you have ${PRE_SELECTION_VOTE_LIMIT} votes. Vote "Yes" on the ${PRE_SELECTION_VOTE_LIMIT} companies you'd most like to hear pitch. The ${PRE_SELECTION_VOTE_LIMIT} companies with the most votes are invited to the monthly pitch.`,
+          `Voting opens once DXV has presented the round's investment opportunities at a live session; we'll email you when it does. Until then you can read each company's deck and memo. Each round you have ${PRE_SELECTION_VOTE_LIMIT} votes. Vote "Yes" on the ${PRE_SELECTION_VOTE_LIMIT} companies you'd most like to hear pitch. The ${PRE_SELECTION_VOTE_LIMIT} companies with the most votes are invited to the monthly pitch.`,
           'You can change your mind until voting closes: change a vote to "No" to free it up for another company. The voting deadline is shown on the board and on each deal.',
         ],
       },
