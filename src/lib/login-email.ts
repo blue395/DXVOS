@@ -2,6 +2,8 @@
 // invite / reset links the team sends. One layout, in DXV's colours. Pure (no server
 // imports) so it can be tested.
 
+import { inert } from "./member-email";
+
 export type LoginLinkEmailKind = "RESET" | "MAGIC";
 
 export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -143,7 +145,9 @@ export function joinRequestPartnerEmail(opts: { partnerName: string; name: strin
     subject: `Join request: ${opts.name}`,
     name: opts.partnerName,
     lead: `${opts.name} (${opts.email}) asked to join DXV through the link "${opts.label}" and has confirmed their email. ${
-      opts.matched ? `They're already in the directory as ${opts.matched}, so approving links them to that record.` : "They're not in the directory yet: approving adds them as a Prospect."
+      opts.matched
+        ? `They're already in the directory as ${opts.matched}, so approving links them to that record.`
+        : "They're not in the directory yet: approving adds them as a Prospect."
     } Approve to email them a personal sign-up link, or decline.`,
     action: "Review join requests",
     link: opts.reviewUrl,
@@ -162,5 +166,36 @@ export function joinInstantPartnerEmail(opts: { partnerName: string; name: strin
     action: "Open their record",
     link: opts.angelUrl,
     small: "Instant links are capped and expire. Switch a link off any time on Angels → Invite an angel.",
+  });
+}
+
+/**
+ * To the team inbox when a member signs their investor statement in the portal (Blue,
+ * 2026-11-06). Only what the team needs to follow up: who, which statement, set-up or
+ * renewal. Never the criteria ticked, the typed signature or the IP (those stay on the record).
+ */
+export function statementSignedTeamEmail(opts: {
+  name: string;
+  email: string | null;
+  statement: string;
+  firstTime: boolean;
+  dealAccess: boolean;
+  angelUrl: string;
+}) {
+  const name = inert(opts.name) || "A member"; // typed by the member: plain words only
+  const who = opts.email ? `${name} (${opts.email})` : name;
+  return linkEmail({
+    subject: opts.firstTime ? `New member set up: ${name}` : `Investor statement renewed: ${name}`,
+    name: "DXV team",
+    lead: opts.firstTime
+      ? `${who} has finished setting up their account and signed the ${opts.statement} on the platform. ${
+          opts.dealAccess
+            ? "They can now see the deals DXV shares with members."
+            : "Their record isn't a current Member, so they won't see deals until that's changed on their page."
+        }`
+      : `${who} has signed the ${opts.statement} again on the platform, so their deal access carries on.`,
+    action: "Open their record",
+    link: opts.angelUrl,
+    small: "Sent to the DXV inbox each time a member signs an investor statement on DXV OS.",
   });
 }

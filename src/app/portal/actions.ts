@@ -10,8 +10,21 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAngel } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
-import { BIO_MAX, certificationExpiry, cleanPhone, preSelectionVoteRefusal, EXPERIENCE_LEVELS, latestCertification, nextOnboardingStep, parseList, withoutDiversityTags, TICKET_RANGES } from "@/lib/pipeline";
+import { COMPLIANCE_KIND_LABELS, STATEMENT_CERT_TYPE } from "@/lib/compliance-texts";
+import { statementSignedTeamEmail } from "@/lib/login-email";
+import { appOrigin, sendMail, teamInbox } from "@/lib/mail";
+import {
+  BIO_MAX,
+  certificationExpiry,
+  cleanPhone,
+  preSelectionVoteRefusal,
+  EXPERIENCE_LEVELS,
+  latestCertification,
+  nextOnboardingStep,
+  parseList,
+  withoutDiversityTags,
+  TICKET_RANGES,
+} from "@/lib/pipeline";
 import type { ActionResult } from "@/lib/action-result";
 import { angelHasDealAccess, loadDealRoom, memberRoundVoting } from "@/lib/portal-deals";
 
@@ -37,7 +50,10 @@ const ProfileSchema = z.object({
 
 /** Where to go after a step: the next onboarding step, or home. */
 async function nextPath(angelId: string) {
-  const a = await db.angel.findUniqueOrThrow({ where: { id: angelId }, include: { certifications: { where: { signedByAngel: true }, select: { signedOn: true, expiresOn: true } } } });
+  const a = await db.angel.findUniqueOrThrow({
+    where: { id: angelId },
+    include: { certifications: { where: { signedByAngel: true }, select: { signedOn: true, expiresOn: true } } },
+  });
   const step = nextOnboardingStep(a, latestCertification(a.certifications));
   return step === "done" ? "/portal" : `/portal/${step}`;
 }
@@ -85,7 +101,8 @@ export async function signStatement(_prev: ActionResult, formData: FormData): Pr
   const parsed = SignSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
   const text = await db.complianceText.findUnique({ where: { id: parsed.data.textId } });
-  if (!text || text.status !== "APPROVED" || text.kind === "MEMBER_TERMS") return { error: "That statement has been updated. Reload the page and sign the current version." };
+  if (!text || text.status !== "APPROVED" || text.kind === "MEMBER_TERMS")
+    return { error: "That statement has been updated. Reload the page and sign the current version." };
   const ticked = formData.getAll(`criterion`).map(String);
   const criteria = text.criteria.filter((c) => ticked.includes(c));
   if (criteria.length === 0) return { error: "Tick the criterion (or criteria) that apply to you." };
@@ -112,8 +129,27 @@ export async function signStatement(_prev: ActionResult, formData: FormData): Pr
     db.angel.update({ where: { id: angel.id }, data: { restrictedDeclaredAt: null } }),
     db.angelEvent.create({ data: { angelId: angel.id, kind: "statement-signed", detail: `${text.title}, version ${text.version}`, actorId: user.id } }),
   ]);
+  await notifyTeamOfStatement(angel, COMPLIANCE_KIND_LABELS[text.kind]);
   revalidatePath("/portal");
   redirect(await nextPath(angel.id));
+}
+
+/** Tell the DXV inbox a member has signed (set-up or renewal). Never blocks the signing. */
+async function notifyTeamOfStatement(
+  angel: { id: string; name: string; email: string | null; onboardedAt: Date | null; status: string; archivedAt: Date | null },
+  statement: string,
+) {
+  const origin = appOrigin();
+  if (!origin) return;
+  const mail = statementSignedTeamEmail({
+    name: angel.name,
+    email: angel.email,
+    statement,
+    firstTime: !angel.onboardedAt,
+    dealAccess: angel.status === "MEMBER" && !angel.archivedAt,
+    angelUrl: `${origin}/angels/${angel.id}`,
+  });
+  await sendMail({ to: teamInbox(), ...mail }).catch(() => console.error("Statement notification failed"));
 }
 
 /** "None of these applies to me": the portal without deal content. */
@@ -157,7 +193,12 @@ function revalidateVote(ventureId: string) {
   revalidatePath(`/deals/${ventureId}`);
 }
 
-const VoteNote = z.string().trim().max(1000).optional().transform((s) => s || null);
+const VoteNote = z
+  .string()
+  .trim()
+  .max(1000)
+  .optional()
+  .transform((s) => s || null);
 
 export async function castPreSelectionVote(ventureId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const parsed = z.object({ interested: z.enum(["yes", "no"], { message: "Choose yes or no" }), note: VoteNote }).safeParse(Object.fromEntries(formData));
@@ -174,7 +215,12 @@ export async function castPreSelectionVote(ventureId: string, _prev: ActionResul
       data: { ventureId, angelName: ctx.angel.name, angelId: ctx.angel.id, interested, note: parsed.data.note, recordedById: ctx.user.id },
     }),
     db.angelEvent.create({
-      data: { angelId: ctx.angel.id, kind: "pitch-selection-vote", detail: `${ctx.room.name}: ${interested ? "interested" : "not interested"}`, actorId: ctx.user.id },
+      data: {
+        angelId: ctx.angel.id,
+        kind: "pitch-selection-vote",
+        detail: `${ctx.room.name}: ${interested ? "interested" : "not interested"}`,
+        actorId: ctx.user.id,
+      },
     }),
   ]);
   revalidateVote(ventureId);

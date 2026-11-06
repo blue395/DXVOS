@@ -11,6 +11,9 @@ export type Mail = { to: string; subject: string; text: string; html: string; he
 
 const isProduction = () => process.env.NODE_ENV === "production";
 
+/** The team inbox for notifications to DXV itself (e.g. a member signing their investor statement). */
+export const teamInbox = () => process.env.TEAM_INBOX_EMAIL?.trim() || "angels@diversityx.vc";
+
 const smtpReady = () => !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MAIL_FROM);
 
 /**
