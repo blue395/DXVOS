@@ -20,11 +20,11 @@ export const config = {
   // check), the Google/Microsoft sign-in callback (/api/auth: its signed state cookie is
   // the check), unsubscribe links (a signed token naming one angel), the founder application
   // (/apply, public by design) and its dev-only deck upload, the privacy notice and member terms
-  // (/privacy, /terms: public legal pages), the public welcome page (/welcome), the Angel Foundations course (/learn and its progress
+  // (/privacy, /terms: public legal pages), the public welcome page (/welcome) and brand images (/brand/, e.g. the logo), the Angel Foundations course (/learn and its progress
   // API: open to anyone who signs up; every page and the API check the session themselves), scheduled jobs (/api/cron: a
   // signed token is the check), Next internals, static files, and Netlify's own function endpoints (the
   // workers authenticate their calls themselves).
   matcher: [
-    "/((?!login|join|apply|privacy|terms|welcome|learn|api/learn/|unsubscribe/|api/auth/|api/unsubscribe/|api/cron/|api/dev/deck-upload/|_next/static|_next/image|favicon.ico|\\.netlify).*)",
+    "/((?!login|join|apply|privacy|terms|welcome|brand/|learn|api/learn/|unsubscribe/|api/auth/|api/unsubscribe/|api/cron/|api/dev/deck-upload/|_next/static|_next/image|favicon.ico|\\.netlify).*)",
   ],
 };

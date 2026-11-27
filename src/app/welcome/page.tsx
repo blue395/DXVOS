@@ -29,9 +29,16 @@ export default async function WelcomePage() {
     <main className="flex-1 bg-dxv-green text-white">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-3">
-          <span className="rounded bg-dxv-yellow px-2 py-0.5 text-xs font-bold tracking-widest text-dxv-green">DXV</span>
+          {/* The Diversity X Ventures wordmark in DXV yellow (the image is used as a mask, as on the course page). */}
+          <span
+            role="img"
+            aria-label="Diversity X Ventures"
+            className="block aspect-[640/77] w-44 bg-dxv-yellow sm:w-56"
+            style={{ WebkitMask: "url(/brand/dxv-logo.png) center/contain no-repeat", mask: "url(/brand/dxv-logo.png) center/contain no-repeat" }}
+          />
           <Link href="/login" className="text-sm text-white/85 underline-offset-4 hover:underline">
-            Already have an account? <span className="font-semibold text-dxv-yellow">Sign in</span>
+            <span className="hidden sm:inline">Already have an account? </span>
+            <span className="font-semibold text-dxv-yellow">Sign in</span>
           </Link>
         </div>
 
