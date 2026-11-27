@@ -12,9 +12,11 @@ import { emailSentLink, linkOrigin, type EmailOutcome } from "./send-link";
 import type { AngelStatus } from "@/generated/prisma/enums";
 
 /** Why this email can't be given a new portal login (null: it can). */
-export async function loginClash(email: string, teamHint: string): Promise<string | null> {
+export async function loginClash(email: string, teamHint: string, opts: { allowLearner?: boolean } = {}): Promise<string | null> {
   const clash = await db.user.findUnique({ where: { email }, select: { role: true } });
   if (!clash) return null;
+  // A course-only login (Angel Foundations) becomes their member login when they accept the invite.
+  if (clash.role === "LEARNER" && opts.allowLearner) return null;
   return clash.role === "ADMIN" ? `That email is a DXV team login. ${teamHint}` : "That email already has a portal login.";
 }
 

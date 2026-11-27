@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/auth/cal
     // No password yet: they sign in with Google/Microsoft, or set one later with "Forgot your password?".
     const unusable = await bcrypt.hash(randomBytes(32).toString("base64url"), 12);
     const ip = clientIp(request.headers);
-    const made = await createLoginFromInvite(invite, unusable, ip, `Set up their login with ${label}`);
+    const made = await createLoginFromInvite(invite, unusable, ip, `Set up their login with ${label}`, { providerOnly: true });
     if ("error" in made) return go(`/join/${intent.inviteToken}`);
     const user = await db.user.findUniqueOrThrow({ where: { id: made.userId }, select: { id: true, email: true, role: true, angelId: true } });
     await connectIdentity(user, identity);

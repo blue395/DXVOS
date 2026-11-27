@@ -56,7 +56,8 @@ export default async function InviteAngelPage() {
                   <span className="min-w-0">
                     <span className="font-medium">{r.name}</span> <span className="break-all text-black/55">{r.email}</span>
                     <span className="block text-xs text-black/55">
-                      Via &ldquo;{r.link.label}&rdquo; · confirmed {r.confirmedAt ? formatDateTime(r.confirmedAt) : ""}
+                      {r.link ? <>Via &ldquo;{r.link.label}&rdquo;</> : "From the Angel Foundations course"} · confirmed{" "}
+                      {r.confirmedAt ? formatDateTime(r.confirmedAt) : ""}
                     </span>
                     {r.angel ? (
                       <span className="mt-1 block text-xs">
@@ -96,7 +97,9 @@ export default async function InviteAngelPage() {
                 <input type="radio" name="mode" value="approve" defaultChecked className="mt-1 accent-dxv-green" />
                 <span>
                   <strong>Approve first</strong>
-                  <span className="block text-xs text-black/55">They confirm their email, a partner approves, then they get their sign-up link. For links that might travel.</span>
+                  <span className="block text-xs text-black/55">
+                    They confirm their email, a partner approves, then they get their sign-up link. For links that might travel.
+                  </span>
                 </span>
               </label>
               <label className="flex items-start gap-2">
@@ -104,8 +107,9 @@ export default async function InviteAngelPage() {
                 <span>
                   <strong>Instant</strong>
                   <span className="block text-xs text-black/55">
-                    Straight into set-up after a verified email (Google, Microsoft or one confirm email); partners are told. Capped at {JOIN_INSTANT_DEFAULT_USES} sign-ups
-                    unless you set a number (up to {JOIN_INSTANT_MAX_USES}), and works {JOIN_INSTANT_MAX_DAYS} days at most. For trusted groups.
+                    Straight into set-up after a verified email (Google, Microsoft or one confirm email); partners are told. Capped at{" "}
+                    {JOIN_INSTANT_DEFAULT_USES} sign-ups unless you set a number (up to {JOIN_INSTANT_MAX_USES}), and works {JOIN_INSTANT_MAX_DAYS} days at
+                    most. For trusted groups.
                   </span>
                 </span>
               </label>

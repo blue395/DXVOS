@@ -15,8 +15,10 @@ export async function findUsableLoginLink(token: string) {
   return link;
 }
 
-/** Log a sign-in link step where the team already looks: a member's activity, or the Team page's log. */
+/** Log a sign-in link step where the team already looks: a member's activity, or the Team page's log (learners: just their last activity). */
 export function loginLinkEvent(user: { id: string; email: string; role: string; angelId: string | null }, kind: string, detail?: string) {
   if (user.role === "ANGEL" && user.angelId) return db.angelEvent.create({ data: { angelId: user.angelId, kind, detail, actorId: user.id } });
+  // Course learners aren't team or members: their sign-ins only touch their own course record.
+  if (user.role === "LEARNER") return db.courseLearner.updateMany({ where: { userId: user.id }, data: { lastActiveAt: new Date() } });
   return db.teamEvent.create({ data: { subjectId: user.id, email: user.email, kind, detail, actorId: user.id } });
 }

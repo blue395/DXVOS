@@ -10,8 +10,9 @@ export const metadata = { title: "Sign in · DXV OS", referrer: "no-referrer" };
 
 // Public: the one-time token is the credential. Opening the page uses nothing up (email
 // scanners open links); the link is only used when the person presses the button.
-export default async function LoginLinkPage({ params }: PageProps<"/login/link/[token]">) {
-  const { token } = await params;
+export default async function LoginLinkPage({ params, searchParams }: PageProps<"/login/link/[token]">) {
+  const [{ token }, sp] = await Promise.all([params, searchParams]);
+  const toCourse = sp.next === "learn"; // a link from the Angel Foundations course goes back to it
   const link = await findUsableLoginLink(token);
 
   if (!link) {
@@ -31,7 +32,7 @@ export default async function LoginLinkPage({ params }: PageProps<"/login/link/[
         <p className="mb-4 text-sm">
           Signing in as <strong>{link.user.email}</strong>.
         </p>
-        <ActionForm action={signInWithLink.bind(null, token)} resetOnSuccess={false}>
+        <ActionForm action={signInWithLink.bind(null, token, toCourse)} resetOnSuccess={false}>
           <SubmitButton pendingLabel="Signing in…" doneLabel="Signed in">
             Sign me in
           </SubmitButton>

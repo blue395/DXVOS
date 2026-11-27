@@ -17,7 +17,8 @@ import type { Prisma } from "@/generated/prisma/client";
 async function linkedEntries(angelId: string) {
   const aliases = await db.angelAlias.findMany({ where: { angelId }, select: { normalized: true } });
   const names = new Set(aliases.map((a) => a.normalized));
-  const mine = <T extends { angelId: string | null; angelName: string }>(rows: T[]) => rows.filter((r) => r.angelId === angelId || (!r.angelId && names.has(normaliseAngelName(r.angelName))));
+  const mine = <T extends { angelId: string | null; angelName: string }>(rows: T[]) =>
+    rows.filter((r) => r.angelId === angelId || (!r.angelId && names.has(normaliseAngelName(r.angelName))));
   const where = { OR: [{ angelId }, ...(names.size ? [{ angelId: null }] : [])] };
   const [pre, eoi, finals] = await Promise.all([
     db.preSelectionVote.findMany({ where, select: { id: true, angelId: true, angelName: true } }),
@@ -67,10 +68,12 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
       db.angelInvite.deleteMany({ where: { angelId } }),
       db.memberJoinRequest.deleteMany({ where: { angelId } }), // their sign-up-link requests (name, email)
       db.angelNote.deleteMany({ where: { angelId } }),
-    db.memberJoinRequest.deleteMany({ where: { angelId } }), // their sign-up-link requests (name, email)
+      db.memberJoinRequest.deleteMany({ where: { angelId } }), // their sign-up-link requests (name, email)
       db.angelEvent.deleteMany({ where: { angelId } }),
       db.angel.delete({ where: { id: angelId } }),
-      db.teamEvent.create({ data: { email: "angel record", kind: "angel-removed", detail: `Removed an angel record with no history (${angelId})`, actorId: actor.id } }),
+      db.teamEvent.create({
+        data: { email: "angel record", kind: "angel-removed", detail: `Removed an angel record with no history (${angelId})`, actorId: actor.id },
+      }),
     ]);
     return { mode };
   }
@@ -94,7 +97,10 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
     ...audits.map((a) =>
       db.entryAudit.update({
         where: { id: a.id },
-        data: { before: scrubAuditSnapshot(a.before) as Prisma.InputJsonValue, after: a.after === null ? undefined : (scrubAuditSnapshot(a.after) as Prisma.InputJsonValue) },
+        data: {
+          before: scrubAuditSnapshot(a.before) as Prisma.InputJsonValue,
+          after: a.after === null ? undefined : (scrubAuditSnapshot(a.after) as Prisma.InputJsonValue),
+        },
       }),
     ),
     db.angelAlias.deleteMany({ where: { angelId } }),
@@ -111,8 +117,18 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
     ...(user
       ? [
           db.loginIdentity.deleteMany({ where: { userId: user.id } }),
+          db.courseLearner.deleteMany({ where: { userId: user.id } }), // Angel Foundations progress, notes and consents
           db.loginLink.updateMany({ where: { userId: user.id, usedAt: null, revokedAt: null }, data: { revokedAt: now } }),
-          db.user.update({ where: { id: user.id }, data: { email: `erased-${user.id}@deleted.invalid`, name: ERASED_ANGEL_NAME, passwordHash: unusable!, disabledAt: now, sessionVersion: { increment: 1 } } }),
+          db.user.update({
+            where: { id: user.id },
+            data: {
+              email: `erased-${user.id}@deleted.invalid`,
+              name: ERASED_ANGEL_NAME,
+              passwordHash: unusable!,
+              disabledAt: now,
+              sessionVersion: { increment: 1 },
+            },
+          }),
         ]
       : []),
     db.angel.update({
@@ -137,7 +153,9 @@ export async function deleteAngelRecord(angelId: string, actor: { id: string }):
       },
     }),
     db.angelEvent.create({ data: { angelId, kind: "personal-details-erased", detail: "Deleted by the DXV team; deal records kept", actorId: actor.id } }),
-    db.teamEvent.create({ data: { email: "angel record", kind: "angel-erased", detail: `Erased an angel's personal details (${angelId})`, actorId: actor.id } }),
+    db.teamEvent.create({
+      data: { email: "angel record", kind: "angel-erased", detail: `Erased an angel's personal details (${angelId})`, actorId: actor.id },
+    }),
   ]);
 
   // Signed statement files hold the person's name, so they go too (after the records are safe).

@@ -28,6 +28,7 @@ export async function createLoginFromInvite(
   passwordHash: string,
   ip: string | null,
   how: string,
+  opts: { providerOnly?: boolean } = {},
 ): Promise<{ userId: string } | { error: string }> {
   const angel = invite.angel;
   if (invite.kind !== "INVITE") return { error: EXPIRED };
@@ -40,7 +41,22 @@ export async function createLoginFromInvite(
     const userId = await db.$transaction(async (tx) => {
       const claimed = await tx.angelInvite.updateMany({ where: { id: invite.id, usedAt: null, revokedAt: null }, data: { usedAt: new Date() } });
       if (claimed.count !== 1) throw new Error("claimed");
-      const user = await tx.user.create({ data: { email, name: angel.name, passwordHash, role: "ANGEL", angelId: angel.id, lastSignInAt: new Date() } });
+      // Someone already on the Angel Foundations course has a learner login with this email:
+      // accepting the invite makes that same login their member login (one login, progress kept).
+      const learner = await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true, role: true, angelId: true } });
+      if (learner && (learner.role !== "LEARNER" || learner.angelId)) throw new Error("has-login");
+      const user = learner
+        ? await tx.user.update({
+            where: { id: learner.id },
+            data: {
+              role: "ANGEL",
+              angelId: angel.id,
+              lastSignInAt: new Date(),
+              sessionVersion: { increment: 1 }, // their access changed: older sessions end
+              ...(opts.providerOnly ? {} : { passwordHash }),
+            },
+          })
+        : await tx.user.create({ data: { email, name: angel.name, passwordHash, role: "ANGEL", angelId: angel.id, lastSignInAt: new Date() } });
       await tx.angel.update({
         where: { id: angel.id },
         data: {
@@ -63,6 +79,7 @@ export async function createLoginFromInvite(
     return { userId };
   } catch (e) {
     if (e instanceof Error && e.message === "claimed") return { error: EXPIRED };
+    if (e instanceof Error && e.message === "has-login") return { error: "You already have a login. Sign in instead." };
     throw e;
   }
 }

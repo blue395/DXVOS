@@ -14,6 +14,7 @@ export function NavLink({
   badge,
   menu,
   exact,
+  fullPage,
 }: {
   href: string;
   children: React.ReactNode;
@@ -21,6 +22,8 @@ export function NavLink({
   badge?: number;
   menu?: boolean;
   exact?: boolean;
+  /** A page outside the app's own navigation (e.g. the course at /learn): opened with a full page load. */
+  fullPage?: boolean;
 }) {
   const pathname = usePathname();
   const active = href === "/" || exact ? pathname === href : pathname.startsWith(href);
@@ -32,8 +35,9 @@ export function NavLink({
       </span>
     );
   }
+  const Tag = fullPage ? "a" : Link;
   return (
-    <Link
+    <Tag
       href={href}
       aria-current={active ? "page" : undefined}
       className={`${menu ? "block rounded-md px-3 py-2.5 text-base" : "shrink-0 rounded px-3 py-1.5"} transition ${active ? "bg-dxv-yellow font-medium text-dxv-green" : "text-white/85 hover:bg-white/10"}`}
@@ -44,6 +48,6 @@ export function NavLink({
           {badge}
         </span>
       ) : null}
-    </Link>
+    </Tag>
   );
 }

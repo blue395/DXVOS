@@ -30,7 +30,7 @@ export async function createAngelLink(angelId: string, kind: "INVITE" | "RESET",
     if (!ready.ready) return { error: inviteBlockReason(ready) ?? "Invites are paused." };
     if (!angel.email) return { error: "Add their email first: it becomes their login." };
     if (angel.user) return { error: "They already have a login. Use a password reset link instead." };
-    const clash = await loginClash(angel.email, "Use Link to a team login below: one login for the team app and their member portal.");
+    const clash = await loginClash(angel.email, "Use Link to a team login below: one login for the team app and their member portal.", { allowLearner: true });
     if (clash) return { error: clash };
   } else {
     if (!angel.user) return { error: "They haven't signed up yet. Send an invite link instead." };
@@ -66,7 +66,7 @@ export async function inviteNewAngel(input: { name: string; email: string }, sen
   const [ready, existing] = await Promise.all([complianceReady(), db.angel.findUnique({ where: { email }, select: { id: true, name: true } })]);
   if (!ready.ready) return { error: inviteBlockReason(ready) ?? "Invites are paused." };
   if (existing) return { error: `${existing.name} is already in the directory with that email: invite them from their page.`, existingAngelId: existing.id };
-  const clash = await loginClash(email, "Partners get member access from the Angel View button in Partner View.");
+  const clash = await loginClash(email, "Partners get member access from the Angel View button in Partner View.", { allowLearner: true });
   if (clash) return { error: clash };
 
   const { token, tokenHash } = newInviteToken();
