@@ -87,3 +87,26 @@ describe("the team's learner list", () => {
     expect(learnerRow({ ...base, role: "ADMIN", syndicateContact: { given: true, createdAt: done } })).toMatchObject({ kind: "Partner", wantsContact: true });
   });
 });
+
+describe("lessons as screens", () => {
+  // The screen-splitting code in the course page (template.html), run against every lesson.
+  const src = COURSE_TEMPLATE.slice(COURSE_TEMPLATE.indexOf("const TARGET ="), COURSE_TEMPLATE.indexOf("function renderBlock"));
+  const plan = new Function("LESSONS", `${src}; return { screensFor, wc };`)(LESSONS) as {
+    screensFor: (l: unknown) => { screens: { kind: string; blocks?: { bi: number; b: unknown }[] }[] };
+    wc: (b: unknown) => number;
+  };
+
+  it("shows every part of every lesson exactly once, in order, in short screens", () => {
+    for (const l of LESSONS) {
+      const { screens } = plan.screensFor(l);
+      const content = screens.filter((s) => s.kind === "content");
+      const shown = content.flatMap((s) => s.blocks!.map((x) => x.bi));
+      const expected = l.blocks.flatMap((b, i) => (b.t === "h1" || b.t === "h2" ? [] : [i]));
+      expect(shown).toEqual(expected);
+      for (const s of content) expect(s.blocks!.reduce((t, x) => t + plan.wc(x.b), 0)).toBeLessThanOrEqual(260);
+      expect(screens[0].kind).toBe("title");
+      expect(screens.filter((s) => s.kind === "quiz")).toHaveLength(l.quiz.length);
+      expect(screens.at(-1)!.kind).toBe("score");
+    }
+  });
+});
