@@ -19,7 +19,7 @@ describe("the Angel Foundations course content", () => {
   });
 
   it("builds the page with every lesson inlined, the disclaimer kept, and the account escaped", () => {
-    const html = buildCoursePage(COURSE_TEMPLATE, COURSE_LOGO, { id: "u1", name: "Sam </script><script>alert(1)</script>", portal: null });
+    const html = buildCoursePage(COURSE_TEMPLATE, COURSE_LOGO, { id: "u1", name: "Sam </script><script>alert(1)</script>", ribbon: false });
     expect(html).not.toMatch(/__DATA__|__LOGO__|__ACCOUNT__/);
     for (const l of LESSONS) expect(html).toContain(JSON.stringify(l.title).slice(1, -1).replace(/<\//g, "<\\/"));
     expect(html).toContain("It is not investment, tax or legal advice");

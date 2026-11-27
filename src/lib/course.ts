@@ -72,12 +72,13 @@ export const scriptJson = (v: unknown) =>
     .replace(/\u2029/g, "\\u2029");
 
 /** The course page, built the same way as DXV's single-file course, plus the signed-in account. */
-export function buildCoursePage(template: string, logo: string, account: { id: string; name: string; portal: string | null }) {
+export function buildCoursePage(template: string, logo: string, account: { id: string; name: string; ribbon: boolean }, ribbonHtml = "") {
   const data = JSON.stringify(LESSONS).replace(/<\//g, "<\\/");
   // Function replacers: a "$" in the content is never read as a replacement pattern.
   return template
     .replace("__DATA__", () => data)
     .replace("__ACCOUNT__", () => scriptJson(account))
+    .replace("__RIBBON__", () => ribbonHtml)
     .replaceAll("__LOGO__", () => logo);
 }
 
