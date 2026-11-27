@@ -27,7 +27,7 @@ export default async function WelcomePage() {
   const criteria = await statementCriteria();
   return (
     <main className="flex-1 bg-dxv-green text-white">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-3">
           <span className="rounded bg-dxv-yellow px-2 py-0.5 text-xs font-bold tracking-widest text-dxv-green">DXV</span>
           <Link href="/login" className="text-sm text-white/85 underline-offset-4 hover:underline">
@@ -40,14 +40,15 @@ export default async function WelcomePage() {
           <p className="mt-4 text-lg text-white/85">{W.intro}</p>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:mt-10 md:grid-cols-2">
+        <div className="mt-8 grid gap-4 sm:mt-10 lg:grid-cols-3">
+          <RouteCard tag={W.member.tag} title={W.member.title} text={W.member.text} cta={W.member.cta} href="/login" />
           <RouteCard tag={W.investor.tag} title={W.investor.title} text={W.investor.text} cta={W.investor.cta} href="/join/request" />
           <RouteCard tag={W.learner.tag} title={W.learner.title} text={W.learner.text} cta={W.learner.cta} href="/learn/join" plain />
         </div>
       </div>
 
       <section id="who-qualifies" className="bg-white text-black">
-        <div className="mx-auto max-w-5xl space-y-5 px-4 py-10">
+        <div className="mx-auto max-w-6xl space-y-5 px-4 py-10">
           <h2 className="text-2xl font-semibold text-dxv-green">{W.qualifies.title}</h2>
           <p className="max-w-3xl text-black/75">{W.qualifies.intro}</p>
           <div className="grid gap-4 md:grid-cols-2">

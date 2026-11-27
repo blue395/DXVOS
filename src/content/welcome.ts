@@ -7,6 +7,12 @@ export const WELCOME = {
   title: "Welcome to DXV",
   intro:
     "Diversity X Ventures is a UK angel syndicate backing Underestimated Founders® building impact ventures at pre-seed and seed. Choose the option that fits you.",
+  member: {
+    tag: "Members",
+    title: "Already a DXV member?",
+    text: "Sign in to see the deals open to you, record your votes, follow your portfolio and carry on with your learning.",
+    cta: "Sign in",
+  },
   investor: {
     tag: "For angel investors",
     title: "Already an angel investor?",
