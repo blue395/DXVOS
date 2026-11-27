@@ -4,12 +4,21 @@
 // Light and dark follow the visitor's setting.
 import Link from "next/link";
 import { COURSE_DISCLAIMER, COURSE_NAME } from "@/content/course";
+import { PortalHeader } from "@/components/portal-header";
+import { currentCourseUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { PORTAL_LINKS } from "@/lib/portal-nav";
 
 export const metadata = { title: `${COURSE_NAME} · Diversity X Ventures`, robots: { index: true, follow: true } };
 
-export default function LearnLayout({ children }: LayoutProps<"/learn">) {
+export default async function LearnLayout({ children }: LayoutProps<"/learn">) {
+  // Members and partners keep the portal's header on the learning pages (Blue, 2026-11-27).
+  const user = await currentCourseUser();
+  const angel = user?.angelId ? await db.angel.findUnique({ where: { id: user.angelId }, select: { name: true, onboardedAt: true, archivedAt: true } }) : null;
+  const member = angel && !angel.archivedAt ? angel : null;
   return (
     <div className="flex flex-1 flex-col bg-[#f4f6f3] text-[#15302a] dark:bg-[#0c1d19] dark:text-[#e7efea]">
+      {member && <PortalHeader name={member.name} partner={user!.role === "ADMIN"} links={member.onboardedAt ? PORTAL_LINKS : []} />}
       <header className="border-b-[6px] border-[#fbe45b] bg-[#1a3c35]">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-4">
           {/* A plain link: the course is a whole page of its own (full page load). */}

@@ -36,20 +36,12 @@ export default async function CourseAccountPage({ searchParams }: PageProps<"/le
             <a href="/learn" className="rounded-full bg-[#fbe45b] px-4 py-2 text-sm font-semibold text-[#1a3c35]">
               Back to the course
             </a>
-            <CourseSignOut />
+            {/* Members and partners have the portal header (with Sign out) above. */}
+            {learnerOnly && <CourseSignOut />}
           </div>
         </div>
         {sp.deleted && <p className="rounded-md bg-[#fbe45b]/40 px-3 py-2 text-sm">Your course data has been deleted.</p>}
-        {!learnerOnly && (
-          <p className="text-sm">
-            You&apos;re using the course with your DXV member login. Your course progress is kept with it.{" "}
-            {user.angelId && (
-              <Link href="/portal" className={learnLink}>
-                Go to the DXV Deal Platform
-              </Link>
-            )}
-          </p>
-        )}
+        {!learnerOnly && <p className="text-sm">You&apos;re using the course with your DXV member login. Your course progress is kept with it.</p>}
       </LearnCard>
 
       {learnerOnly && (
