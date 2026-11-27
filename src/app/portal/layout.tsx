@@ -16,6 +16,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
         { href: "/portal", label: "Home", exact: true },
         { href: "/portal/deals", label: "Deals" },
         { href: "/portal/portfolio", label: "My portfolio" },
+        { href: "/learn", label: "Course", fullPage: true }, // Angel Foundations: every member gets it (Blue, 2026-11-27)
         { href: "/portal/profile", label: "My profile" },
         { href: "/portal/help", label: "Help" },
       ]
@@ -31,14 +32,18 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
           {/* Wider screens: the menu in the bar. */}
           <nav className="hidden flex-1 items-center gap-1 text-sm md:flex">
             {links.map((l) => (
-              <NavLink key={l.href} href={l.href} exact={l.exact}>
+              <NavLink key={l.href} href={l.href} exact={l.exact} fullPage={"fullPage" in l}>
                 {l.label}
               </NavLink>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm md:ml-0">
             {user.role === "ADMIN" && (
-              <Link href="/" className="rounded bg-dxv-yellow px-2 py-1 font-medium whitespace-nowrap text-dxv-green transition hover:bg-white" title="Back to DXV OS">
+              <Link
+                href="/"
+                className="rounded bg-dxv-yellow px-2 py-1 font-medium whitespace-nowrap text-dxv-green transition hover:bg-white"
+                title="Back to DXV OS"
+              >
                 Partner View
               </Link>
             )}
@@ -49,7 +54,7 @@ export default async function PortalLayout({ children }: LayoutProps<"/portal">)
             {/* Phones: the menu behind the burger. */}
             <MobileMenu className="md:hidden">
               {links.map((l) => (
-                <NavLink key={l.href} href={l.href} exact={l.exact} menu>
+                <NavLink key={l.href} href={l.href} exact={l.exact} fullPage={"fullPage" in l} menu>
                   {l.label}
                 </NavLink>
               ))}

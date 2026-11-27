@@ -25,6 +25,7 @@ datasource db {
 enum Role {
   ADMIN
   ANGEL // a syndicate member's portal login (linked to one Angel record); sees only /portal
+  LEARNER // Angel Foundations course only (/learn); becomes ANGEL if DXV approves them for the syndicate
   SYSTEM // DXV OS itself (e.g. "DXV website" for founder submissions): never signs in
 }
 
@@ -47,6 +48,8 @@ model User {
   memberEmailsSent      MemberEmail[]
   founderEmailsSent     FounderEmail[]
   diversityAccess       DiversityAccessLog[]
+  courseLearner         CourseLearner?
+  courseJoinRequests    MemberJoinRequest[]  @relation("MemberJoinRequestLearner")
 
   stageChanges             StageChange[]
   memoVersions             MemoVersion[]
@@ -940,6 +943,7 @@ enum JoinRequestStatus {
   APPROVED // invite sent
   DECLINED
   HAS_LOGIN // they already had a login: sent a sign-in email instead, nothing to approve
+  WITHDRAWN // a course learner unticked "contact me about joining" before a partner decided
 }
 
 // One request to join through a shareable link. Requests that never became members are
@@ -947,8 +951,10 @@ enum JoinRequestStatus {
 // erased with it.
 model MemberJoinRequest {
   id               String            @id @default(cuid())
-  linkId           String
-  link             MemberJoinLink    @relation(fields: [linkId], references: [id])
+  linkId           String? // the shareable link it came through (null: a course learner's opt-in)
+  link             MemberJoinLink?   @relation(fields: [linkId], references: [id], onDelete: Restrict)
+  learnerId        String? // the course learner's login that opted in (Angel Foundations course)
+  learner          User?             @relation("MemberJoinRequestLearner", fields: [learnerId], references: [id], onDelete: SetNull)
   name             String
   email            String // lower case
   status           JoinRequestStatus @default(UNCONFIRMED)
@@ -1704,4 +1710,67 @@ model DiversityAccessLog {
   at        DateTime         @default(now())
 
   @@index([subjectId, at])
+}
+
+// ── Angel Foundations course (Blue, 2026-11-27) ─────────────────────────────
+// The public course at /learn. Anyone can sign up (a LEARNER login, name + email, magic
+// link); members and partners use it with their own login. Progress follows the login across
+// devices. Education only: learners never see deals. Opting in to hear about the syndicate
+// makes a join request a partner approves (MemberJoinRequest.learnerId).
+
+enum LearnerDescribesAs {
+  HIGH_NET_WORTH // thinks they may qualify as a high net worth individual
+  SOPHISTICATED // thinks they may qualify as a sophisticated investor
+  ACTIVE_ANGEL // already investing as an angel
+  TRAINING // here to learn (angel-in-training)
+}
+
+model CourseLearner {
+  userId       String              @id
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  describesAs  LearnerDescribesAs? // their own description, not a legal statement
+  describedAt  DateTime?
+  ipHash       String? // keyed hash of where they signed up from: sign-up limits only
+  createdAt    DateTime            @default(now())
+  lastActiveAt DateTime            @default(now())
+  progress     CourseProgress[]
+  consents     CourseConsent[]
+
+  @@index([createdAt])
+}
+
+// One row per learner per lesson. Answers and notes are the learner's own (notes are never shown to the team).
+model CourseProgress {
+  id          String        @id @default(cuid())
+  userId      String
+  learner     CourseLearner @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  lesson      Int
+  openedAt    DateTime?
+  answers     Json          @default("{}") // { "0": "B", ... } question index → option
+  notes       Json          @default("{}") // { "note-4-12-0": "text" }
+  correct     Int           @default(0)
+  completedAt DateTime? // every quiz question answered
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([userId, lesson])
+}
+
+enum CourseConsentKind {
+  PRIVACY_NOTICE // read the course privacy notice at sign-up
+  AGE // confirmed they are 18 or over
+  SYNDICATE_CONTACT // may DXV contact them about joining the syndicate (its own unticked box)
+}
+
+// Append-only: every consent given or withdrawn, with the exact wording shown.
+model CourseConsent {
+  id        String            @id @default(cuid())
+  userId    String
+  learner   CourseLearner     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  kind      CourseConsentKind
+  given     Boolean
+  version   String
+  wording   String
+  createdAt DateTime          @default(now())
+
+  @@index([userId, kind, createdAt])
 }

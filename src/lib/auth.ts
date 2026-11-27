@@ -24,8 +24,8 @@ export const getCurrentUser = cache(async () => {
   return user;
 });
 
-/** Where a signed-in user belongs: the team's app, or an angel's portal. */
-export const homeFor = (role: string) => (role === "ANGEL" ? "/portal" : "/");
+/** Where a signed-in user belongs: the team's app, an angel's portal, or (course learners) the Angel Foundations course. */
+export const homeFor = (role: string) => (role === "ANGEL" ? "/portal" : role === "LEARNER" ? "/learn" : "/");
 
 export async function requireAdmin() {
   const user = await getCurrentUser();
@@ -43,7 +43,8 @@ export async function requireAdmin() {
 export async function requireAngel() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!user.angelId) redirect(homeFor(user.role));
+  // Only member and partner logins: a course learner never reaches the portal, whatever else is set.
+  if (!user.angelId || (user.role !== "ANGEL" && user.role !== "ADMIN")) redirect(homeFor(user.role));
   const angel = await db.angel.findUnique({ where: { id: user.angelId } });
   // An archived angel record: angel-only logins are signed out; a partner keeps the team app.
   if (!angel || angel.archivedAt) redirect(user.role === "ANGEL" ? "/login" : "/");
@@ -62,4 +63,21 @@ export const hasMemberAccess = (user: { role: string; angelId: string | null } |
 export async function requireAdminWith<T>(load: () => Promise<T>): Promise<T> {
   const [, data] = await Promise.all([requireAdmin(), load()]);
   return data;
+}
+
+/**
+ * The Angel Foundations course (/learn): any signed-in learner, member or partner (Blue,
+ * 2026-11-27: every angel gets the course automatically). Course data is always the signed-in
+ * login's own. Returns null when signed out, so the public sign-up page can show instead.
+ */
+export async function currentCourseUser() {
+  const user = await getCurrentUser();
+  if (!user || (user.role !== "LEARNER" && user.role !== "ANGEL" && user.role !== "ADMIN")) return null;
+  return user;
+}
+
+export async function requireCourseUser() {
+  const user = await currentCourseUser();
+  if (!user) redirect("/learn/join");
+  return user;
 }

@@ -140,11 +140,23 @@ export function joinAlreadyMemberEmail(opts: { name: string; signInUrl: string; 
 }
 
 /** To partners: someone confirmed their email through a shareable link and is waiting for approval. */
-export function joinRequestPartnerEmail(opts: { partnerName: string; name: string; email: string; label: string; matched: string | null; reviewUrl: string }) {
+export function joinRequestPartnerEmail(opts: {
+  partnerName: string;
+  name: string;
+  email: string;
+  label: string;
+  matched: string | null;
+  reviewUrl: string;
+  /** From the Angel Foundations course (they ticked "contact me about joining"), not a link. */
+  course?: boolean;
+}) {
+  const how = opts.course
+    ? "said on the Angel Foundations course that they'd like to hear about joining DXV"
+    : `asked to join DXV through the link "${opts.label}"`;
   return linkEmail({
-    subject: `Join request: ${opts.name}`,
+    subject: `Join request: ${inert(opts.name)}`,
     name: opts.partnerName,
-    lead: `${opts.name} (${opts.email}) asked to join DXV through the link "${opts.label}" and has confirmed their email. ${
+    lead: `${inert(opts.name)} (${opts.email}) ${how} and has confirmed their email. ${
       opts.matched
         ? `They're already in the directory as ${opts.matched}, so approving links them to that record.`
         : "They're not in the directory yet: approving adds them as a Prospect."
@@ -197,5 +209,19 @@ export function statementSignedTeamEmail(opts: {
     action: "Open their record",
     link: opts.angelUrl,
     small: "Sent to the DXV inbox each time a member signs an investor statement on DXV OS.",
+  });
+}
+
+/** Angel Foundations course: the one-time link that confirms a new learner's email and signs them in (or signs a returning one in). */
+export function courseSignInEmail(opts: { name: string; link: string; minutes: number; isNew: boolean }) {
+  return linkEmail({
+    subject: opts.isNew ? "Confirm your email to start Angel Investing Foundations" : "Your sign-in link for Angel Investing Foundations",
+    name: inert(opts.name),
+    lead: opts.isNew
+      ? "Thanks for signing up to Angel Investing Foundations, DXV's free angel investing course. Press the button to confirm your email and start the course. Your progress is saved to your account, so you can pick up on any device."
+      : "Here's your link to sign in and carry on with Angel Investing Foundations.",
+    action: opts.isNew ? "Confirm and start the course" : "Sign in to the course",
+    link: opts.link,
+    small: `It works once, for the next ${opts.minutes} minutes. If you didn't ask for it, you can ignore this email.`,
   });
 }

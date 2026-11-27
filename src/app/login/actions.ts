@@ -14,7 +14,16 @@ import { newInviteToken } from "@/lib/invite-token";
 import { findUsableLoginLink, loginLinkEvent } from "@/lib/login-links";
 import { loginLinkEmail } from "@/lib/login-email";
 import { appOrigin, mailConfigured, sendMail } from "@/lib/mail";
-import { LOGIN_LIMITS, LOGIN_LINK_MINUTES, LOGIN_LINKS_PER_HOUR, LOGIN_LINKS_PER_IP_HOUR, LOGIN_PAUSED_MESSAGE, MIN_PASSWORD_LENGTH, canSignIn, loginThrottled } from "@/lib/pipeline";
+import {
+  LOGIN_LIMITS,
+  LOGIN_LINK_MINUTES,
+  LOGIN_LINKS_PER_HOUR,
+  LOGIN_LINKS_PER_IP_HOUR,
+  LOGIN_PAUSED_MESSAGE,
+  MIN_PASSWORD_LENGTH,
+  canSignIn,
+  loginThrottled,
+} from "@/lib/pipeline";
 
 // Pre-computed hash of a random string. Comparing against it when the email is
 // unknown makes "no such user" take as long as "wrong password".
@@ -130,18 +139,17 @@ async function claimLink(id: string) {
 }
 
 /** Magic link: sign in. A button press, not the page load, so email scanners that open links can't use it up. */
-export async function signInWithLink(token: string): Promise<ActionResult> {
+export async function signInWithLink(token: string, toCourse = false): Promise<ActionResult> {
   const link = await findUsableLoginLink(token);
   if (!link || link.kind !== "MAGIC") return { error: LINK_EXPIRED };
   const teamOnly = teamRefusal(link.user.role, "link");
   if (teamOnly) return { error: teamOnly };
   if (!(await claimLink(link.id))) return { error: LINK_EXPIRED };
-  await Promise.all([
-    db.user.update({ where: { id: link.user.id }, data: { lastSignInAt: new Date() } }),
-    loginLinkEvent(link.user, "signed-in-by-link"),
-  ]);
+  await Promise.all([db.user.update({ where: { id: link.user.id }, data: { lastSignInAt: new Date() } }), loginLinkEvent(link.user, "signed-in-by-link")]);
   await createSession(link.user.id);
-  redirect(homeFor(link.user.role));
+  // From the Angel Foundations course: back to the course (every login may use it).
+  // (Via the welcome page: the course itself is a whole page of its own, opened with a full page load.)
+  redirect(toCourse && link.user.role !== "SYSTEM" ? "/learn/welcome" : homeFor(link.user.role));
 }
 
 const NewPasswordSchema = z
