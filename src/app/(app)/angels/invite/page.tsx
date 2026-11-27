@@ -56,7 +56,7 @@ export default async function InviteAngelPage() {
                   <span className="min-w-0">
                     <span className="font-medium">{r.name}</span> <span className="break-all text-black/55">{r.email}</span>
                     <span className="block text-xs text-black/55">
-                      {r.link ? <>Via &ldquo;{r.link.label}&rdquo;</> : "From the Angel Foundations course"} · confirmed{" "}
+                      {r.link ? <>Via &ldquo;{r.link.label}&rdquo;</> : r.learnerId ? "From the Angel Foundations course" : "From the welcome page"} · confirmed{" "}
                       {r.confirmedAt ? formatDateTime(r.confirmedAt) : ""}
                     </span>
                     {r.angel ? (

@@ -116,6 +116,27 @@ export async function requestToJoin(
   const link = await loadJoinLink(token);
   if (!link) return { error: "This sign-up link doesn't work. Ask the DXV team for a new one." };
   if (link.state !== "open") return { error: LINK_STATE_MESSAGE[link.state] };
+  return submitJoinRequest(link, input, ip);
+}
+
+/**
+ * Someone asks to join from the public welcome page (Blue, 2026-11-27: "Already an angel
+ * investor?"): the same approve-first journey as a shareable link, without a link. They confirm
+ * their email, then a partner approves before they get an invite.
+ */
+export function requestToJoinFromWebsite(input: { name?: unknown; email?: unknown; formToken?: unknown; trap?: unknown }, ip: string | null) {
+  return submitJoinRequest(null, input, ip);
+}
+
+/** Where a directory record made from a website request came from. */
+export const WEBSITE_SOURCE = "DXV website request";
+
+async function submitJoinRequest(
+  link: { id: string } | null,
+  input: { name?: unknown; email?: unknown; formToken?: unknown; trap?: unknown },
+  ip: string | null,
+): Promise<{ ok: true } | { error: string }> {
+  const linkId = link?.id ?? null;
   const shownAt = joinFormTime(String(input.formToken ?? ""));
   if (input.trap || shownAt === null || !formTimingOk(shownAt, Date.now())) return { error: "Please wait a moment and try again." };
   const parsed = JoinSchema.safeParse({ name: input.name, email: input.email });
@@ -128,7 +149,8 @@ export async function requestToJoin(
   const [fromIpLastHour, fromEmailLastDay, viaLinkLastDay, user, angel, open] = await Promise.all([
     ipHash ? db.memberJoinRequest.count({ where: { ipHash, createdAt: { gte: new Date(now - HOUR) } } }) : 0,
     db.memberJoinRequest.count({ where: { email, createdAt: { gte: new Date(now - 24 * HOUR) } } }),
-    db.memberJoinRequest.count({ where: { linkId: link.id, createdAt: { gte: new Date(now - 24 * HOUR) } } }),
+    // Per link; website requests share one daily allowance.
+    db.memberJoinRequest.count({ where: { linkId, ...(linkId ? {} : { learnerId: null }), createdAt: { gte: new Date(now - 24 * HOUR) } } }),
     db.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
     db.angel.findFirst({
       where: { email: { equals: email, mode: "insensitive" }, erasedAt: null },
@@ -142,7 +164,7 @@ export async function requestToJoin(
   const origin = appOrigin()!;
   // Already has a login: send a sign-in email, nothing for partners to approve.
   if (user || angel?.user) {
-    await db.memberJoinRequest.create({ data: { linkId: link.id, name, email, status: "HAS_LOGIN", ipHash, angelId: angel?.id ?? null } });
+    await db.memberJoinRequest.create({ data: { linkId, name, email, status: "HAS_LOGIN", ipHash, angelId: angel?.id ?? null } });
     // Their directory record's login may use a different email (e.g. a partner's work address):
     // say so, partly hidden, so they don't try to sign in with this one. Sent only to this address.
     const loginEmail = !user && angel?.user && angel.user.email.toLowerCase() !== email ? maskEmail(angel.user.email) : null;
@@ -159,7 +181,7 @@ export async function requestToJoin(
     // An earlier unconfirmed request for this email is replaced (its confirm link stops working).
     db.memberJoinRequest.deleteMany({ where: { email, status: "UNCONFIRMED" } }),
     db.memberJoinRequest.create({
-      data: { linkId: link.id, name, email, ipHash, confirmTokenHash: tokenHash, confirmExpiresAt: new Date(now + JOIN_CONFIRM_HOURS * HOUR) },
+      data: { linkId, name, email, ipHash, confirmTokenHash: tokenHash, confirmExpiresAt: new Date(now + JOIN_CONFIRM_HOURS * HOUR) },
     }),
   ]);
   await sendMail({ to: email, ...joinConfirmEmail({ name, link: `${origin}/join/open/confirm/${confirmToken}`, hours: JOIN_CONFIRM_HOURS }) }).catch(() =>
@@ -180,10 +202,12 @@ export async function confirmJoinEmail(token: string): Promise<ConfirmOutcome> {
   const invalid = { outcome: "invalid" } as const;
   if (!isInviteTokenShape(token)) return invalid;
   const req = await db.memberJoinRequest.findUnique({ where: { confirmTokenHash: hashInviteToken(token) }, include: { link: true } });
-  if (!req || !req.link || req.status !== "UNCONFIRMED" || !req.confirmExpiresAt || req.confirmExpiresAt < new Date()) return invalid;
-  const link = req.link;
-  const used = await db.memberJoinRequest.count({ where: { linkId: req.linkId, status: { in: [...COUNTED] } } });
-  if (joinLinkState(link, used) !== "open") return invalid;
+  if (!req || req.status !== "UNCONFIRMED" || !req.confirmExpiresAt || req.confirmExpiresAt < new Date()) return invalid;
+  const link = req.link; // null: a request from the public welcome page (always approve-first)
+  if (link) {
+    const used = await db.memberJoinRequest.count({ where: { linkId: req.linkId, status: { in: [...COUNTED] } } });
+    if (joinLinkState(link, used) !== "open") return invalid;
+  }
   const angel = await db.angel.findFirst({
     where: { email: { equals: req.email, mode: "insensitive" }, erasedAt: null },
     select: { id: true, name: true, status: true, archivedAt: true, user: { select: { id: true } } },
@@ -195,11 +219,11 @@ export async function confirmJoinEmail(token: string): Promise<ConfirmOutcome> {
   });
   if (claimed.count !== 1) return invalid;
   const matched = angel ? `${angel.name} (${angel.status.toLowerCase()})` : null;
-  if (link.instant && !angel?.archivedAt && !angel?.user && (await complianceReady()).ready) {
+  if (link?.instant && !angel?.archivedAt && !angel?.user && (await complianceReady()).ready) {
     const admitted = await admitInstantly({ requestId: req.id, link, name: req.name, email: req.email, angel, matched });
     if (admitted) return { outcome: "setup", inviteToken: admitted.inviteToken };
   }
-  await notifyPartners({ name: req.name, email: req.email, label: link.label, matched });
+  await notifyPartners({ name: req.name, email: req.email, label: link?.label ?? WEBSITE_SOURCE, matched, website: !link });
   return { outcome: "confirmed" };
 }
 
@@ -331,7 +355,7 @@ export async function completeInstantProviderJoin(
   return { go: "/portal" };
 }
 
-export async function notifyPartners(r: { name: string; email: string; label: string; matched: string | null; course?: boolean }) {
+export async function notifyPartners(r: { name: string; email: string; label: string; matched: string | null; course?: boolean; website?: boolean }) {
   const origin = appOrigin();
   if (!origin || !mailConfigured()) return;
   const partners = await db.user.findMany({ where: { role: "ADMIN", disabledAt: null }, select: { email: true, name: true } });
@@ -368,7 +392,7 @@ export async function approveJoinRequest(requestId: string, admin: { id: string;
   const clash = await loginClash(req.email, "Partners use Angel View instead.", { allowLearner: true });
   if (clash) return { error: clash };
 
-  const via = req.link ? `link "${req.link.label}"` : "the Angel Foundations course";
+  const via = req.link ? `link "${req.link.label}"` : req.learnerId ? "the Angel Foundations course" : "the DXV website";
   const detail = `Approved sign-up request (${via})`;
   const angel =
     existing ??
@@ -377,7 +401,7 @@ export async function approveJoinRequest(requestId: string, admin: { id: string;
         name: req.name,
         email: req.email,
         status: "PROSPECT",
-        source: req.link ? `Sign-up link: ${req.link.label}` : COURSE_SOURCE,
+        source: req.link ? `Sign-up link: ${req.link.label}` : req.learnerId ? COURSE_SOURCE : WEBSITE_SOURCE,
         createdById: admin.id,
       },
       select: { id: true, name: true, status: true, archivedAt: true, user: { select: { id: true } } },

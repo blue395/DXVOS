@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import type { OAuthProvider } from "@/generated/prisma/enums";
 import type { ActionResult } from "@/lib/action-result";
 import { clientIp } from "@/lib/client-ip";
-import { confirmJoinEmail, loadJoinLink, LINK_STATE_MESSAGE, requestToJoin } from "@/lib/join-links";
+import { confirmJoinEmail, loadJoinLink, LINK_STATE_MESSAGE, requestToJoin, requestToJoinFromWebsite } from "@/lib/join-links";
 import { beginOAuth, enabledProviders, PROVIDER_LABEL } from "@/lib/oauth";
 
 export async function askToJoin(token: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -19,6 +19,16 @@ export async function askToJoin(token: string, _prev: ActionResult, formData: Fo
   );
   if ("error" in out) return { error: out.error };
   redirect(`/join/open/${encodeURIComponent(token)}?sent=1`);
+}
+
+/** From the welcome page ("Already an angel investor?"): the same approve-first request, without a link. */
+export async function askToJoinFromWebsite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const out = await requestToJoinFromWebsite(
+    { name: formData.get("name"), email: formData.get("email"), formToken: formData.get("formToken"), trap: formData.get("website") },
+    clientIp(await headers()),
+  );
+  if ("error" in out) return { error: out.error };
+  redirect("/join/request?sent=1");
 }
 
 export async function confirmMyEmail(token: string): Promise<ActionResult> {
