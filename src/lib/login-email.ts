@@ -149,10 +149,14 @@ export function joinRequestPartnerEmail(opts: {
   reviewUrl: string;
   /** From the Angel Foundations course (they ticked "contact me about joining"), not a link. */
   course?: boolean;
+  /** From the public welcome page ("Already an angel investor?"), not a link. */
+  website?: boolean;
 }) {
   const how = opts.course
     ? "said on the Angel Foundations course that they'd like to hear about joining DXV"
-    : `asked to join DXV through the link "${opts.label}"`;
+    : opts.website
+      ? "asked to join DXV from the welcome page, as an angel investor,"
+      : `asked to join DXV through the link "${opts.label}"`;
   return linkEmail({
     subject: `Join request: ${inert(opts.name)}`,
     name: opts.partnerName,

@@ -14,6 +14,7 @@ import {
   joinLinkToken,
   loadJoinLink,
   requestToJoin,
+  requestToJoinFromWebsite,
 } from "./join-links";
 
 const stamp = Date.now();
@@ -225,5 +226,27 @@ describe("instant links", () => {
     expect(await completeInstantProviderJoin(approve.id, id(mail("prov")), null)).toEqual({ problem: "link" });
     expect(await completeInstantProviderJoin(instant.id, id(`jp-${stamp}@example.test`), null)).toEqual({ problem: "team" });
     expect(await db.angel.count({ where: { email: mail("prov") } })).toBe(0);
+  });
+});
+
+describe("requests from the welcome page (no link)", () => {
+  it("confirm email, then a partner approves: a new Prospect from the website, never instant", async () => {
+    const email = mail("website");
+    expect(await requestToJoinFromWebsite({ name: "Website Synthetic", email, formToken: formToken() }, null)).toEqual({ ok: true });
+    const r = await db.memberJoinRequest.findFirstOrThrow({ where: { email } });
+    expect(r).toMatchObject({ status: "UNCONFIRMED", linkId: null, learnerId: null });
+    // The real confirm link is only in the email: confirm with a known token the same way.
+    const { token, tokenHash } = newInviteToken();
+    await db.memberJoinRequest.update({ where: { id: r.id }, data: { confirmTokenHash: tokenHash } });
+    expect(await confirmJoinEmail(token)).toEqual({ outcome: "confirmed" });
+    const out = await approveJoinRequest(r.id, admin);
+    expect("error" in out).toBe(false);
+    expect(await db.angel.findFirstOrThrow({ where: { email } })).toMatchObject({ status: "PROSPECT", source: "DXV website request" });
+  });
+
+  it("refuses bots, and an email with a login just gets a sign-in email", async () => {
+    expect("error" in (await requestToJoinFromWebsite({ name: "Bot", email: mail("webbot"), formToken: issueJoinFormToken() }, null))).toBe(true);
+    expect(await requestToJoinFromWebsite({ name: "Partner", email: `jp-${stamp}@example.test`, formToken: formToken() }, null)).toEqual({ ok: true });
+    expect((await db.memberJoinRequest.findFirstOrThrow({ where: { email: `jp-${stamp}@example.test` } })).status).toBe("HAS_LOGIN");
   });
 });

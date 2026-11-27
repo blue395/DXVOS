@@ -28,3 +28,10 @@ The course has its own short notice at `/learn/privacy` (wording in `src/content
 2. The FCA wording shown under "What this means" (approve the statements under Angels > Statements and terms; the 2024 changes to the high net worth criteria).
 3. The consent wording in `src/content/course.ts` (a change means a new version string).
 4. Google Fonts on the course page (above).
+
+## Welcome page (Blue, 2026-11-27)
+DXV OS's address now opens a public welcome page (`/welcome`, wording in `src/content/welcome.ts`) for anyone not signed in, with two routes:
+- **"Already an angel investor?"** goes to `/join/request`: name and email only, the same approve-first journey as a shareable sign-up link (confirm email, then a partner approves before any invite; requests that never become members are deleted after 90 days). New records show the source "DXV website request".
+- **"Curious about angel investing?"** goes to the course sign-up above.
+
+For Kevin: the page describes DXV in general terms only (no companies, figures or returns), shows the approved investor statement criteria word for word, and carries a risk warning. Please check it against the Financial Promotion Order.

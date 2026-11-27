@@ -7,7 +7,10 @@ import { SESSION_COOKIE } from "@/lib/session-cookie";
 export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has(SESSION_COOKIE);
   if (!hasSession) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // The main address is the public welcome page for visitors (Blue, 2026-11-27): it routes
+    // angel investors and learners. Everything else that needs a login goes to /login.
+    const to = request.nextUrl.pathname === "/" ? "/welcome" : "/login";
+    return NextResponse.redirect(new URL(to, request.url));
   }
   return NextResponse.next();
 }
@@ -17,11 +20,11 @@ export const config = {
   // check), the Google/Microsoft sign-in callback (/api/auth: its signed state cookie is
   // the check), unsubscribe links (a signed token naming one angel), the founder application
   // (/apply, public by design) and its dev-only deck upload, the privacy notice and member terms
-  // (/privacy, /terms: public legal pages), the Angel Foundations course (/learn and its progress
+  // (/privacy, /terms: public legal pages), the public welcome page (/welcome), the Angel Foundations course (/learn and its progress
   // API: open to anyone who signs up; every page and the API check the session themselves), scheduled jobs (/api/cron: a
   // signed token is the check), Next internals, static files, and Netlify's own function endpoints (the
   // workers authenticate their calls themselves).
   matcher: [
-    "/((?!login|join|apply|privacy|terms|learn|api/learn/|unsubscribe/|api/auth/|api/unsubscribe/|api/cron/|api/dev/deck-upload/|_next/static|_next/image|favicon.ico|\\.netlify).*)",
+    "/((?!login|join|apply|privacy|terms|welcome|learn|api/learn/|unsubscribe/|api/auth/|api/unsubscribe/|api/cron/|api/dev/deck-upload/|_next/static|_next/image|favicon.ico|\\.netlify).*)",
   ],
 };
